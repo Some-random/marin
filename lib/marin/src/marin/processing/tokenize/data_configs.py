@@ -394,4 +394,4 @@ def _verify_tokenizers_same(components: dict[str, TokenizerStep | TokenizeConfig
                     f"Tokenizers ({name}) and {tokenizer} ({first_name}) have equivalent vocabularies but are not the"
                     " same tokenizer. This may cause issues with training."
                 )
-    return tokenizer
+    return unwrap_versioned_value(tokenizer)
