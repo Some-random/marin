@@ -57,6 +57,7 @@ class DataEfficiencyConfig:
     teacher_data_weights: dict[str, float] | None = None
 
     block_cross_document_attention: bool = True
+    use_default_validation: bool = True
 
     ### Trainer config
     base_train_steps: int = 1024
@@ -72,6 +73,8 @@ class DataEfficiencyConfig:
     ### Hardware
     tpu_type: str = "v4-128"
     slice_count: int = 1
+    gpu_type: str | None = None
+    gpu_count: int | None = None
     per_device_parallelism: int = -1
 
     ### Optimizer config
@@ -209,7 +212,7 @@ class DataEfficiencyConfig:
             block_cross_document_attention=self.block_cross_document_attention,
         )
 
-        prepared_data_config = _prepare_data_config(data_config, use_default_validation=True)
+        prepared_data_config = _prepare_data_config(data_config, use_default_validation=self.use_default_validation)
 
         if validation_only_components:
             prepared_data_config = add_validation_sets_to_mixture(prepared_data_config, validation_only_components)
@@ -280,6 +283,8 @@ class DataEfficiencyConfig:
         return LmEvalHarnessConfig(task_spec=convert_to_levanter_task_config(self.eval_harness_tasks))
 
     def build_resource_config(self) -> ResourceConfig:
+        if self.gpu_type is not None:
+            return ResourceConfig.with_gpu(self.gpu_type, count=self.gpu_count or 1)
         return ResourceConfig.with_tpu(self.tpu_type, slice_count=self.slice_count)
 
     def build_train_lm_config(self) -> TrainLmConfig:
