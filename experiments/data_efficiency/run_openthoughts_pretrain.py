@@ -2,8 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-1.4B model, 655M tokens from DCLM (1 shard), 8 epochs, WD=3.2.
-Proper validation on held-out dclm_200m_val.
+Pretrain 1.4B on flattened OpenThoughts reasoning data, eval on dclm_val.
+
+Data: 795M tokens of OpenThoughts-114k (math/code/science CoT traces)
+Training: 8 epochs of 200M tokens = 6400 steps
+Eval: dclm_200m_val (held-out web text)
+
+Compare against baseline: 1.4B on dclm_200m, 8 epochs, val loss 3.413
 """
 
 import os
@@ -22,26 +27,23 @@ from levanter.trainer import TrainerConfig
 
 from experiments.data_efficiency.models import model_dict
 
-# 655M tokens from 1 completed DCLM shard (479K docs)
-TRAIN_PATH = "/fsx/users/dongweij/marin/outputs/tokenized/dclm_shard73"
-# Held-out validation set (separate from training data)
-VAL_PATH = "/fsx/users/dongweij/marin/outputs/tokenized/data_efficiency/dclm_200m_val-415aea"
+OPENTHOUGHTS = "/fsx/users/dongweij/marin/outputs/tokenized/openthoughts_flat"
+DCLM_VAL = "/fsx/users/dongweij/marin/outputs/tokenized/data_efficiency/dclm_200m_val-415aea"
 
 model_config = model_dict["1_4b4k"]
 
 data_config = LmDataConfig(
     components={
-        "dclm_train": DatasetComponent(cache_dir=TRAIN_PATH),
-        "dclm_val": DatasetComponent(cache_dir=VAL_PATH),
+        "openthoughts": DatasetComponent(cache_dir=OPENTHOUGHTS),
+        "dclm_val": DatasetComponent(cache_dir=DCLM_VAL),
     },
-    train_weights={"dclm_train": 1.0, "dclm_val": 0.0},
+    train_weights={"openthoughts": 1.0, "dclm_val": 0.0},
     tokenizer="meta-llama/Meta-Llama-3.1-8B",
     shuffle=True,
     block_cross_document_attention=True,
     shuffle_before_trainval_split=False,
 )
 
-# 800 base_steps * 8 epochs = 6400 total steps
 train_config = TrainLmConfig(
     data=data_config,
     trainer=TrainerConfig(
@@ -49,7 +51,7 @@ train_config = TrainLmConfig(
         tracker=WandbConfig(
             project="dongwei-data-efficiency",
             entity="dongwei_jiang",
-            tags=["data-efficiency", "dclm-655M", "1.4b", "8-epoch", "regularized"],
+            tags=["reasoning-exp", "openthoughts-pretrain", "1.4b", "8-epoch"],
         ),
         mp=jmp.get_policy("p=f32,c=bfloat16"),
         train_batch_size=64,
