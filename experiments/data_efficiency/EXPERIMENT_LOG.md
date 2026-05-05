@@ -170,5 +170,45 @@ PIQA test split returns label=-1 for all examples. Must use validation split for
 | C (OT→DCLM) | — | 30.9% | 28.6% |
 | D (DCLM→OT) | — | 34.1% | 32.1% |
 
-### Conclusion
+### Conclusion (OpenThoughts)
 At 200M token data budget with models 300M–1.4B, pretraining on reasoning data (OpenThoughts CoT traces) provides NO benefit over standard web text (DCLM) on any metric — perplexity, ARC, PIQA, SciQ, HellaSwag, WinoGrande, or MMLU. The reasoning data actively hurts performance. This holds regardless of curriculum order (reasoning first or web first).
+
+---
+
+## May 4–5: Procedural Knowledge Experiments (300M)
+
+### Motivation
+Based on "Procedural Knowledge in Pretraining Drives Reasoning" (Ruis et al., arxiv:2411.12580):
+- Models learn reasoning from **code and math that demonstrates procedures**, not from explicit CoT traces
+- Code on StackExchange is 10x overrepresented in influential documents for reasoning
+- The same procedural documents help across different reasoning questions of the same type
+
+This explains why OpenThoughts (explicit CoT) failed — it's the wrong type of reasoning data. We should test procedural knowledge sources: code and math web pages.
+
+### Data
+- **DCLM 200M**: 164K web documents, ~200M tokens (baseline)
+- **Code Procedural 218M**: ~218M tokens of Python, JavaScript, C, C++ code from The Stack
+- **OpenWebMath 219M**: ~219M tokens of math web pages with formulas and procedures
+- **OpenThoughts filtered 170M**: ~170M tokens of CoT traces (for comparison)
+
+### Runs (300M, all with LR=3e-3, WD=3.2, 6400 steps)
+
+| Run | Data | ARC Easy | PIQA | SciQ | dclm_val |
+|---|---|---|---|---|---|
+| Baseline | DCLM 200M | 39.6% | 60.3% | 63.2% | 3.797 |
+| Code only | Code 218M (Python/JS/C/C++) | 26.1% | 49.4% | 49.4% | 5.947 |
+| **OpenWebMath only** | OWM 219M (math web pages) | 34.9% | 48.9% | **73.2%** | 4.304 |
+| OpenThoughts only | OT 170M (CoT traces) | — | — | — | 6.187 |
+
+### Key Findings (Procedural Knowledge)
+1. **OpenWebMath beats DCLM on SciQ**: 73.2% vs 63.2% — first reasoning data to beat baseline on ANY benchmark
+2. **Code alone doesn't help**: Hurts all benchmarks (ARC Easy 26.1%, PIQA 49.4%, SciQ 49.4%)
+3. **OpenThoughts confirmed bad**: Worst dclm_val loss (6.187), no benchmark improvements
+4. **Procedural knowledge hypothesis validated**: Math web pages (which show HOW to solve problems) help more than explicit reasoning traces (which show step-by-step solutions)
+5. **Sequential curriculum still fails**: When we tried OWM→DCLM sequentially, the model forgot the SciQ gains
+
+### Open Questions
+1. **Simultaneous mixing untested**: 80% DCLM + 20% OpenWebMath mixed during training — might preserve both web text quality AND SciQ gains
+2. **600M with correct LR**: 600M v2 runs crashed, need restart with LR=1e-3
+3. **Code + DCLM mixing**: 80% DCLM + 20% Code — code alone fails but mixed might help
+4. **Causal bridges**: The cross-document bridge idea from `half-baked-idea.txt` — still unexplored
