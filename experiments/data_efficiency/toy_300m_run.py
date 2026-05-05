@@ -9,7 +9,14 @@
 import os
 from datetime import timedelta
 
-os.environ.setdefault("WANDB_API_KEY", "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")
+# Load secrets from .secrets file
+from pathlib import Path
+_secrets = Path(__file__).resolve().parents[2] / ".secrets"
+if _secrets.exists():
+    for line in _secrets.read_text().splitlines():
+        if "=" in line and not line.startswith("#"):
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k, v)
 
 import jmp
 from levanter.checkpoint import CheckpointerConfig
