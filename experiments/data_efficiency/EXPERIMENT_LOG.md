@@ -37,7 +37,7 @@ Does mixing reasoning data (OpenThoughts-114k) with web data (DCLM) during pretr
 
 | Run | Description | Phase 1 | Phase 2 | Steps | dclm_val | ARC-C | HellaSwag | WinoGrande | MMLU |
 |-----|-------------|---------|---------|-------|----------|-------|-----------|------------|------|
-| A (baseline) | DCLM only | DCLM 6400 steps | — | 6400 | **3.797** | — | — | — | — |
+| A (baseline) | DCLM only | DCLM 6400 steps | — | 6400 | **3.797** | 0.175 | 0.274 | 0.504 | — |
 | B | OT only | OT 6400 steps | — | 6400 | **6.187** | 0.226 | 0.267 | 0.500 | 0.259 |
 | C | OT→DCLM | OT 3200 steps | DCLM 3200 steps | 6400 | **5.051** | 0.218 | 0.266 | 0.507 | 0.253 |
 | D | DCLM→OT | DCLM 3200 steps | OT 3200 steps | 6400 | **3.906** | 0.214 | 0.272 | 0.505 | 0.269 |
@@ -64,10 +64,10 @@ Same as 300M experiments but at 600M scale — does larger model show clearer si
 
 | Run | Description | Phase 1 | Phase 2 | Steps | dclm_val | ARC-C | HellaSwag | WinoGrande | MMLU |
 |-----|-------------|---------|---------|-------|----------|-------|-----------|------------|------|
-| A (baseline) | DCLM only | DCLM 6400 steps | — | 6400 | (running) | — | — | — | — |
+| A (baseline) | DCLM only | DCLM 6400 steps | — | 6400 | **3.789** | 0.170 | 0.264 | 0.487 | — |
 | B | OT only | OT 6400 steps | — | 6400 | **6.151** | 0.225 | 0.275 | 0.500 | 0.263 |
-| C | OT→DCLM | OT 3200 steps | DCLM 3200 steps | 6400 | **5.668** | 0.231 | 0.266 | 0.504 | 0.258 |
-| D | DCLM→OT | DCLM 3200 steps | OT 3200 steps | 6400 | **4.074** | 0.221 | 0.260 | 0.503 | 0.252 |
+| C | OT→DCLM | OT 3200 steps | DCLM 3200 steps | 6400 | **5.668** | 0.172 | 0.261 | 0.509 | 0.258 |
+| D | DCLM→OT | DCLM 3200 steps | OT 3200 steps | 6400 | **4.074** | 0.177 | 0.262 | 0.493 | 0.252 |
 
 ### Key Findings (600M)
 - Same pattern as 300M — reasoning data hurts DCLM perplexity, order matters (DCLM first is better)
@@ -106,7 +106,9 @@ The paper evaluates on easier benchmarks than what we initially used. Results on
 | Model | ARC Easy | PIQA | SciQ |
 |---|---|---|---|
 | Paper 300M (16ep, WD=1.6) | **43.8%** | **62.5%** | **72.1%** |
-| Our 300M (8ep, WD=0.1) | 39.6% | 60.3% | 63.2% |
+| Our 300M A (DCLM baseline) | 39.6% | 60.3% | 63.2% |
+| Our 300M C (OT→DCLM) | 32.1% | 54.5% | 50.3% |
+| Our 300M D (DCLM→OT) | 37.5% | 57.6% | 58.8% |
 | Random | 25% | 50% | 25% |
 
 **600M models (our experiments):**
@@ -140,10 +142,10 @@ PIQA test split returns label=-1 for all examples. Must use validation split for
 
 | Run | Description | dclm_val | ARC Easy | PIQA | SciQ | ARC-C | HellaSwag | WinoGrande | MMLU |
 |-----|-------------|----------|----------|------|------|-------|-----------|------------|------|
-| A (baseline, from earlier) | DCLM 200M, 8ep | **3.413** | — | — | — | — | — | — | — |
-| B | OT only, 6400 steps | 6.211 | 31.3% | 53.6% | 51.5% | 21.9% | 27.0% | 51.5% | 25.5% |
-| C | OT→DCLM (3200+3200) | 5.935 | 28.6% | 54.5% | 42.4% | 23.4% | 26.6% | 50.3% | 25.7% |
-| D | DCLM→OT (3200+3200) | 4.331 | 32.1% | 57.1% | 44.9% | 22.4% | 26.7% | 50.6% | 26.5% |
+| A (baseline, from earlier) | DCLM 200M, 8ep | **3.413** | — (not eval'd) | — | — | — | 28.3% | 50.0% | 23.2% |
+| B | OT only, 6400 steps | 6.211 | 31.3% | 53.6% | 51.5% | 18.8% | 26.2% | 49.9% | 23.0% |
+| C | OT→DCLM (3200+3200) | 5.935 | 28.6% | 54.5% | 42.4% | 17.0% | 26.3% | 49.4% | 23.1% |
+| D | DCLM→OT (3200+3200) | 4.331 | 32.1% | 57.1% | 44.9% | 17.4% | 26.0% | 50.0% | 23.4% |
 
 ### Key Findings (1.4B)
 - Same pattern as 300M/600M — reasoning data hurts both DCLM perplexity AND downstream benchmarks
@@ -165,10 +167,10 @@ PIQA test split returns label=-1 for all examples. Must use validation split for
 **ARC Easy:**
 | Run | 300M | 600M | 1.4B |
 |-----|------|------|------|
-| A (DCLM baseline) | 39.6% | 37.3% | — |
-| B (OT only) | — | — | 31.3% |
-| C (OT→DCLM) | — | 30.9% | 28.6% |
-| D (DCLM→OT) | — | 34.1% | 32.1% |
+| A (DCLM baseline) | 39.6% | 37.3% | — (not eval'd) |
+| B (OT only) | — (not eval'd) | — (not eval'd) | 31.3% |
+| C (OT→DCLM) | 32.1% | 30.9% | 28.6% |
+| D (DCLM→OT) | 37.5% | 34.1% | 32.1% |
 
 ### Conclusion (OpenThoughts)
 At 200M token data budget with models 300M–1.4B, pretraining on reasoning data (OpenThoughts CoT traces) provides NO benefit over standard web text (DCLM) on any metric — perplexity, ARC, PIQA, SciQ, HellaSwag, WinoGrande, or MMLU. The reasoning data actively hurts performance. This holds regardless of curriculum order (reasoning first or web first).
@@ -198,7 +200,7 @@ This explains why OpenThoughts (explicit CoT) failed — it's the wrong type of 
 | Baseline | DCLM 200M | 39.6% | 60.3% | 63.2% | 3.797 |
 | Code only | Code 218M (Python/JS/C/C++) | 26.1% | 49.4% | 49.4% | 5.947 |
 | **OpenWebMath only** | OWM 219M (math web pages) | 34.9% | 48.9% | **73.2%** | 4.304 |
-| OpenThoughts only | OT 170M (CoT traces) | — | — | — | 6.187 |
+| OpenThoughts only | OT 170M (CoT traces) | — (not eval'd on easy benchmarks) | — | — | 6.187 |
 
 ### Key Findings (Procedural Knowledge)
 1. **OpenWebMath beats DCLM on SciQ**: 73.2% vs 63.2% — first reasoning data to beat baseline on ANY benchmark
@@ -212,3 +214,71 @@ This explains why OpenThoughts (explicit CoT) failed — it's the wrong type of 
 2. **600M with correct LR**: 600M v2 runs crashed, need restart with LR=1e-3
 3. **Code + DCLM mixing**: 80% DCLM + 20% Code — code alone fails but mixed might help
 4. **Causal bridges**: The cross-document bridge idea from `half-baked-idea.txt` — still unexplored
+
+---
+
+## May 5–6: Mixed DCLM+OWM Run & Research Hypotheses
+
+### Mixed Run: 80% DCLM + 20% OpenWebMath (300M)
+
+This is an **off-ramp exploration** from the original staged curriculum hypothesis. The original idea was that reasoning-style data (first OpenThoughts, then OpenWebMath) should be staged sequentially — reasoning first, then web data, or vice versa. Sequential curriculum failed in both directions:
+- OWM→DCLM: model forgets SciQ gains
+- DCLM→OWM: model forgets language/world knowledge
+
+Simultaneous mixing is a fallback to see if we can get OWM's SciQ benefit without losing DCLM's general capabilities.
+
+**Run config:** 300M, LR=3e-3, WD=3.2, 6400 steps, 80% DCLM + 20% OWM mixed throughout training.
+
+| Metric | Mixed 80/20 | DCLM baseline | OWM only |
+|---|---|---|---|
+| dclm_val | **3.687** | 3.797 | 4.304 |
+| ARC Easy | 38.2% | 39.6% | 34.9% |
+| PIQA | 58.0% | 60.3% | 48.9% |
+| SciQ | **64.5%** | 63.2% | **73.2%** |
+| ARC-C | 17.7% | 17.5% | — |
+| HellaSwag | 26.6% | 27.4% | — |
+| WinoGrande | 52.1% | 50.4% | — |
+
+**Analysis:** The mixed run slightly improves SciQ over DCLM baseline (64.5% vs 63.2%) but ARC Easy and PIQA are flat or slightly down. This supports **H3 (domain-specific knowledge)**: OWM's benefit is concentrated on science benchmarks, not a general reasoning improvement. The dclm_val improvement (3.687 vs 3.797) suggests the model benefits from data diversity for perplexity, but this doesn't translate to broad benchmark gains.
+
+### Research Hypotheses
+
+We now have a clear empirical pattern: OpenWebMath trains a model that excels at SciQ (73.2% vs 63.2% DCLM baseline) but hurts ARC Easy (34.9% vs 39.6%) and PIQA (48.9% vs 60.3%). Sequential curriculum in either direction loses one set of gains. Three hypotheses explain different aspects of this pattern.
+
+#### H1: Model needs language/world knowledge first before reasoning data is useful
+
+The idea: a model that already understands language and the world can extract more value from procedural math content than a model learning both from scratch.
+
+- **Prediction for DCLM→OWM:** SciQ > 73.2% (language foundation makes reasoning data more useful)
+- **Prediction:** ARC Easy/PIQA stay decent (world knowledge partially survives from DCLM phase)
+- **How to test:** Vary DCLM phase length before switching to OWM. Run 1600/3200/4800 steps of DCLM, then OWM for the remaining steps (4800/3200/1600). If more DCLM first leads to better SciQ, that supports H1.
+
+#### H2: Catastrophic forgetting — later data overwrites earlier
+
+The idea: whatever the model learns last dominates. Earlier training is largely wasted because the model overwrites those representations.
+
+- **Prediction for DCLM→OWM:** SciQ ≈ 73.2% (same as OWM-only; the DCLM phase is wasted)
+- **Prediction:** ARC Easy/PIQA drop to OWM-only levels (~34.9% and ~48.9%)
+- **How to test:** Run DCLM→OWM with DCLM replay during phase 2 (10% DCLM + 90% OWM in the second phase). If replay mitigates forgetting (ARC Easy/PIQA stay higher), that confirms H2 as the mechanism.
+- **Note:** H1 and H2 can both be true simultaneously — the model may need prior knowledge AND suffer from forgetting.
+
+#### H3: OWM teaches domain-specific science knowledge, not general reasoning
+
+The idea: OWM's SciQ improvement comes from memorizing science facts and math procedures, not from learning transferable reasoning skills.
+
+- **Prediction for mixed run:** SciQ improves but ARC Easy/PIQA stay flat (science knowledge helps science benchmarks only)
+- **How to test:** Evaluate OWM-trained models on reasoning benchmarks outside math/science domains. If OWM only helps science-related tasks, it is domain knowledge transfer, not general reasoning improvement.
+
+### Discriminating Experiments
+
+These experiments produce different predictions under each hypothesis, allowing us to distinguish between them:
+
+| Experiment | H1 predicts | H2 predicts | H3 predicts |
+|---|---|---|---|
+| DCLM→OWM (3200+3200) | SciQ > 73.2% | SciQ ≈ 73.2% | SciQ ≈ 73.2% |
+| DCLM→OWM varying lengths | More DCLM → better SciQ | SciQ always ≈ 73.2% | — |
+| Mixed run (80/20) | SciQ + ARC + PIQA all improve | — | SciQ up, ARC/PIQA flat |
+| OWM + DCLM replay in phase 2 | — | Forgetting mitigated | — |
+| OWM model on non-science reasoning | — | — | No improvement (domain-specific) |
+
+The mixed run (80% DCLM + 20% OWM) is already complete and benchmark results will directly test H1 vs H3: if all three benchmarks improve, that favors H1 (general synergy); if only SciQ improves, that favors H3 (domain-specific knowledge).
