@@ -9,11 +9,11 @@ Replicate "Pre-training Under Infinite Compute" paper results on local 8x A100-4
 
 | Run | Model | Data | Tokens | Epochs | WD | LR | Steps | Time | dclm_val | Notes |
 |-----|-------|------|--------|--------|-----|-----|-------|------|----------|-------|
-| 300M baseline | 300m4k | dclm_200m | 200M | 8 | 0.1 | 1e-3 | 6400 | ~1.5h | **3.797** | Paper gets 3.785. Match. |
-| 1.4B regularized (dclm_200m) | 1_4b4k | dclm_200m | 200M | 8 | 3.2 | 1e-3 | 6400 | ~3.5h (TE) | **3.413** | Paper single-model best: 3.462. We beat it slightly — likely dclm_200m is a curated subset. |
-| 1.4B (dclm_shard73) | 1_4b4k | dclm shard73 | 655M | ~2.6 | 3.2 | 1e-3 | 6400 | ~4.5h (TE) | **3.309** | More unique tokens → less repetition → lower val loss. |
-| 8B (dclm_200m) | l8b | dclm_200m | 200M | 1 | 0.1 | 3e-3 | 6104 | ~5h | **6.897** | 8B on 200M tokens is massively undertrained. |
-| 1.4B OpenThoughts (unfiltered) | 1_4b4k | openthoughts_flat | 795M | ~2.1 | 3.2 | 1e-3 | 6400 | ~4.7h (TE) | **5.647** | Pure reasoning data → bad at web text. Expected. |
+| 300M baseline | 300M (seq_len=4k) | dclm_200m | 200M | 8 | 0.1 | 1e-3 | 6400 | ~1.5h | **3.797** | Paper gets 3.785. Match. |
+| 1.4B regularized (dclm_200m) | 1.4B (seq_len=4k) | dclm_200m | 200M | 8 | 3.2 | 1e-3 | 6400 | ~3.5h (TE) | **3.413** | Paper single-model best: 3.462. We beat it slightly — likely dclm_200m is a curated subset. |
+| 1.4B (dclm_shard73) | 1.4B (seq_len=4k) | dclm shard73 | 655M | ~2.6 | 3.2 | 1e-3 | 6400 | ~4.5h (TE) | **3.309** | More unique tokens → less repetition → lower val loss. |
+| 8B (dclm_200m) | 8B | dclm_200m | 200M | 1 | 0.1 | 3e-3 | 6104 | ~5h | **6.897** | 8B on 200M tokens is massively undertrained. |
+| 1.4B OpenThoughts (unfiltered) | 1.4B (seq_len=4k) | openthoughts_flat | 795M | ~2.1 | 3.2 | 1e-3 | 6400 | ~4.7h (TE) | **5.647** | Pure reasoning data → bad at web text. Expected. |
 
 ### Key Findings (Pre-May 2)
 - Successfully replicated paper's single-model results within 0.05 nats
@@ -24,7 +24,7 @@ Replicate "Pre-training Under Infinite Compute" paper results on local 8x A100-4
 
 ---
 
-## May 1–2: Reasoning Data Curriculum Experiments (300M)
+## May 1: Reasoning Data Curriculum Experiments (300M)
 
 ### Hypothesis
 Does mixing reasoning data (OpenThoughts-114k) with web data (DCLM) during pretraining improve perplexity or reasoning benchmarks?
@@ -55,7 +55,9 @@ Key observation: Models produce fluent-looking but factually wrong text. Model D
 
 ---
 
-## May 2–3: Reasoning Data Curriculum Experiments (600M)
+## May 2: Reasoning Data Curriculum Experiments (600M)
+
+**NOTE:** These 600M runs used LR=3e-3 (same as 300M), but the paper specifies LR=1e-3 for 600M. This was fixed in commit `0aa2c60a6` but the runs below have NOT been re-run with the correct LR. Results may be slightly off.
 
 ### Hypothesis
 Same as 300M experiments but at 600M scale — does larger model show clearer signal from reasoning data?
@@ -76,7 +78,7 @@ Same as 300M experiments but at 600M scale — does larger model show clearer si
 
 ---
 
-## Open Questions / Next Steps
+### Open Questions / Next Steps
 
 1. **Need DCLM-only baselines with eval harness** for both 300M and 600M to compare properly
 2. **Paper's benchmarks are easier** (arc_easy, piqa, sciq) than what we used (arc_challenge, hellaswag, winogrande, mmlu). Paper's 300M model gets 44% arc_easy. Should switch to their benchmarks.
@@ -87,7 +89,7 @@ Same as 300M experiments but at 600M scale — does larger model show clearer si
 
 ---
 
-## Infrastructure Notes
+### Infrastructure Notes
 
 - **Transformer Engine 2.13**: Required 3 changes to Levanter attention.py (global mesh resource, AttnSoftmaxType, keyword args for fused_attn). ~30% speedup (2.5s → 1.8s/step for 1.4B).
 - **Tokenization**: Full DCLM tokenization infeasible (~60 days estimated). Got 8 usable shards (~36B tokens).
@@ -96,7 +98,7 @@ Same as 300M experiments but at 600M scale — does larger model show clearer si
 
 ---
 
-## May 3: Eval Consolidation & Reference Models
+## May 3: Eval Consolidation, Reference Models & 1.4B Experiments
 
 ### Paper's Benchmarks (arc_easy, piqa, sciq)
 The paper evaluates on easier benchmarks than what we initially used. Results on these:
@@ -134,27 +136,25 @@ Massive gap between our 300M-600M models (200M tokens) and properly trained 1B m
 ### Key Finding: PIQA Test Split Has No Labels
 PIQA test split returns label=-1 for all examples. Must use validation split for per-example eval. The lm-eval-harness handles this correctly but our manual eval script initially didn't.
 
----
+### 1.4B Reasoning Experiments (completed ~4:02 AM PST May 4)
 
-## May 3–4: 1.4B Reasoning Experiments (completed ~4:02 AM PST May 4)
-
-### Runs (1.4B)
+#### Runs (1.4B)
 
 | Run | Description | dclm_val | ARC Easy | PIQA | SciQ | ARC-C | HellaSwag | WinoGrande | MMLU |
 |-----|-------------|----------|----------|------|------|-------|-----------|------------|------|
-| A (baseline, from earlier) | DCLM 200M, 8ep | **3.413** | — (not eval'd) | — | — | — | 28.3% | 50.0% | 23.2% |
+| A (baseline, from earlier) | DCLM 200M, 8ep | **3.413** | 43.6% | 62.6% | 71.7% | 18.5% | 28.3% | 50.0% | 23.2% |
 | B | OT only, 6400 steps | 6.211 | 31.3% | 53.6% | 51.5% | 18.8% | 26.2% | 49.9% | 23.0% |
 | C | OT→DCLM (3200+3200) | 5.935 | 28.6% | 54.5% | 42.4% | 17.0% | 26.3% | 49.4% | 23.1% |
 | D | DCLM→OT (3200+3200) | 4.331 | 32.1% | 57.1% | 44.9% | 17.4% | 26.0% | 50.0% | 23.4% |
 
-### Key Findings (1.4B)
+#### Key Findings (1.4B)
 - Same pattern as 300M/600M — reasoning data hurts both DCLM perplexity AND downstream benchmarks
 - Run D (DCLM→OT) best among reasoning runs but still worse than DCLM baseline on all metrics
 - 1.4B model shows same U-shape in dclm_val during OT-only training: drops, recovers, plateaus
 - dclm_val trajectory for Run B: 12.3 → 7.8 → 9.5 → 6.5 → 6.2 (interesting overfitting then recovery)
 - No model size from 300M to 1.4B shows benefit from OpenThoughts reasoning data on any benchmark
 
-### Cross-Scale Summary (all models, same experiment design)
+#### Cross-Scale Summary (all models, same experiment design)
 
 **dclm_val loss:**
 | Run | 300M | 600M | 1.4B |
@@ -167,17 +167,17 @@ PIQA test split returns label=-1 for all examples. Must use validation split for
 **ARC Easy:**
 | Run | 300M | 600M | 1.4B |
 |-----|------|------|------|
-| A (DCLM baseline) | 39.6% | 37.3% | — (not eval'd) |
+| A (DCLM baseline) | 39.6% | 37.3% | 43.6% |
 | B (OT only) | — (not eval'd) | — (not eval'd) | 31.3% |
 | C (OT→DCLM) | 32.1% | 30.9% | 28.6% |
 | D (DCLM→OT) | 37.5% | 34.1% | 32.1% |
 
-### Conclusion (OpenThoughts)
+#### Conclusion (OpenThoughts)
 At 200M token data budget with models 300M–1.4B, pretraining on reasoning data (OpenThoughts CoT traces) provides NO benefit over standard web text (DCLM) on any metric — perplexity, ARC, PIQA, SciQ, HellaSwag, WinoGrande, or MMLU. The reasoning data actively hurts performance. This holds regardless of curriculum order (reasoning first or web first).
 
 ---
 
-## May 4–5: Procedural Knowledge Experiments (300M)
+## May 4: Procedural Knowledge Experiments (300M)
 
 ### Motivation
 Based on "Procedural Knowledge in Pretraining Drives Reasoning" (Ruis et al., arxiv:2411.12580):
@@ -217,7 +217,7 @@ This explains why OpenThoughts (explicit CoT) failed — it's the wrong type of 
 
 ---
 
-## May 5–6: Mixed DCLM+OWM Run & Research Hypotheses
+## May 5: Mixed DCLM+OWM Run & Research Hypotheses
 
 ### Mixed Run: 80% DCLM + 20% OpenWebMath (300M)
 
