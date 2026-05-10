@@ -423,3 +423,36 @@ DCLM val: Treatment 1.198 BPB (3.705 loss) vs Control 1.191 BPB (3.686 loss)
 | Macro avg delta | -1.3% | +0.7% |
 
 The improved design (continuous LR, better treatment data, disjoint data) eliminated the macro avg deficit but still shows no clear benefit from reasoning data injection.
+
+---
+
+## Research Direction: Revised Hypotheses (Post-May 10)
+
+The original H1/H2/H3 hypotheses (May 5) have been refined based on accumulated experimental evidence across all runs (300M–1.4B, multiple data types and curriculum designs).
+
+### H1: What Makes Reasoning Data Good for Pretraining?
+
+**The problem:** Not all "reasoning data" is equal. OpenThoughts (long exploratory CoT traces) consistently hurts performance across all scales and curriculum orderings. OpenWebMath shows a SciQ gain (73.2% vs 63.2% baseline) but this saturates with enough general pretraining and does not transfer beyond science domains — consistent with domain knowledge transfer rather than general reasoning capability. Code alone hurts all benchmarks.
+
+**The constraint:** Good reasoning data must teach something that (a) transfers beyond the domain it was trained on, and (b) is not confounded with domain familiarity — i.e., the gain should not disappear when the model sees enough general web text.
+
+**What we know from the literature:**
+- Content-free synthetic tasks (Percy's work, arxiv 2206.10139; Procedural Pretraining, arxiv 2601.21725) can close ~65% of the gap to natural pretraining, suggesting structural patterns matter even without semantic content
+- Procedural knowledge — data demonstrating how to derive something step by step — is 10x overrepresented in influential pretraining documents for reasoning (Ruis et al., arxiv 2411.12580)
+- OpenThoughts fails because its exploratory back-and-forth CoT is the wrong structure for a model starting from scratch with no world knowledge to anchor on
+
+**What we don't know:** Whether real language data with explicit causal structure — as opposed to content-free synthetic tasks — can teach transferable reasoning capability. The causal bridge idea is the most natural candidate: by conditioning generation on two real document endpoints (causally related via Wikipedia wikilinks), the model is forced to construct relational understanding grounded in real-world events. This is neither content-free nor domain-specific — it is structured real language. Whether this teaches transferable reasoning is the core empirical question.
+
+### H2: How Do We Retain Reasoning Capability Through General Pretraining?
+
+**The problem:** Even if we solve H1 and identify good reasoning data, there are two distinct mechanisms by which the capability could be lost during subsequent general web text training:
+
+**Sub-problem 2a — Catastrophic forgetting:** The model overwrites representations learned from reasoning data when exposed to web-scale text. The May 8 and May 10 H1 experiments are consistent with this — the SciQ gains from OWM disappear after phase 2 DCLM training. Replay (mixing a small fraction of reasoning data throughout web text training) is a standard mitigation but untested here.
+
+**Sub-problem 2b — No training pressure to use reasoning circuits:** Steven Cao's point: even if reasoning circuits exist after phase 1, there is no mechanism during standard next-token prediction on web text that activates or reinforces those circuits. The model is not prompted to reason during web text training, so whatever was built in phase 1 sits dormant. This is a more fundamental problem than forgetting — replay does not solve it, because the problem is not forgetting but never using.
+
+**What we don't know:** Whether there exists a training signal during web text exposure that both retains reasoning circuits and actively uses them. Possible directions include: perplexity-based filtering of web text (only train on documents the reasoning-capable model finds surprising, not documents it can predict via shortcuts), or a joint training objective that ties reasoning evaluation to web text prediction. Both are speculative.
+
+### The Relationship Between H1 and H2
+
+H1 is the more fundamental bottleneck. Until we have data that demonstrably teaches transferable reasoning (H1 solved), H2 is moot — there is nothing to retain. The causal bridge experiments address H1 first.
