@@ -282,3 +282,144 @@ These experiments produce different predictions under each hypothesis, allowing 
 | OWM model on non-science reasoning | — | — | No improvement (domain-specific) |
 
 The mixed run (80% DCLM + 20% OWM) is already complete and benchmark results will directly test H1 vs H3: if all three benchmarks improve, that favors H1 (general synergy); if only SciQ improves, that favors H3 (domain-specific knowledge).
+
+---
+
+## May 8: H1 Experiment — Reasoning Data in the Middle of Training
+
+### Hypothesis
+Model needs language/world knowledge first before reasoning data is useful.
+If we inject reasoning data after initial pretraining, the model should perform better
+on reasoning benchmarks compared to training on web data only.
+
+### Design
+- **Treatment**: Run A (3B DCLM pretrained) → 200M OT → 400M DCLM
+- **Control**: Run A (3B DCLM pretrained) → 200M DCLM → 400M DCLM
+- Both use `initialize_from_checkpoint_path` with fresh cosine LR schedule per phase
+- Phase1: 763 steps (200M tokens), Phase2: 1526 steps (400M tokens)
+- Model: 300M, batch_size=64, seq_len=4096, LR=3e-3, WD=1.6
+
+### Fixes Applied
+1. **LR schedule counter reset**: `initialize_from_checkpoint_path` now resets optimizer schedule counters (was loading stale counters from source checkpoint, giving wrong LR)
+2. **Force checkpoint save**: `LambdaCallback.on_step` now passes `force` parameter (was being dropped, so final checkpoint never saved)
+3. **Checkpoint wait**: Trainer now waits for async checkpoint save to complete before returning
+
+### WandB Runs
+| Phase | Run ID | Tags |
+|-------|--------|------|
+| Treatment Phase1 (OT) | 06va0rn2 | h1-v2, treatment, phase1, ot |
+| Control Phase1 (DCLM) | ncpocjta | h1-v2, control, phase1, dclm |
+| Treatment Phase2 (DCLM) | d47v5z8y | h1-v2, treatment, phase2, dclm |
+| Control Phase2 (DCLM) | vothg0mz | h1-v2, control, phase2, dclm |
+
+### Results
+
+| Benchmark | Treatment (OT→DCLM) | Control (DCLM→DCLM) | Diff |
+|-----------|---------------------|----------------------|------|
+| ARC Easy | 35.0% | 35.0% | 0.0% |
+| ARC Challenge | 19.0% | 18.9% | +0.2% |
+| PIQA | 48.9% | 49.2% | -0.4% |
+| SciQ | 70.9% | 69.0% | **+1.9%** |
+| HellaSwag | 26.2% | 26.4% | -0.2% |
+| Winogrande | 50.9% | 51.0% | -0.1% |
+| MMLU | 25.8% | 26.7% | -1.0% |
+| **Macro avg** | **27.0%** | **28.3%** | **-1.3%** |
+
+DCLM val loss: Treatment 3.743 vs Control 3.720
+
+### Conclusion
+**H1 is not supported.** Injecting 200M tokens of reasoning data (OpenThoughts) in the
+middle of training does not help reasoning benchmarks. The control (pure DCLM) slightly
+outperforms on most benchmarks (macro avg -1.3%). Treatment only wins on SciQ (+1.9%),
+consistent with H3 (domain-specific knowledge transfer) rather than general reasoning
+improvement.
+
+### Caveats
+- Each phase gets a fresh cosine LR from max → 0. This means there's a LR jump at the
+  phase boundary. Both conditions have the same jump so the comparison is fair, but a
+  continuous cosine schedule would be more representative of real training.
+- The 200M tokens of OT may not be enough to teach reasoning at 300M model scale.
+- Fresh optimizer (Adam moments reset) at each phase means the model "forgets" gradient
+  history, which may hurt the treatment more since it switches domains twice.
+
+---
+
+## May 10: H1 Revisited — Continuous Cosine LR, OWM+Code Treatment
+
+### Motivation
+The May 8 H1 experiment had two problems:
+1. **Fresh cosine LR per phase** — LR jumps at phase boundaries, optimizer moments reset
+2. **OpenThoughts as treatment** — already conclusively shown to be useless at all scales (300M–1.4B)
+
+This run fixes both: continuous cosine LR across phases 1+2 (via `initialize_from_step`), and uses OWM+Code as treatment data since OWM showed the only positive signal (SciQ 73.2% vs 63.2% baseline).
+
+### Technical Implementation
+Added `initialize_from_step` to `TrainLmConfig` in `lib/levanter/src/levanter/main/train_lm.py`:
+- Loads weights+optimizer from checkpoint via `initialize_from_checkpoint_path`
+- Sets optimizer schedule counter AND `state.step` to specified value
+- Enables continuous cosine LR across phases without `load_checkpoint_path` (which OOMs)
+- Verified with smoke test: 40-step single run vs 20+20 split has 0.00e+00 max LR difference
+
+### Design
+```
+Phase 0 (shared):     Train from scratch on 203M DCLM, 4 epochs = 3,096 steps
+Phase 1 (1,667 steps / 437M tokens):
+  Treatment: OWM (219M) + Code (218M) mixed 50/50
+  Control:   Disjoint DCLM (~407M tokens)
+Phase 2 (3,052 steps / 800M tokens):
+  Both arms: Disjoint DCLM (~778M tokens)
+```
+
+LR schedule: Phases 1+2 share one continuous cosine over 4,719 total steps.
+- Phase 1: `stop_step=1667`, `num_train_steps=4719`
+- Phase 2: `initialize_from_step=1667`, `num_train_steps=4719`
+
+All DCLM data is disjoint across phases (phase 0: 203M, phase 1 control: 407M, phase 2: 778M — downloaded 1.52B total from DCLM baseline).
+
+Model: 300M, batch_size=64, seq_len=4096, LR=3e-3, WD=1.6
+
+### WandB Runs
+| Phase | Run ID | Description |
+|-------|--------|-------------|
+| Phase 0 (pretrain) | hvu9zzrj | 300M on DCLM 200M, 4 epochs |
+| Treatment Phase 1 | ja7ty1se | OWM+Code mix, 1667 steps |
+| Control Phase 1 | rd5wfmmu | Disjoint DCLM, 1667 steps |
+| Treatment Phase 2 | un39dx11 | Disjoint DCLM, 3052 steps (from step 1667) |
+| Control Phase 2 | m67nooef | Disjoint DCLM, 3052 steps (from step 1667) |
+
+### Results
+
+| Benchmark | Treatment (OWM+Code) | Control (DCLM only) | Delta |
+|-----------|---------------------|---------------------|-------|
+| ARC Easy | 35.5% | 36.7% | -1.1% |
+| ARC Challenge | 22.3% | 22.5% | -0.3% |
+| PIQA | 50.0% | 50.2% | -0.2% |
+| SciQ | 74.1% | 74.1% | 0.0% |
+| HellaSwag | 27.3% | 27.4% | -0.0% |
+| WinoGrande | 50.4% | 51.1% | -0.6% |
+| MMLU | 26.7% | 25.3% | **+1.4%** |
+| **Macro avg** | **27.6%** | **26.9%** | **+0.7%** |
+
+DCLM val: Treatment 1.198 BPB (3.705 loss) vs Control 1.191 BPB (3.686 loss)
+
+### Analysis
+1. **SciQ is flat** (74.1% both arms) — surprising given OWM-only showed 73.2% vs 63.2% DCLM baseline. The control also reaches 74.1%, suggesting phase 0 pretraining (4 epochs of 203M DCLM) already saturates SciQ at this model size.
+2. **MMLU is the only treatment win** (+1.4%) — OWM+Code may help with knowledge breadth
+3. **Most benchmarks within noise** (0–0.6%) — no clear treatment advantage or disadvantage
+4. **DCLM val loss slightly worse for treatment** (3.705 vs 3.686) — expected since treatment saw less DCLM in phase 1
+5. **Continuous cosine LR worked correctly** — both arms resumed from step 1667 with matching LR schedules
+
+### Conclusion
+**H1 remains unsupported even with proper LR continuity and better treatment data.** Injecting OWM+Code mid-training does not meaningfully help reasoning benchmarks compared to pure DCLM training. The previous SciQ signal from OWM (73.2%) appears to be a domain knowledge effect that saturates with enough general pretraining, not a lasting advantage from procedural knowledge injection.
+
+### Comparison with May 8 H1
+| Change | May 8 | May 10 |
+|--------|-------|--------|
+| LR schedule | Fresh cosine per phase | Continuous cosine (initialize_from_step) |
+| Treatment data | OpenThoughts (170M) | OWM+Code (437M) |
+| Phase 0 | Paper's 16-epoch ckpt | 4-epoch fresh pretrain |
+| DCLM data | Repeated across phases | Disjoint per phase |
+| SciQ delta | +1.9% | 0.0% |
+| Macro avg delta | -1.3% | +0.7% |
+
+The improved design (continuous LR, better treatment data, disjoint data) eliminated the macro avg deficit but still shows no clear benefit from reasoning data injection.

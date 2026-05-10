@@ -509,7 +509,11 @@ class Trainer:
         """
         iter_data = iter(train_loader)
 
-        while int(state.step) < self.num_train_steps:
+        effective_max_step = self.num_train_steps
+        if self.config.stop_step is not None:
+            effective_max_step = min(effective_max_step, self.config.stop_step)
+
+        while int(state.step) < effective_max_step:
             with capture_time() as loading_time:
                 try:
                     example = next(iter_data)
@@ -527,8 +531,11 @@ class Trainer:
         """
         Performs training until the number of steps is reached.
         """
-        # Handle case where training is already complete (e.g., resuming from final checkpoint)
-        if int(state.step) >= self.num_train_steps:
+        effective_max_step = self.num_train_steps
+        if self.config.stop_step is not None:
+            effective_max_step = min(effective_max_step, self.config.stop_step)
+
+        if int(state.step) >= effective_max_step:
             logger.info(
                 f"Training already complete at step {state.step} (target: {self.num_train_steps}). "
                 "Running final hooks only."
@@ -549,6 +556,9 @@ class Trainer:
         # force hooks to run at the end
         self.run_hooks(info, force=True)
 
+        if hasattr(self, '_checkpointer'):
+            self._checkpointer.wait_until_finished()
+
         return info
 
     def _add_default_hooks(self):
@@ -558,6 +568,7 @@ class Trainer:
         self.add_hook(levanter.callbacks.log_step_info(self.config.num_train_steps), every=1)
         # engine.add_hook(callbacks.log_memory_usage(), every=1)
         checkpointer = self.config.checkpointer.create(self.run_id)
+        self._checkpointer = checkpointer
         self.add_hook(checkpointer.on_step, every=1)  # checkpointer manages its own frequency
 
         # Add watch callback if configured
@@ -821,6 +832,7 @@ class TrainerConfig:
 
     # Config related to duration
     num_train_steps: int = 400_000  # number of training steps
+    stop_step: Optional[int] = None  # if set, stop training at this step (even if < num_train_steps)
     steps_per_eval: int = 1_000  # how often to evaluate
     max_eval_batches: Optional[int] = None  # max number of batches to evaluate on. None means all batches
 
