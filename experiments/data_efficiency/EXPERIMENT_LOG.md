@@ -426,7 +426,13 @@ The improved design (continuous LR, better treatment data, disjoint data) elimin
 
 ---
 
-## Research Direction: Revised Hypotheses (Post-May 10)
+## May 11: Literature Review & Hypothesis Refinement
+
+After the H1 experiment showed no clear benefit from reasoning data injection, we stepped back to survey the literature on what makes reasoning data effective for pretraining. Reviewed 15+ papers across synthetic data composition, pretraining vs post-training, code and reasoning, abstract reasoning transfer, and data selection/curriculum. Full paper summaries and dataset inventory in [papers/reasoning_data_summary.md](/papers/reasoning_data_summary.md).
+
+The key finding: our results are consistent with the broader literature — pure reasoning data hurts, domain-specific gains (OWM → SciQ) don't transfer, and the diversity of reasoning patterns matters more than any single domain. This led to a revision of the research hypotheses below.
+
+## Research Direction: Revised Hypotheses
 
 The original H1/H2/H3 hypotheses (May 5) have been refined based on accumulated experimental evidence across all runs (300M–1.4B, multiple data types and curriculum designs).
 
