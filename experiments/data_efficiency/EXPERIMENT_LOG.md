@@ -456,3 +456,53 @@ The original H1/H2/H3 hypotheses (May 5) have been refined based on accumulated 
 ### The Relationship Between H1 and H2
 
 H1 is the more fundamental bottleneck. Until we have data that demonstrably teaches transferable reasoning (H1 solved), H2 is moot — there is nothing to retain. The causal bridge experiments address H1 first.
+
+---
+
+## Literature Review: What Makes Reasoning Data Good for Pretraining?
+
+### Synthetic Data Composition
+
+- **Demystifying Synthetic Data in LLM Pre-training** (Kang et al., 2025, arxiv 2510.01631): Pure synthetic data is NOT superior to CommonCrawl; textbook-style alone performs WORSE. Mixing ~30% rephrased synthetic with web text speeds up training 5-10x. Explains why OpenThoughts (pure reasoning traces) hurts.
+- **Phi-4 Technical Report** (Microsoft, 2024, arxiv 2412.08905): 40% synthetic data in pretraining. Synthetic data acts as "spoonfeeding" — each token predictable from context, making reasoning patterns easier to learn. Must be diverse and mixed with organic data. Structure matters more than domain content.
+- **EntiGraph: Synthetic Continued Pretraining** (Gao et al., ICLR 2025 Oral, arxiv 2409.07431): Uses knowledge graphs to generate synthetic data about entity relationships. The combinatorial relational structure drives diversity and quality. Directly relevant to the causal bridge idea — relational structure between real entities is what makes synthetic data effective.
+
+### Pretraining Sets the Ceiling
+
+- **Echo Chamber** (Zhao et al., 2025, arxiv 2504.07912): RL converges toward dominant pretraining patterns — amplifies, not creates. Pretraining data composition is the PRIMARY determinant of reasoning ability; post-training cannot compensate.
+- **Pre-Training vs Mid-Training vs RL** (Zhang, Neubig, Yue, 2025, arxiv 2512.07783): Pretraining sets the ceiling. Mid-training significantly enhances vs RL alone. RL only works at the model's "edge of competence."
+- **Front-Loading Reasoning** (NVIDIA, 2025, arxiv 2510.03264): Integrating reasoning data from the START yields up to 19% gains that CANNOT be recovered through later SFT. BROAD DIVERSITY in reasoning patterns (+11% avg) matters most, not domain specificity. Strongest evidence that OWM's gains are domain-specific rather than transferable.
+
+### Code and Reasoning
+
+- **How Does Code Pretraining Affect Task Performance?** (Petty et al., TMLR 2025, arxiv 2409.04556): Code improves compositional tasks (semantic parsing, math) but HARMS tasks requiring linguistic structure and world knowledge. Matches our finding that code alone hurts all benchmarks.
+- **To Code, or Not To Code?** (Meta, 2024, arxiv 2408.10914): At 470M-2.8B, code yields up to 8.2% improvement in NL reasoning and 4.2% in world knowledge. Code QUALITY has outsized impact. Tension with Petty et al. suggests the type/quality of code matters more than presence/absence.
+
+### Abstract Reasoning Transfer
+
+- **Warm Up Before You Train** (2025, arxiv 2505.13718): Distilling CoT from TOY domain (Knights & Knaves logic puzzles) transfers broadly to MATH, HumanEval+, MMLU-Pro. Closest analog to H1: reasoning SKILL from content-free domain transfers to real tasks. The reasoning structure, not domain content, is what transfers.
+- **Scaling Laws for Implicit Reasoning at Pretraining** (2025, arxiv 2504.03635): Pretrains on synthetic knowledge-graph-style multihop reasoning. Overparameterization can IMPAIR reasoning through memorization. Non-trivial relationship between model size and reasoning generalization.
+
+### Data Selection and Curriculum
+
+- **Perplexity Correlations for Data Selection** (Thrush & Potts, ICLR 2025, arxiv 2409.05816): Selecting pretraining documents whose loss correlates with downstream benchmark performance outperforms hand-engineered classifiers. Practical tool for identifying which data domains predict reasoning.
+- **Curriculum Learning for LLM Pretraining** (Elgaar et al., 2026, arxiv 2601.21698): Training follows shared latent phases regardless of curriculum ordering; curricula mainly change within-phase exposure. At 300M-1.4B, curriculum effects are modest but real.
+- **General Intelligence Requires Reward-based Pretraining** (Gershman et al., Harvard, 2025, arxiv 2502.19402): Next-token prediction lets models exploit spurious correlations instead of learning reasoning algorithms. Explains why OpenThoughts teaches surface CoT patterns rather than reasoning procedures.
+
+### Synthesis: What the Literature Says About H1
+
+1. **Pure reasoning data hurts; ~30% mixed with web data is optimal.** Our OpenThoughts results are consistent with the broader finding that pure synthetic/reasoning data underperforms web text.
+2. **Diversity of reasoning patterns matters more than domain specificity.** OWM's SciQ gains saturate because math domain knowledge doesn't transfer. NVIDIA's front-loading paper shows BROAD diversity (+11%) is the key.
+3. **Relational/combinatorial structure drives quality.** EntiGraph's entity-relationship approach and the causal bridge idea share the same insight: generating data that fills in relational edges between real concepts forces the model to learn transferable structure.
+4. **Abstract reasoning from toy domains DOES transfer.** Knights & Knaves → MATH/code transfer suggests content-free procedural reasoning is a viable path.
+5. **Pretraining is the ceiling — post-training amplifies but cannot create.** This validates H1 as the fundamental question.
+
+### Implications for Next Experiments
+
+The literature points to three promising directions for H1:
+
+**Direction A — Causal bridges (relational structure with real content):** Generate training data by conditioning on causally related document pairs (e.g., Wikipedia wikilinks). This combines EntiGraph's relational structure insight with real-world grounding. The model must construct causal explanations between endpoints, teaching transferable relational reasoning. Neither content-free nor domain-specific.
+
+**Direction B — Abstract procedural tasks (content-free structure):** Following the "Warm Up Before You Train" approach — train on toy logic/reasoning tasks that teach procedural structure without domain content. Advantage: cleanly isolates reasoning structure from domain knowledge. Risk: may not scale to pretraining (the paper uses distillation, not pretraining from scratch).
+
+**Direction C — Diversity-optimized reasoning mix:** Following NVIDIA's front-loading insight — instead of OWM+Code (two domains), create a maximally diverse reasoning mix across many domains (math, logic, code, science, law, etc.) at ~30% of training data. The hypothesis: it's not any single reasoning domain but the BREADTH of procedural patterns that teaches transferable reasoning.
