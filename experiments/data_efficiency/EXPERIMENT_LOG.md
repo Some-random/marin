@@ -506,3 +506,35 @@ The literature points to three promising directions for H1:
 **Direction B — Abstract procedural tasks (content-free structure):** Following the "Warm Up Before You Train" approach — train on toy logic/reasoning tasks that teach procedural structure without domain content. Advantage: cleanly isolates reasoning structure from domain knowledge. Risk: may not scale to pretraining (the paper uses distillation, not pretraining from scratch).
 
 **Direction C — Diversity-optimized reasoning mix:** Following NVIDIA's front-loading insight — instead of OWM+Code (two domains), create a maximally diverse reasoning mix across many domains (math, logic, code, science, law, etc.) at ~30% of training data. The hypothesis: it's not any single reasoning domain but the BREADTH of procedural patterns that teaches transferable reasoning.
+
+### Deep Dive: Concrete Experimental Details from Key Papers
+
+#### EntiGraph (arxiv 2409.07431) — Stanford
+
+**Recipe:** Extract entities from source documents with an LLM → enumerate all entity pairs and triplets → prompt gpt-4-turbo to "analyze relations among given entities" for each pair/triplet → collect outputs as synthetic corpus. No explicit knowledge graph built — the graph is implicit in the entity combinations.
+
+**Scale:** 265 source articles (1.3M tokens) → 455M synthetic tokens (350x amplification). Student: Llama 3 8B, continued pretraining for 2 epochs with RedPajama replay.
+
+**Results:** QuALITY QA accuracy: base 39.5% → EntiGraph CPT 56.2% (vs GPT-4 closed-book 51.3%). Provides 80% of RAG's improvement. Scaling is log-linear in synthetic token count.
+
+**Applicability to us:** The entity-relationship approach validates that relational structure drives data quality. But at our scale (200M source tokens), 350x amplification = 70B synthetic tokens — impractical. More importantly, EntiGraph targets domain-specific knowledge acquisition (memorizing facts from niche articles), NOT general reasoning. The causal bridge idea extends this by targeting causal/relational reasoning rather than factual recall.
+
+#### NVIDIA Front-Loading (arxiv 2510.03264)
+
+**Recipe:** 8B hybrid transformer, 1T tokens, 512 H100s. 80% base corpus + 20% reasoning data during pretraining. Reasoning data: D_LDQ (336B tokens, ~56% math, ~17% code, ~27% science/general) for diversity + D_SHQ (OpenThoughts 1.2M examples) for quality. Post-training: SFT on 4.8M examples, then GRPO RL.
+
+**Key numbers:** After full pipeline (pretrain+SFT+RL): M_base 37.9% → M_LMQ 56.7% average across MATH-500/GSM8K/AIME/GPQA/MMLU/MMLU-Pro/LiveCodeBench. The 19% gap cannot be closed by doubling SFT data.
+
+**Critical ablation:** Diversity beats quality in pretraining (D_LDQ +9.1% over D_SHQ at base model stage). Quality beats diversity in SFT (opposite direction). "Latent effect": adding high-quality data to diverse pretraining shows minimal immediate benefit but unlocks +4.25% after SFT.
+
+**Applicability to us:** The 20% reasoning mix ratio is testable at our scale. The asymmetric principle (diversity for pretraining, quality for SFT) is actionable. But the scale gap is enormous (1T tokens vs our 200M-1B), and the 336B diverse reasoning dataset is not public. We could approximate with a broader mix of public sources.
+
+#### Warm Up Before You Train (arxiv 2505.13718) — NYU Abu Dhabi
+
+**Recipe:** Generate long CoT traces from QwQ-32B teacher on 5,000 Knights & Knaves logic puzzles (no filtering, wrong answers kept). SFT on traces with very low LR (1e-6), 3 epochs, ~20 min on 6 H100s for 1.5B model.
+
+**Key numbers:** Qwen2.5-3B: MATH 43.8% → 54.0% (+10.2), HumanEval+ 32.5% → 47.8% (+15.3), MMLU-Pro 29.2% → 38.2% (+9.0). Cross-domain: RLVR on HumanEval+ causes -13.8% MATH regression for base model, but only -1.4% for warmed-up model.
+
+**Critical detail:** This is a POST-training intervention (SFT on pretrained base model), NOT pretraining from scratch. Model sizes tested: 1.5B–14B. Unclear if 300M can absorb long reasoning traces. The K&K dataset is tiny (5,000 examples) but each trace is ~1600-3600 tokens.
+
+**Applicability to us:** Very cheap to try as a bonus on top of any pretrained model. Could warmup our 300M models and see if reasoning benchmarks improve. But this doesn't address H1 (what data to pretrain on) — it's a post-training trick. Still worth running as a quick experiment to see if our 300M models have latent reasoning capacity that warmup can unlock.
