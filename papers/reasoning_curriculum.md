@@ -52,6 +52,16 @@
 
 ---
 
+### [OLMo 3](https://arxiv.org/abs/2512.13961) (OLMo Team, AI2, 2026)
+
+**Motivation:** OLMo 2 was fully open but trailed frontier open-weight models. OLMo 3 aims to be the strongest fully-open model family, releasing the entire model flow (every stage, checkpoint, data point, and dependency) at 7B and 32B scales, including thinking (OLMo 3 Think), instruction (OLMo 3 Instruct), and RL-Zero variants.
+
+**Experiment Setup:** Decoder-only transformer at 7B and 32B with 8192 context, SWA at 3/4 layers, bfloat16. Three-stage base model training: Stage 1 (pretraining) on Dolma 3 Mix (5.9T tokens of web, academic PDFs via olmOCR, code, math); Stage 2 (midtraining) on Dolma 3 Dolmino Mix (100B tokens of high-quality data for math, code, general knowledge QA, instruction following); Stage 3 (long-context extension) on Dolma 3 Longmino Mix (50B for 7B, 100B for 32B, combining long documents with midtraining data). Post-training: SFT, DPO, and RLVR via OlmoRL framework. Model merging ("souping") used across stages. Total ~56 days on 1024 H100 GPUs (~$2.75M at $2/H100-hour). All data, code, checkpoints, and logs released.
+
+**Conclusion:** OLMo 3 Base 32B is the best fully-open base model, outperforming Marin 32B and Apertus 70B with double-digit improvements on math and code. OLMo 3.1 Think 32B is the strongest fully-open thinking model, competitive with Qwen 3 32B (trained on 6x fewer tokens). OLMo 3 Instruct 7B/32B surpass Qwen 2.5, Gemma 3, IBM Granite 3.3, and Llama 3 at comparable scales. Flagship scores: 96.2% MATH, 80.6% AIME 2024, 83.3% LiveCodeBench v3, 86.4% MMLU, 57.5% GPQA.
+
+---
+
 ## Synthetic Data
 
 ### [Demystifying Synthetic Data in LLM Pre-training](https://arxiv.org/abs/2510.01631) (Kang et al., 2025)
