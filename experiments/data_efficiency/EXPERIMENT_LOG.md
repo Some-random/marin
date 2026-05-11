@@ -2,7 +2,7 @@
 
 ## May 11: Literature Review & Hypothesis Refinement
 
-After the H1 experiment showed no clear benefit from reasoning data injection, we stepped back to survey the literature on what makes reasoning data effective for pretraining. Reviewed 15+ papers across synthetic data composition, pretraining vs post-training, code and reasoning, abstract reasoning transfer, and data selection/curriculum. Full paper summaries and dataset inventory in [papers/reasoning_data_summary.md](/papers/reasoning_data_summary.md). Downloaded all cited paper PDFs to `papers/`.
+After the H1 experiment showed no clear benefit from reasoning data injection, we stepped back to survey the literature on what makes reasoning data effective for pretraining. Reviewed 15+ papers across synthetic data composition, pretraining vs post-training, code and reasoning, abstract reasoning transfer, and data selection/curriculum. Paper notes organized by category in [papers/reasoning_curriculum.md](../../papers/reasoning_curriculum.md) and [papers/causal_bridge.md](../../papers/causal_bridge.md). Downloaded all cited paper PDFs to `papers/`.
 
 The key finding: our results are consistent with the broader literature — pure reasoning data hurts, domain-specific gains (OWM → SciQ) don't transfer, and the diversity of reasoning patterns matters more than any single domain. This led to a revision of the research hypotheses.
 
@@ -39,7 +39,7 @@ H1 is the more fundamental bottleneck. Until we have data that demonstrably teac
 
 ### Literature Review
 
-See [papers/reasoning_data_summary.md](/papers/reasoning_data_summary.md) for full paper summaries, dataset inventory, and applicability analysis.
+See [papers/reasoning_curriculum.md](../../papers/reasoning_curriculum.md) for paper notes on reasoning, synthetic data, and curriculum. See [papers/causal_bridge.md](../../papers/causal_bridge.md) for causal bridge related papers.
 
 Key takeaways:
 1. Pure reasoning data hurts; ~30% mixed with web data is optimal (Kang et al.)
@@ -47,14 +47,6 @@ Key takeaways:
 3. Relational/combinatorial structure drives quality (EntiGraph)
 4. Abstract reasoning from toy domains DOES transfer (Warm Up Before You Train)
 5. Pretraining is the ceiling — post-training amplifies but cannot create (Echo Chamber, Front-Loading)
-
-### Next Experiment Directions
-
-**Direction A — Causal bridges (relational structure with real content):** Generate training data by conditioning on causally related document pairs (e.g., Wikipedia wikilinks). Combines EntiGraph's relational structure insight with real-world grounding. Most novel, most infrastructure-heavy.
-
-**Direction B — Abstract procedural tasks (content-free structure):** Train on toy logic/reasoning tasks (e.g., Knights & Knaves). Cleanly isolates reasoning structure from domain knowledge. Risk: the paper uses post-training, not pretraining from scratch.
-
-**Direction C — Diversity-optimized reasoning mix:** Instead of OWM+Code (2 domains), mix reasoning data from many domains at ~20-30% of total. Tests whether breadth of procedural patterns matters more than depth.
 
 ---
 
