@@ -19,7 +19,7 @@ Specifies the model configs
 import dataclasses
 
 from levanter.models.llama import LlamaConfig
-from levanter.models.rotary import Llama3RotaryEmbeddingsConfig
+from levanter.layers.rotary import Llama3RotaryEmbeddingsConfig
 
 from levanter.models.mixtral import MixtralConfig
 

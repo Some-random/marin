@@ -227,3 +227,75 @@
 **Experiment Setup:** Evaluate state-of-the-art LLMs (Llama 3.1 8B/70B, Qwen2.5 Coder 7B/32B, GPT-4o, o1) on algorithmic tasks in Brainf**k and Befunge programming languages to isolate reasoning from memorization. Compare RPT (reward-based pretraining) vs SPT-then-RFT in simplified 9x9 Go.
 
 **Conclusion:** All models perform poorly on esoteric language tasks (~12% Brainf**k, ~29% Befunge), with o1 the notable outlier due to RL post-training. In Go, pure RPT achieves 100% win rate against SPT-then-RFT, confirming supervised pretraining constrains RL's exploration. The authors argue transitioning from supervised to reward-based pretraining is critical for robust, generalizable reasoning.
+
+---
+
+## Physics of Language Models
+
+### [Physics of Language Models: Part 1, Learning Hierarchical Language Structures](https://arxiv.org/abs/2305.13673) (Allen-Zhu & Li, 2023)
+
+**Motivation:** Prior interpretability work focused on simple tasks like name copying, leaving open whether generative models can learn and reason over recursive, hierarchical language structures defined by context-free grammars (CFGs) that are locally ambiguous and require dynamic programming to parse.
+
+**Experiment Setup:** Design a family of 7 synthetic CFGs of depth L=7 producing sequences up to length 729. Pre-train GPT-2 small (12-layer, 12-head, 768-dim) and variants (with relative positional attention and rotary embeddings) from scratch on corpora sampled from these CFGs. Evaluate generation accuracy, diversity, and distributional match (KL-divergence); probe hidden states with multi-head linear probing.
+
+**Conclusion:** GPT models (except absolute positional embeddings) accurately learn CFG hierarchies, with hidden states linearly encoding nonterminal ancestor/boundary information. Attention patterns resemble dynamic programming-style information flow. Injecting 10% structural noise improves robustness, and encoder-only models (BERT, DeBERTa) struggle with deep structure reasoning compared to autoregressive GPT.
+
+---
+
+### [Physics of Language Models: Part 2.1, Grade-School Math and the Hidden Reasoning Process](https://arxiv.org/abs/2407.20311) (Ye, Xu, Li & Allen-Zhu, 2024)
+
+**Motivation:** LMs achieve near-perfect accuracy on GSM8K, but it is unclear whether they truly learn reasoning or memorize solution templates. Studying this on internet-pretrained models is confounded by data contamination, motivating a controlled synthetic setting.
+
+**Experiment Setup:** Build iGSM, a synthetic grade-school math dataset with over 90 trillion solution templates, using hierarchical categorizations (4 layers, 100 items each), structure and dependency graphs. Difficulty controlled via number of operations (op) and instance parameters (ip). Pre-train GPT-2 (12-layer, 768-dim) with RoPE from scratch, evaluate in-distribution and OOD (larger op values). Six probing tasks examine the model's internal reasoning process.
+
+**Conclusion:** GPT-2 achieves 99%+ accuracy and generalizes OOD to longer reasoning chains, confirming genuine reasoning. The model formulates a plan before generating, mentally preprocesses all parameter dependencies, and predominantly produces shortest solutions. Model depth is crucial -- a 16-layer, 576-dim transformer solves harder problems than a 4-layer, 1920-dim model twice its size.
+
+---
+
+### [Physics of Language Models: Part 2.2, How to Learn From Mistakes on Grade-School Math Problems](https://arxiv.org/abs/2408.16293) (Ye, Xu, Li & Allen-Zhu, 2024)
+
+**Motivation:** LMs can self-correct via multi-round prompting, but it would be more efficient to correct errors immediately during generation. It is unclear whether including error-correction ("retry") data in pretraining can improve reasoning accuracy, or whether training on mistakes teaches the model to produce errors.
+
+**Experiment Setup:** Using the iGSM synthetic math dataset, construct "retry data" by inserting erroneous solution steps followed by immediate corrections. Pre-train GPT-2 (12-layer, 768-dim with RoPE) from scratch on iGSM-med and iGSM-hard, comparing error-free pretraining, retry pretraining (error rates p=5%-50%), and beam search baselines. Also explore finetuning with retry data vs pretraining with it.
+
+**Conclusion:** Pretraining with retry data teaches automatic self-correction during autoregressive generation, achieving higher accuracy than error-free pretraining and beam search without multi-round prompting. Even at p=20-50% error rates, models predominantly generate correct solutions and only self-correct on rare mistakes. Error correction cannot be added via fine-tuning -- it must be in pretraining. "Fake" retry data (random future steps as errors) is nearly as effective.
+
+---
+
+### [Physics of Language Models: Part 3.1, Knowledge Storage and Extraction](https://arxiv.org/abs/2309.14316) (Allen-Zhu & Li, 2023)
+
+**Motivation:** LLMs store vast knowledge extractable via QA, but it is unclear whether they answer by genuinely extracting knowledge from training or by memorizing similar questions (data contamination). Understanding the storage-extraction relationship is critical for practical training.
+
+**Experiment Setup:** Construct synthetic biography datasets (bioS and bioR) for N=100K individuals with 6 attributes each. Pre-train GPT-2 models (124M on bioS, 302M on bioR) from scratch, fine-tune with QA on half the individuals, test OOD on the other half. Three knowledge augmentation strategies tested: multiple biography variants, fullname substitution, and sentence permutation.
+
+**Conclusion:** Without augmentation, models achieve near-zero QA accuracy on held-out individuals -- knowledge is memorized but not extractable because it is distributed across all biography tokens. With sufficient augmentation (paraphrasing, shuffling, rewriting), knowledge becomes linearly encoded in person name embeddings and extractable via instruction finetuning, reaching 86.6% OOD accuracy on bioS and 77.7% on bioR.
+
+---
+
+### [Physics of Language Models: Part 3.2, Knowledge Manipulation](https://arxiv.org/abs/2309.14402) (Allen-Zhu & Li, 2023)
+
+**Motivation:** LMs can store factual knowledge, but whether they can flexibly manipulate it at inference -- classification, comparison, and inverse search over memorized facts -- remains unclear. Real-world evaluation cannot distinguish genuine deduction from contamination.
+
+**Experiment Setup:** GPT2 with RoPE (12-layer 768-dim for bioS, 12-layer 1280-dim for bioR) pretrained on synthetic biography data for N=100K individuals with knowledge augmentation. Finetuned via LoRA on four tasks -- retrieval, classification (modular arithmetic on attributes), comparison (ranking), and inverse search -- and evaluated OOD on unseen individuals.
+
+**Conclusion:** LMs excel at retrieval but fundamentally struggle with classification and comparison unless Chain-of-Thought is used during both training and inference, even with perfect knowledge extraction and abundant training data (25K+ QAs). Inverse knowledge search achieves virtually 0% accuracy regardless of prompting, model size, or training method. These limitations hold for GPT-4 and Llama-3.
+
+---
+
+### [Physics of Language Models: Part 3.3, Knowledge Capacity Scaling Laws](https://arxiv.org/abs/2404.05405) (Allen-Zhu & Li, 2024)
+
+**Motivation:** Larger models store more knowledge, but the precise scaling constant -- bits of factual knowledge per parameter -- lacks rigorous quantification. Existing scaling laws focus on loss rather than measuring actual knowledge bits stored.
+
+**Experiment Setup:** GPT2 (with RoPE), LLaMA, and Mistral architectures of varying sizes trained from scratch on synthetic biography datasets (bioS with N up to 20M, bioR up to 1M). A "capacity ratio" is defined as bits of stored knowledge divided by trainable parameters, evaluated after 1000 exposures per knowledge piece. Also test quantization (int8, int4) and MoE (32 experts).
+
+**Conclusion:** GPT2 consistently achieves 2 bits per parameter across all sizes, predicting a 7B model can store 14B bits (surpassing English Wikipedia + textbooks). int8 preserves capacity, int4 drops to 0.7 bit/param. LLaMA/Mistral's GatedMLP is 1.3x less efficient. MoE with 32 experts only loses 1.3x despite using 8.8% of parameters at inference. Junk data causes 20x capacity loss, but prepending domain tokens mitigates it to 2x.
+
+---
+
+### [Physics of Language Models: Part 4.1, Architecture Design and the Magic of Canon Layers](https://arxiv.org/abs/2512.17351) (Allen-Zhu, 2025)
+
+**Motivation:** Systematic architecture comparison is hindered by noisy benchmarks (2-4% variance at 1.3B/100B scale), unreliable pretraining loss as a capability proxy, and data quality confounds. Controlled synthetic tasks can isolate and evaluate core capabilities cheaply and reliably.
+
+**Experiment Setup:** Five synthetic pretrain tasks targeting distinct capabilities: Depo (reasoning depth via k-hop permutation traversal, K up to 16), Brevo (reasoning breadth via DAG traversal), Capo (knowledge capacity via N=50K-2M synthetic biographies), Mano (knowledge manipulation via modular arithmetic, length up to 16), and Lano (hierarchical structure via CFG parsing). Compare Llama(RoPE), Llama(NoPE), GLA, Mamba2, and GDN at GPT2-small scale, validated at 1.3B/100B tokens.
+
+**Conclusion:** Canon layers -- lightweight 1-d convolutions of kernel size 4 adding horizontal token-to-token information flow -- improve Transformer reasoning depth by 200-400%, breadth by 30%, revive NoPE to match RoPE, and lift GLA to rival Mamba2/GDN. Transformers with Canon maintain 2-4x greater reasoning depth than linear models and ~40% higher knowledge capacity. Findings confirmed at 1.3B real-world pretraining scale.

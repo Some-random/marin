@@ -535,6 +535,19 @@ MULTILINGUAL_LM_EVAL_LOGPROB_TASKS = (
 MULTILINGUAL_LM_EVAL_GENERATIVE_TASKS = MGSM_MULTILINGUAL_TASKS
 
 
+def convert_to_levanter_task_config(tasks: Sequence[EvalTaskConfig]) -> list["TaskConfig"]:
+    from levanter.eval_harness import TaskConfig
+
+    return [
+        TaskConfig(
+            task=task.name,
+            num_fewshot=task.num_fewshot,
+            task_alias=task.task_alias,
+        )
+        for task in tasks
+    ]
+
+
 def convert_to_task_metrics(tasks: Sequence[EvalTaskConfig], metric: str) -> list[str]:
     """
     Convert a list of EvalTaskConfig to a list of strings corresponding to
