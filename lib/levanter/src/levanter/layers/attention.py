@@ -19,6 +19,12 @@ from jax import numpy as jnp
 from ..inference.utils import is_valid
 
 try:
+    import transformer_engine.jax.sharding as _te_sharding
+    _te_sharding._GLOBAL_MESH_RESOURCE = _te_sharding.MeshResource()
+except ImportError:
+    pass
+
+try:
     from jax.experimental.pallas.ops.tpu.ragged_paged_attention import (
         ragged_paged_attention as tpu_ragged_paged_attention,
     )
@@ -498,6 +504,18 @@ def _try_te_attention(
         return None
 
 
+def _segment_ids_to_segment_pos(segment_ids: jnp.ndarray) -> jnp.ndarray:
+    """Convert segment IDs [B, S] to position-within-segment for each token."""
+    def _compute_pos_single(seg_ids):
+        same_as_prev = jnp.concatenate([jnp.array([False]), seg_ids[1:] == seg_ids[:-1]])
+        def scan_fn(carry, same):
+            pos = jnp.where(same, carry + 1, 0)
+            return pos, pos
+        _, positions = jax.lax.scan(scan_fn, jnp.int32(0), same_as_prev)
+        return positions
+    return jax.vmap(_compute_pos_single)(segment_ids)
+
+
 def _te_flash_attention(
     QPos: AxisSelector,
     KPos: AxisSelection,
@@ -519,6 +537,7 @@ def _te_flash_attention(
 ):
     from transformer_engine.jax.attention import (  # type: ignore[import]
         AttnBiasType,
+        AttnSoftmaxType,
         QKVLayout,
         SequenceDescriptor,
         fused_attn,  # noqa: F401
@@ -593,19 +612,22 @@ def _te_flash_attention(
         q_seg_reshaped = _maybe_flatten(q_segment_ids, batch_axes, "B")
         q_seg_reshaped = q_seg_reshaped.rearrange(("B", QPos)).array
         kv_seg_reshaped = _maybe_flatten(kv_segment_ids, batch_axes, "B")
+        if QPos.name != KPos.name and QPos.name in [a.name for a in kv_seg_reshaped.axes]:
+            kv_seg_reshaped = kv_seg_reshaped.rename({QPos.name: KPos.name})
         kv_seg_reshaped = kv_seg_reshaped.rearrange(("B", KPos)).array
         segment_ids_for_te = (q_seg_reshaped, kv_seg_reshaped)
 
-    sequence_descriptor = SequenceDescriptor.from_seqlens((q_seqlens, kv_seqlens), segment_ids=segment_ids_for_te)
+    sequence_descriptor = SequenceDescriptor.from_seqlens((q_seqlens, kv_seqlens))
 
     attn_output = fused_attn(
-        (q_, k_, v_),
-        fused_attn_bias,
-        sequence_descriptor,
-        prng,
+        qkv=(q_, k_, v_),
+        bias=fused_attn_bias,
+        sequence_descriptor=sequence_descriptor,
+        seed=prng,
         attn_bias_type=attn_bias_type,
         attn_mask_type=attn_mask_type,
         qkv_layout=QKVLayout.BSHD_BSHD_BSHD,
+        softmax_type=AttnSoftmaxType.VANILLA_SOFTMAX,
         scaling_factor=scaling_factor,
         dropout_probability=dropout,
         is_training=is_training,

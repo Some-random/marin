@@ -68,6 +68,12 @@ class TrainLmConfig:
     If provided, will initialize from this checkpoint, used for llama style ablation. This resets the data loader.
     Note that this differs from --trainer.initialize_from, which does not reset the data loader.
     """
+    initialize_from_step: Optional[int] = None
+    """
+    When using initialize_from_checkpoint_path, set the optimizer schedule counter and
+    training step to this value. Allows continuing a cosine LR schedule from a prior phase.
+    If None, defaults to 0 (fresh schedule).
+    """
     eval_harness: Optional[LmEvalHarnessConfig] = None
     eval_harness_steps: int = 10000
 
@@ -175,8 +181,18 @@ def main(config: TrainLmConfig):
 
         if int(state.step) == 0 and config.initialize_from_checkpoint_path is not None:
             state = load_checkpoint(state, config.initialize_from_checkpoint_path)
-            # reset to step 0, we're just initializing weights here
-            state = dataclasses.replace(state, step=jnp.array(0))
+            resume_step = config.initialize_from_step or 0
+            opt_state = state.opt_state
+            new_hp_states = {}
+            for k, v in opt_state.hyperparams_states.items():
+                if hasattr(v, 'count'):
+                    v = v._replace(count=jnp.full_like(v.count, resume_step))
+                new_hp_states[k] = v
+            opt_state = opt_state._replace(
+                count=jnp.full_like(opt_state.count, resume_step),
+                hyperparams_states=new_hp_states,
+            )
+            state = dataclasses.replace(state, step=jnp.array(resume_step), opt_state=opt_state)
 
         if int(state.step) == 0:
             # TODO: I don't love that we init the model twice, but it's not a big deal i think?
