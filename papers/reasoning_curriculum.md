@@ -74,7 +74,7 @@
 
 ---
 
-## Reasoning Data
+## Reasoning in Pretraining
 
 ### [Front-Loading Reasoning: Synergy between Pretraining and Post-Training Data](https://arxiv.org/abs/2510.03264) (Akter et al., NVIDIA, 2025)
 
@@ -85,6 +85,28 @@
 **Conclusion:** Front-loading reasoning data yields +19% average gain that compounds through SFT and RL. SFT alone cannot catch up -- doubling SFT data for the baseline fails to match even the weakest reasoning-pretrained model. Optimal strategy is asymmetric: pretraining benefits most from diversity (+11%), SFT from quality (+15%). Naive mixed-quality SFT scaling is actively harmful (-5% on math).
 
 ---
+
+### [How Does Code Pretraining Affect Language Model Task Performance?](https://arxiv.org/abs/2409.04556) (Petty et al., 2025)
+
+**Motivation:** Code is increasingly included in pretraining corpora and anecdotal evidence suggests it improves non-code tasks, but no prior work has established a causal connection by controlling code proportions as a continuous variable.
+
+**Experiment Setup:** Construct datasets mixing C4 (natural language) and The Pile's code at code mixtures m in [0, 0.9] in two settings: competitive (132B total, code displaces language) and additive (132B language fixed, code added on top up to 264B). Pretrain 374M-parameter transformers (5 seeds each), evaluate on COGS, COGS-vf, English Passivization, and BigBench tasks.
+
+**Conclusion:** Higher code proportions improve compositional tasks (semantic parsing, arithmetic/math). Conversely, code harms tasks requiring linguistic structure (syntax, morphology) and factual knowledge. Code increases variance across tasks while raising the upper quartile, revealing a fundamental trade-off between structured reasoning and linguistic/factual capabilities.
+
+---
+
+### [To Code, or Not To Code? Exploring Impact of Code in Pre-training](https://arxiv.org/abs/2408.10914) (Aryabumi et al., Meta, 2024)
+
+**Motivation:** Including code in pretraining is standard but there has been no exhaustive study measuring its impact on non-code tasks across varying proportions, code quality types, model scales, and training stages.
+
+**Experiment Setup:** Pretrain 470M and 2.8B parameter transformers on SlimPajama (503B text tokens) mixed with code from The Stack (139B), markup (180B), synthetic code (3.2B), and code-adjacent data (21.4B) at varying proportions, using 200B-token training budgets plus 40B-token cooldown on TPU v5e. 64 total models evaluated on NL reasoning (11 benchmarks), world knowledge (TriviaQA, NaturalQuestions), code (HumanEval, MBPP), and LLM-as-judge win-rates.
+
+**Conclusion:** Best config yields +8.2% NL reasoning, +4.2% world knowledge, +6.6% generative win-rates, 12x code boost vs text-only. Code quality matters significantly -- synthetic code yields 9% and 44% increases in NL reasoning and code respectively over web-scraped. Including code during cooldown provides additional gains. Initialization from a code-pretrained model followed by continued text pretraining is the strongest recipe for NL tasks.
+
+---
+
+## Reasoning in Post-Training
 
 ### [Echo Chamber: RL Post-training Amplifies Behaviors Learned in Pretraining](https://arxiv.org/abs/2504.07912) (Zhao et al., 2025)
 
@@ -113,36 +135,6 @@
 **Experiment Setup:** Fine-tune Qwen2.5-7B-Instruct on reasoning datasets across math, code, and science. Ablations at 31,600 examples each, testing question sourcing (27 code, 21 math, 14 science sources), filtering (fastText vs LLM-based), answer generation (DeepSeek-R1 vs QwQ-32B as teachers), and multi-sampling strategies. Final OpenThoughts3-1.2M uses QwQ-32B as teacher.
 
 **Conclusion:** OpenThinker3-7B achieves 53% AIME 2025, 51% LiveCodeBench, 54% GPQA Diamond, outperforming R1-Distill-7B by 12.4 points average. QwQ-32B is a stronger teacher than DeepSeek-R1 despite lower benchmark scores. Sampling multiple answers per question (16x+) is highly effective. No verification or answer filtering improved over unfiltered data.
-
----
-
-### [How Does Code Pretraining Affect Language Model Task Performance?](https://arxiv.org/abs/2409.04556) (Petty et al., 2025)
-
-**Motivation:** Code is increasingly included in pretraining corpora and anecdotal evidence suggests it improves non-code tasks, but no prior work has established a causal connection by controlling code proportions as a continuous variable.
-
-**Experiment Setup:** Construct datasets mixing C4 (natural language) and The Pile's code at code mixtures m in [0, 0.9] in two settings: competitive (132B total, code displaces language) and additive (132B language fixed, code added on top up to 264B). Pretrain 374M-parameter transformers (5 seeds each), evaluate on COGS, COGS-vf, English Passivization, and BigBench tasks.
-
-**Conclusion:** Higher code proportions improve compositional tasks (semantic parsing, arithmetic/math). Conversely, code harms tasks requiring linguistic structure (syntax, morphology) and factual knowledge. Code increases variance across tasks while raising the upper quartile, revealing a fundamental trade-off between structured reasoning and linguistic/factual capabilities.
-
----
-
-### [To Code, or Not To Code? Exploring Impact of Code in Pre-training](https://arxiv.org/abs/2408.10914) (Aryabumi et al., Meta, 2024)
-
-**Motivation:** Including code in pretraining is standard but there has been no exhaustive study measuring its impact on non-code tasks across varying proportions, code quality types, model scales, and training stages.
-
-**Experiment Setup:** Pretrain 470M and 2.8B parameter transformers on SlimPajama (503B text tokens) mixed with code from The Stack (139B), markup (180B), synthetic code (3.2B), and code-adjacent data (21.4B) at varying proportions, using 200B-token training budgets plus 40B-token cooldown on TPU v5e. 64 total models evaluated on NL reasoning (11 benchmarks), world knowledge (TriviaQA, NaturalQuestions), code (HumanEval, MBPP), and LLM-as-judge win-rates.
-
-**Conclusion:** Best config yields +8.2% NL reasoning, +4.2% world knowledge, +6.6% generative win-rates, 12x code boost vs text-only. Code quality matters significantly -- synthetic code yields 9% and 44% increases in NL reasoning and code respectively over web-scraped. Including code during cooldown provides additional gains. Initialization from a code-pretrained model followed by continued text pretraining is the strongest recipe for NL tasks.
-
----
-
-### [s1: Simple Test-Time Scaling](https://arxiv.org/abs/2501.19393) (Muennighoff et al., 2025)
-
-**Motivation:** Test-time scaling (allowing models to "think longer" at inference) has shown strong results (e.g., OpenAI's o1), but the techniques remain proprietary. The authors investigate whether a simple recipe of curated data plus controlled decoding can replicate test-time scaling without RL.
-
-**Experiment Setup:** Curate s1K: 1,000 high-quality reasoning traces selected from 59K questions by filtering for difficulty (only Gemini Flash 2.0 Thinking gets right but smaller models fail), diversity (16 topics), and quality (verified traces). Finetune Qwen2.5-32B-Instruct on s1K for 100-200 steps. At inference, use "budget forcing": append "Wait" tokens to force continued reasoning, or "Final Answer" to stop early.
-
-**Conclusion:** s1-32B matches or exceeds o1-preview on competition math (AIME24: 56.7% vs o1-preview 44.6%) and MATH500 (93.0% vs 90.0%), using only 1,000 SFT examples and no RL. Budget forcing provides smooth compute-accuracy trade-off. A small, high-quality, diverse reasoning dataset with simple decoding control is sufficient for strong test-time scaling.
 
 ---
 
