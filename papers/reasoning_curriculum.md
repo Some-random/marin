@@ -166,6 +166,8 @@
 
 **Conclusion:** Implicit reasoning follows a U-shaped curve with model size -- there exists an optimal size beyond which larger models degrade due to overfitting/memorization. The optimal size scales linearly with graph search entropy (R^2=0.85). Each parameter in an optimally-sized LM can reason over ~0.008 bits vs ~2 bits for memorization, highlighting reasoning is fundamentally harder than storage.
 
+**Dongwei's comment:** The paper conflates implicit, closed-system pattern matching with genuine, open-ended reasoning. By focusing strictly on synthetic pretraining environments, it entirely ignores the inference-time scaling, tool use, and test-time compute where actual agentic AI and reasoning breakthroughs are currently happening.
+
 ---
 
 ### [Procedural Knowledge in Pretraining Drives Reasoning](https://arxiv.org/abs/2411.12580) (Ruis et al., 2025)
