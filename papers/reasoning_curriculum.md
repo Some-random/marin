@@ -1,6 +1,7 @@
 # Reasoning & Curriculum: Paper Notes
 
-## Model Training / Tech Reports
+<details>
+<summary><b>Model Training / Tech Reports</b></summary>
 
 ### [Textbooks Are All You Need (Phi-1)](https://arxiv.org/abs/2306.11644) (Gunasekar et al., 2023)
 
@@ -60,9 +61,10 @@
 
 **Conclusion:** OLMo 3 Base 32B is the best fully-open base model, outperforming Marin 32B and Apertus 70B with double-digit improvements on math and code. OLMo 3.1 Think 32B is the strongest fully-open thinking model, competitive with Qwen 3 32B (trained on 6x fewer tokens). OLMo 3 Instruct 7B/32B surpass Qwen 2.5, Gemma 3, IBM Granite 3.3, and Llama 3 at comparable scales. Flagship scores: 96.2% MATH, 80.6% AIME 2024, 83.3% LiveCodeBench v3, 86.4% MMLU, 57.5% GPQA.
 
----
+</details>
 
-## Synthetic Data
+<details>
+<summary><b>Synthetic Data</b></summary>
 
 ### [Demystifying Synthetic Data in LLM Pre-training](https://arxiv.org/abs/2510.01631) (Kang et al., 2025)
 
@@ -72,9 +74,10 @@
 
 **Conclusion:** Mixing ~30% high-quality rephrased synthetic data with 70% natural web text speeds up convergence 5-10x. Pure rephrased synthetic is not faster than natural text alone, and textbook-style synthetic alone hurts at small budgets. Larger generators (beyond ~8B) do not yield better synthetic data -- Llama-3-70B actually produced worse rephrased data than 8B.
 
----
+</details>
 
-## Reasoning in Pretraining
+<details>
+<summary><b>Reasoning in Pretraining</b></summary>
 
 ### [Front-Loading Reasoning: Synergy between Pretraining and Post-Training Data](https://arxiv.org/abs/2510.03264) (Akter et al., NVIDIA, 2025)
 
@@ -94,7 +97,8 @@
 
 **Conclusion:** Procedural knowledge drives reasoning, not answer retrieval. Documents influential for one reasoning query are strongly predictive for other queries of the same task type (high cross-query correlation), unlike factual queries. For reasoning, the answer almost never appears in top influential docs; instead they contain code implementing the same procedure or math showing the same method on different numbers. Code and StackExchange are 10x overrepresented among top influential documents.
 
-**Dongwei's comment:**
+<details>
+<summary><b>Dongwei's comment</b></summary>
 
 #### 1. EK-FAC Attribution Methodology & Approximations
 To bypass the impossible computational cost of full "Leave-One-Out" retraining across 5 million documents, the authors compute data attribution using Influence Functions. This maps parameter shifts via a first-order Taylor expansion:
@@ -112,6 +116,8 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 * **High-Saliency vs. Low-Saliency Data:** Unlike standard natural language prose (which exhibits flat, near-zero influence because its structure doesn't register during formal logic evaluation), code is inherently dense with strict algorithmic sequences. Because it aggressively forces parameter optimization during pretraining, it has high saliency, generating massive structural gradients that pull the model's weights heavily in either direction.
 * **The Helper Mechanism (Positive Influence):** Code documents that demonstrate step-by-step logic, variable tracking, or implementation of the targeted mathematical logic provide a structural layout that aligns perfectly with the target query's gradient requirements.
 * **The Distractor Mechanism (Negative Influence):** When a code document mirrors the syntax, variable naming conventions, or formatting of a query prompt but executes a *conflicting or entirely different algorithmic rule* (e.g., computing a distance formula instead of a line slope using identical variable names), it induces localized gradient conflict. This structural overlap pulls the parameter subspace *away* from the correct target reasoning chain, making it a high-magnitude logical inhibitor.
+
+</details>
 
 ---
 
@@ -133,9 +139,10 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 **Conclusion:** Best config yields +8.2% NL reasoning, +4.2% world knowledge, +6.6% generative win-rates, 12x code boost vs text-only. Code quality matters significantly -- synthetic code yields 9% and 44% increases in NL reasoning and code respectively over web-scraped. Including code during cooldown provides additional gains. Initialization from a code-pretrained model followed by continued text pretraining is the strongest recipe for NL tasks.
 
----
+</details>
 
-## Reasoning in Post-Training
+<details>
+<summary><b>Reasoning in Post-Training</b></summary>
 
 ### [Echo Chamber: RL Post-training Amplifies Behaviors Learned in Pretraining](https://arxiv.org/abs/2504.07912) (Zhao et al., 2025)
 
@@ -165,9 +172,10 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 **Conclusion:** OpenThinker3-7B achieves 53% AIME 2025, 51% LiveCodeBench, 54% GPQA Diamond, outperforming R1-Distill-7B by 12.4 points average. QwQ-32B is a stronger teacher than DeepSeek-R1 despite lower benchmark scores. Sampling multiple answers per question (16x+) is highly effective. No verification or answer filtering improved over unfiltered data.
 
----
+</details>
 
-## Synthetic Tasks
+<details>
+<summary><b>Synthetic Tasks</b></summary>
 
 ### [Warm Up Before You Train](https://arxiv.org/abs/2505.13718) (Shrestha et al., 2025)
 
@@ -209,9 +217,10 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 **Conclusion:** Content-free synthetic pretraining closes ~65% of the gap to natural pretraining, demonstrating that structural patterns matter even without semantic content.
 
----
+</details>
 
-## Curriculum & Data Selection
+<details>
+<summary><b>Curriculum & Data Selection</b></summary>
 
 ### [Improving Pretraining Data Using Perplexity Correlations](https://arxiv.org/abs/2409.05816) (Thrush, Potts & Hashimoto, 2025)
 
@@ -241,11 +250,12 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 **Conclusion:** All models perform poorly on esoteric language tasks (~12% Brainf**k, ~29% Befunge), with o1 the notable outlier due to RL post-training. In Go, pure RPT achieves 100% win rate against SPT-then-RFT, confirming supervised pretraining constrains RL's exploration. The authors argue transitioning from supervised to reward-based pretraining is critical for robust, generalizable reasoning.
 
----
+</details>
 
-## Physics of Language Models
+<details>
+<summary><b>Physics of Language Models</b></summary>
 
-### [Physics of Language Models: Part 1, Learning Hierarchical Language Structures](https://arxiv.org/abs/2305.13673) (Allen-Zhu & Li, 2023)
+### [Part 1: Learning Hierarchical Language Structures](https://arxiv.org/abs/2305.13673) (Allen-Zhu & Li, 2023)
 
 **Motivation:** Prior interpretability work focused on simple tasks like name copying, leaving open whether generative models can learn and reason over recursive, hierarchical language structures defined by context-free grammars (CFGs) that are locally ambiguous and require dynamic programming to parse.
 
@@ -255,7 +265,7 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 ---
 
-### [Physics of Language Models: Part 2.1, Grade-School Math and the Hidden Reasoning Process](https://arxiv.org/abs/2407.20311) (Ye, Xu, Li & Allen-Zhu, 2024)
+### [Part 2.1: Grade-School Math and the Hidden Reasoning Process](https://arxiv.org/abs/2407.20311) (Ye, Xu, Li & Allen-Zhu, 2024)
 
 **Motivation:** LMs achieve near-perfect accuracy on GSM8K, but it is unclear whether they truly learn reasoning or memorize solution templates. Studying this on internet-pretrained models is confounded by data contamination, motivating a controlled synthetic setting.
 
@@ -265,7 +275,7 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 ---
 
-### [Physics of Language Models: Part 2.2, How to Learn From Mistakes on Grade-School Math Problems](https://arxiv.org/abs/2408.16293) (Ye, Xu, Li & Allen-Zhu, 2024)
+### [Part 2.2: How to Learn From Mistakes on Grade-School Math Problems](https://arxiv.org/abs/2408.16293) (Ye, Xu, Li & Allen-Zhu, 2024)
 
 **Motivation:** LMs can self-correct via multi-round prompting, but it would be more efficient to correct errors immediately during generation. It is unclear whether including error-correction ("retry") data in pretraining can improve reasoning accuracy, or whether training on mistakes teaches the model to produce errors.
 
@@ -275,7 +285,7 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 ---
 
-### [Physics of Language Models: Part 3.1, Knowledge Storage and Extraction](https://arxiv.org/abs/2309.14316) (Allen-Zhu & Li, 2023)
+### [Part 3.1: Knowledge Storage and Extraction](https://arxiv.org/abs/2309.14316) (Allen-Zhu & Li, 2023)
 
 **Motivation:** LLMs store vast knowledge extractable via QA, but it is unclear whether they answer by genuinely extracting knowledge from training or by memorizing similar questions (data contamination). Understanding the storage-extraction relationship is critical for practical training.
 
@@ -285,7 +295,7 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 ---
 
-### [Physics of Language Models: Part 3.2, Knowledge Manipulation](https://arxiv.org/abs/2309.14402) (Allen-Zhu & Li, 2023)
+### [Part 3.2: Knowledge Manipulation](https://arxiv.org/abs/2309.14402) (Allen-Zhu & Li, 2023)
 
 **Motivation:** LMs can store factual knowledge, but whether they can flexibly manipulate it at inference -- classification, comparison, and inverse search over memorized facts -- remains unclear. Real-world evaluation cannot distinguish genuine deduction from contamination.
 
@@ -295,7 +305,7 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 ---
 
-### [Physics of Language Models: Part 3.3, Knowledge Capacity Scaling Laws](https://arxiv.org/abs/2404.05405) (Allen-Zhu & Li, 2024)
+### [Part 3.3: Knowledge Capacity Scaling Laws](https://arxiv.org/abs/2404.05405) (Allen-Zhu & Li, 2024)
 
 **Motivation:** Larger models store more knowledge, but the precise scaling constant -- bits of factual knowledge per parameter -- lacks rigorous quantification. Existing scaling laws focus on loss rather than measuring actual knowledge bits stored.
 
@@ -305,10 +315,12 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 ---
 
-### [Physics of Language Models: Part 4.1, Architecture Design and the Magic of Canon Layers](https://arxiv.org/abs/2512.17351) (Allen-Zhu, 2025)
+### [Part 4.1: Architecture Design and the Magic of Canon Layers](https://arxiv.org/abs/2512.17351) (Allen-Zhu, 2025)
 
 **Motivation:** Systematic architecture comparison is hindered by noisy benchmarks (2-4% variance at 1.3B/100B scale), unreliable pretraining loss as a capability proxy, and data quality confounds. Controlled synthetic tasks can isolate and evaluate core capabilities cheaply and reliably.
 
 **Experiment Setup:** Five synthetic pretrain tasks targeting distinct capabilities: Depo (reasoning depth via k-hop permutation traversal, K up to 16), Brevo (reasoning breadth via DAG traversal), Capo (knowledge capacity via N=50K-2M synthetic biographies), Mano (knowledge manipulation via modular arithmetic, length up to 16), and Lano (hierarchical structure via CFG parsing). Compare Llama(RoPE), Llama(NoPE), GLA, Mamba2, and GDN at GPT2-small scale, validated at 1.3B/100B tokens.
 
 **Conclusion:** Canon layers -- lightweight 1-d convolutions of kernel size 4 adding horizontal token-to-token information flow -- improve Transformer reasoning depth by 200-400%, breadth by 30%, revive NoPE to match RoPE, and lift GLA to rival Mamba2/GDN. Transformers with Canon maintain 2-4x greater reasoning depth than linear models and ~40% higher knowledge capacity. Findings confirmed at 1.3B real-world pretraining scale.
+
+</details>
