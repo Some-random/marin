@@ -86,6 +86,35 @@
 
 ---
 
+### [Procedural Knowledge in Pretraining Drives Reasoning](https://arxiv.org/abs/2411.12580) (Ruis et al., 2025)
+
+**Motivation:** It is debated whether LLMs truly reason or merely retrieve answers from pretraining data. Understanding which pretraining documents are influential for reasoning vs factual recall can reveal the generalization strategy and inform data selection.
+
+**Experiment Setup:** EK-FAC influence functions rank 5 million pretraining documents (2.5B tokens) by influence on completions from Cohere Command R 7B and 35B for 40 reasoning queries (two-step arithmetic, slope calculation, linear equations) and 40 factual queries. Analyze top 500 (0.01%) most influential documents for answer presence and procedural content.
+
+**Conclusion:** Procedural knowledge drives reasoning, not answer retrieval. Documents influential for one reasoning query are strongly predictive for other queries of the same task type (high cross-query correlation), unlike factual queries. For reasoning, the answer almost never appears in top influential docs; instead they contain code implementing the same procedure or math showing the same method on different numbers. Code and StackExchange are 10x overrepresented among top influential documents.
+
+**Dongwei's comment:**
+
+#### 1. EK-FAC Attribution Methodology & Approximations
+To bypass the impossible computational cost of full "Leave-One-Out" retraining across 5 million documents, the authors compute data attribution using Influence Functions. This maps parameter shifts via a first-order Taylor expansion:
+$$\mathcal{I}_f(x) = -\nabla_{\theta}f(\theta^*)^T H^{-1} \nabla_{\theta}\mathcal{L}(x, \theta^*)$$
+* **The Math:** It calculates the dot product between the Query Gradient ($\nabla_{\theta}f$, what the prompt needs) and the Document Gradient ($\nabla_{\theta}\mathcal{L}$, how the training text pushes the weights), scaled by the Inverse Hessian ($H^{-1}$, which translates the local curvature and geometry of the loss landscape).
+* **Scale Approximations (EK-FAC):** To compute this over billions of parameters, several mathematical constraints are applied:
+  1. **Layer-by-Layer Isolation:** Assumes parameters across different transformer layers do not interact, slicing the giant Hessian into isolated layer blocks.
+  2. **MLP Block Focus:** Isolates computations exclusively to Multi-Layer Perceptron (Feed-Forward) weights, where dense procedural mapping is concentrated.
+  3. **Kronecker-Factoring (K-FAC):** Factors the massive layer Hessian block into a Kronecker product ($\otimes$) of two significantly smaller covariance matrices—layer input activations ($A$) and upstream loss gradients ($\Delta\theta$)—making matrix inversion mathematically tractable.
+  4. **Eigenbasis Re-scaling (The "E"):** Performs this factorization within a specialized eigenvector coordinate system (calibrated using a sample of 100,000 documents) to ensure the approximation preserves structural accuracy.
+
+#### 2. Detailed Breakdown of Finding 5: The Dual Dynamics of Code
+Finding 5 reveals that code and StackExchange datasets are vastly overrepresented at *both* the extreme positive (helpful) and extreme negative (inhibitory) tails of the document influence ranking.
+
+* **High-Saliency vs. Low-Saliency Data:** Unlike standard natural language prose (which exhibits flat, near-zero influence because its structure doesn't register during formal logic evaluation), code is inherently dense with strict algorithmic sequences. Because it aggressively forces parameter optimization during pretraining, it has high saliency, generating massive structural gradients that pull the model's weights heavily in either direction.
+* **The Helper Mechanism (Positive Influence):** Code documents that demonstrate step-by-step logic, variable tracking, or implementation of the targeted mathematical logic provide a structural layout that aligns perfectly with the target query's gradient requirements.
+* **The Distractor Mechanism (Negative Influence):** When a code document mirrors the syntax, variable naming conventions, or formatting of a query prompt but executes a *conflicting or entirely different algorithmic rule* (e.g., computing a distance formula instead of a line slope using identical variable names), it induces localized gradient conflict. This structural overlap pulls the parameter subspace *away* from the correct target reasoning chain, making it a high-magnitude logical inhibitor.
+
+---
+
 ### [How Does Code Pretraining Affect Language Model Task Performance?](https://arxiv.org/abs/2409.04556) (Petty et al., 2025)
 
 **Motivation:** Code is increasingly included in pretraining corpora and anecdotal evidence suggests it improves non-code tasks, but no prior work has established a causal connection by controlling code proportions as a continuous variable.
@@ -159,16 +188,6 @@
 **Conclusion:** Implicit reasoning follows a U-shaped curve with model size -- there exists an optimal size beyond which larger models degrade due to overfitting/memorization. The optimal size scales linearly with graph search entropy (R^2=0.85). Each parameter in an optimally-sized LM can reason over ~0.008 bits vs ~2 bits for memorization, highlighting reasoning is fundamentally harder than storage.
 
 **Dongwei's comment:** The paper conflates implicit, closed-system pattern matching with genuine, open-ended reasoning. By focusing strictly on synthetic pretraining environments, it entirely ignores the inference-time scaling, tool use, and test-time compute where actual agentic AI and reasoning breakthroughs are currently happening.
-
----
-
-### [Procedural Knowledge in Pretraining Drives Reasoning](https://arxiv.org/abs/2411.12580) (Ruis et al., 2025)
-
-**Motivation:** It is debated whether LLMs truly reason or merely retrieve answers from pretraining data. Understanding which pretraining documents are influential for reasoning vs factual recall can reveal the generalization strategy and inform data selection.
-
-**Experiment Setup:** EK-FAC influence functions rank 5 million pretraining documents (2.5B tokens) by influence on completions from Cohere Command R 7B and 35B for 40 reasoning queries (two-step arithmetic, slope calculation, linear equations) and 40 factual queries. Analyze top 500 (0.01%) most influential documents for answer presence and procedural content.
-
-**Conclusion:** Procedural knowledge drives reasoning, not answer retrieval. Documents influential for one reasoning query are strongly predictive for other queries of the same task type (high cross-query correlation), unlike factual queries. For reasoning, the answer almost never appears in top influential docs; instead they contain code implementing the same procedure or math showing the same method on different numbers. Code and StackExchange are 10x overrepresented among top influential documents.
 
 ---
 
