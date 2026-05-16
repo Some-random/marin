@@ -193,7 +193,12 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 **Conclusion:** Implicit reasoning follows a U-shaped curve with model size -- there exists an optimal size beyond which larger models degrade due to overfitting/memorization. The optimal size scales linearly with graph search entropy (R^2=0.85). Each parameter in an optimally-sized LM can reason over ~0.008 bits vs ~2 bits for memorization, highlighting reasoning is fundamentally harder than storage.
 
-**Dongwei's comment:** The paper conflates implicit, closed-system pattern matching with genuine, open-ended reasoning. By focusing strictly on synthetic pretraining environments, it entirely ignores the inference-time scaling, tool use, and test-time compute where actual agentic AI and reasoning breakthroughs are currently happening.
+<details>
+<summary><b>Dongwei's comment</b></summary>
+
+The paper conflates implicit, closed-system pattern matching with genuine, open-ended reasoning. By focusing strictly on synthetic pretraining environments, it entirely ignores the inference-time scaling, tool use, and test-time compute where actual agentic AI and reasoning breakthroughs are currently happening.
+
+</details>
 
 ---
 
@@ -214,6 +219,16 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 **Experiment Setup:** Pretrain language models on content-free synthetic tasks that preserve structural patterns of natural language without semantic content.
 
 **Conclusion:** Content-free synthetic pretraining closes ~65% of the gap to natural pretraining, demonstrating that structural patterns matter even without semantic content.
+
+---
+
+### [Between Circuits and Chomsky: Pre-pretraining on Formal Languages](https://arxiv.org/abs/2502.19249) (Hu, Petty, Shi, Merrill & Linzen, NYU, 2025)
+
+**Motivation:** Language models require 5-6 orders of magnitude more data than humans. The authors ask whether pre-pretraining on formal languages can impart inductive biases that improve natural language learning efficiency, and which formal language properties (hierarchical structure, transformer-expressibility) drive transfer.
+
+**Experiment Setup:** Test 4 formal languages -- 1-Dyck (nested brackets), k-Dyck (k bracket types), k-Shuffle Dyck (cross-serial dependencies), and ww (copy language) -- positioned along the Chomsky hierarchy and C-RASP circuit complexity hierarchy. Pre-pretrain Pythia 160M for 500-4000 steps on formal language tokens, then train on C4 for 10K steps (~665M tokens). Scale-up: Pythia 1B on 1.63B C4 tokens. Baselines: no pre-pretraining, random strings, extra C4 data. Evaluate on C4 validation loss, BLiMP grammaticality, and verbatim retrieval.
+
+**Conclusion:** k-Shuffle Dyck (context-sensitive, hierarchical, in C-RASP) is the best formal language -- at 1B scale it yields a 33% token efficiency gain (MRS=17.3), meaning each formal token replaces ~17 natural language tokens. Hierarchical structure is necessary: random strings and the copy language (no hierarchy) hurt or don't help. Mechanistically, a sparse subnetwork of attention heads learned during formal pre-pretraining transfers to and drives natural language performance. The benefit comes from global hierarchical dependencies, not local n-gram statistics.
 
 </details>
 
