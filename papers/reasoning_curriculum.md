@@ -117,6 +117,13 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 **Conclusion:** Higher code proportions improve compositional tasks (semantic parsing, arithmetic/math). Conversely, code harms tasks requiring linguistic structure (syntax, morphology) and factual knowledge. Code increases variance across tasks while raising the upper quartile, revealing a fundamental trade-off between structured reasoning and linguistic/factual capabilities.
 
+<details>
+<summary><b>Dongwei's comment</b></summary>
+
+This paper's "code harms NL" finding is largely a displacement artifact. In the competitive setting (132B fixed budget), high code proportions leave the model starved of natural language — of course factual/linguistic tasks degrade. The additive setting is more informative but under-discussed. The evaluation also skews narrow: COGS and passivization test formal compositional structure, not the NL reasoning benchmarks (ARC, HellaSwag) that practitioners care about. Aryabumi et al. (2408.10914) — running concurrently — finds the opposite conclusion (+8.2% NL reasoning) using higher-quality code (synthetic + curated vs web-scraped Pile), larger models (470M-2.8B vs 374M), and broader evaluation. The two papers agree that code helps compositional/structural tasks; they disagree on broader NL because they differ on code quality, data regime, and what "reasoning" means. Follow-ups (Waheed et al. 2509.21499, Twist et al. 2601.21894) confirm that code complexity profile and programming language choice modulate the effect — web-scraped code of uncontrolled complexity is a much weaker treatment than filtered/synthetic code.
+
+</details>
+
 ---
 
 ### [To Code, or Not To Code? Exploring Impact of Code in Pre-training](https://arxiv.org/abs/2408.10914) (Aryabumi et al., Meta, 2024)
@@ -126,6 +133,13 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 **Experiment Setup:** Pretrain 470M and 2.8B parameter transformers on SlimPajama (503B text tokens) mixed with code from The Stack (139B), markup (180B), synthetic code (3.2B), and code-adjacent data (21.4B) at varying proportions, using 200B-token training budgets plus 40B-token cooldown on TPU v5e. 64 total models evaluated on NL reasoning (11 benchmarks), world knowledge (TriviaQA, NaturalQuestions), code (HumanEval, MBPP), and LLM-as-judge win-rates.
 
 **Conclusion:** Best config yields +8.2% NL reasoning, +4.2% world knowledge, +6.6% generative win-rates, 12x code boost vs text-only. Code quality matters significantly -- synthetic code yields 9% and 44% increases in NL reasoning and code respectively over web-scraped. Including code during cooldown provides additional gains. Initialization from a code-pretrained model followed by continued text pretraining is the strongest recipe for NL tasks.
+
+<details>
+<summary><b>Dongwei's comment</b></summary>
+
+The strongest finding here — code-init then continue on text — is a curriculum effect, not a mixing effect. But mixing also works: 20% reasoning data mixed throughout pretraining works in Front-Loading Reasoning (Akter et al., 2510.03264). The real variable is not "mix vs sequence" but displacement proportion and code quality. This paper's use of synthetic code (GPT-generated) likely explains much of the gap with Petty et al. (2409.04556), who use only web-scraped Pile code and find code harms NL tasks. The two papers agree on the structural reasoning benefit; the disagreement on factual/linguistic tasks comes from (1) code quality — synthetic >> web-scraped, (2) displacement — Petty's competitive setting starves the model of NL, (3) evaluation scope — Petty measures COGS/passivization (narrow structural), this paper measures ARC/HellaSwag/PIQA (broad NL reasoning). Neither paper isolates what property of code helps — later work (Waheed et al., Twist et al.) shows it's hierarchical/procedural structure, not syntax, and that complexity profiles matter more than raw proportion.
+
+</details>
 
 </details>
 
