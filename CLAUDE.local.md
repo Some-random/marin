@@ -39,11 +39,12 @@
 - When running experiments at different model sizes, ALWAYS check the paper's hyperparameters for EACH model size. Don't assume one setting works for all. The paper uses different LR/WD/epochs per model size (e.g., 300M: LR=3e-3, 600M/1.4B: LR=1e-3).
 
 ## Paper reading rules
-- When summarizing a paper, read the actual results/figures, not just the abstract. Abstracts editorialize.
+- When summarizing a paper, read the FULL paper including appendix. Key evidence often lives in appendix figures, not the main text.
+- Read the actual results/figures, not just the abstract. Abstracts editorialize and overstate.
 - NEVER claim two papers conflict or agree without reading the relevant results sections of BOTH papers.
 - Present what the paper shows (numbers, figures, experimental conditions). Do not construct narratives or frameworks on top.
 - When comparing papers, state the specific experimental differences (model size, data, eval tasks, proportions) before drawing any conclusion.
-- If you only read the abstract, say "based on the abstract" — do not present it as a full reading.
+- If you only read part of the paper, say exactly which pages/sections you read — do not present partial reading as a full reading.
 - Do not invent "confounds" or "explanations" for why papers disagree. Present the differences and let the user interpret.
 
 ## Experiment logging
