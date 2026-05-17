@@ -191,6 +191,13 @@ The headline finding is simpler than the abstract suggests: always mix code with
 
 **Conclusion:** Code fine-tuning does not uniformly improve reasoning — gains depend strongly on structural complexity. The relationship is non-monotonic: accuracy peaks at intermediate complexity (~CC≈10) and degrades for both very simple and very complex code. In 20 of 24 model-dataset combinations (83%), restricting to a specific complexity range outperforms the mixed-complexity control. High complexity can actively harm reasoning — Llama models show near-perfect negative correlations (ρ ≈ −1.00) with CC. Cyclomatic complexity is a more reliable signal than LLOC. Problem-driven complexity (Instruct) shows stronger effects than solution-driven (CodeNet). The absolute CC value matters more than whether complexity comes from solution variation or problem difficulty.
 
+<details>
+<summary><b>Dongwei's comment</b></summary>
+
+The optimal complexity range is post-hoc and model-specific. Figure 3 shows the peak split differs across models (Qwen peaks at LOW/MID on CodeNet CC, Llama declines near-monotonically, Mistral shows the opposite U-shaped curve). The paper says "the effective complexity range itself appears to be model-specific." So the "83%" finding means: for any given model, there exists some restricted split that beats the mixed control — but you can't know which one without trying them all. The CC≈10 heuristic is an average across models, not a reliable predictor for a specific model. This limits practical applicability — you'd need to do the full complexity sweep for your model, which isn't cheaper than just trying different code datasets.
+
+</details>
+
 </details>
 
 <details>
