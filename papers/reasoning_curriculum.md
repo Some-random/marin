@@ -181,6 +181,16 @@ The headline finding is simpler than the abstract suggests: always mix code with
 
 **Conclusion:** OpenThinker3-7B achieves 53% AIME 2025, 51% LiveCodeBench, 54% GPQA Diamond, outperforming R1-Distill-7B by 12.4 points average. QwQ-32B is a stronger teacher than DeepSeek-R1 despite lower benchmark scores. Sampling multiple answers per question (16x+) is highly effective. No verification or answer filtering improved over unfiltered data.
 
+---
+
+### [Not All Code Is Equal: A Data-Centric Study of Code Complexity and LLM Reasoning](https://arxiv.org/abs/2601.21894) (Twist, Yang, Yan et al., King's College London & KAUST, 2026)
+
+**Motivation:** Prior work shows code exposure improves reasoning, but treats code as an undifferentiated signal. This paper asks whether the structural complexity of code — measured by cyclomatic complexity (CC, number of independent execution paths) and logical lines of code (LLOC) — systematically affects reasoning gains during fine-tuning.
+
+**Experiment Setup:** Two dataset constructions controlling complexity: (1) Solution-driven (CodeNet) — multiple solutions to the same programming problems, split into 5 complexity levels (MIN/LOW/MID/HIGH/MAX) + a mixed control (CTRL), 8,087 samples each, in Python/JavaScript/Java. (2) Problem-driven (Instruct) — from Magicoder, Evol-Instruct, WizardLM, where problems naturally vary in difficulty, same 5 splits + CTRL. Fine-tune 6 models with LoRA (2 epochs, LR 2e-5): Qwen 2.5 3B/7B/14B, Llama 3 3B/8B, Mistral 7B. Evaluate on GSM8K, MATH401, MATH500, GPQA, BBEH-mini, HLE.
+
+**Conclusion:** Code fine-tuning does not uniformly improve reasoning — gains depend strongly on structural complexity. The relationship is non-monotonic: accuracy peaks at intermediate complexity (~CC≈10) and degrades for both very simple and very complex code. In 20 of 24 model-dataset combinations (83%), restricting to a specific complexity range outperforms the mixed-complexity control. High complexity can actively harm reasoning — Llama models show near-perfect negative correlations (ρ ≈ −1.00) with CC. Cyclomatic complexity is a more reliable signal than LLOC. Problem-driven complexity (Instruct) shows stronger effects than solution-driven (CodeNet). The absolute CC value matters more than whether complexity comes from solution variation or problem difficulty.
+
 </details>
 
 <details>
