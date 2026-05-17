@@ -85,27 +85,27 @@
 
 **Conclusion:** Procedural knowledge drives reasoning, not answer retrieval. Documents influential for one reasoning query are strongly predictive for other queries of the same task type (high cross-query correlation), unlike factual queries. For reasoning, the answer almost never appears in top influential docs; instead they contain code implementing the same procedure or math showing the same method on different numbers. Code and StackExchange are 10x overrepresented among top influential documents.
 
-<details>
-<summary><b>Dongwei's comment</b></summary>
-
-#### 1. EK-FAC Attribution Methodology & Approximations
-To bypass the impossible computational cost of full "Leave-One-Out" retraining across 5 million documents, the authors compute data attribution using Influence Functions. This maps parameter shifts via a first-order Taylor expansion:
-$$\mathcal{I}_f(x) = -\nabla_{\theta}f(\theta^*)^T H^{-1} \nabla_{\theta}\mathcal{L}(x, \theta^*)$$
-* **The Math:** It calculates the dot product between the Query Gradient ($\nabla_{\theta}f$, what the prompt needs) and the Document Gradient ($\nabla_{\theta}\mathcal{L}$, how the training text pushes the weights), scaled by the Inverse Hessian ($H^{-1}$, which translates the local curvature and geometry of the loss landscape).
-* **Scale Approximations (EK-FAC):** To compute this over billions of parameters, several mathematical constraints are applied:
-  1. **Layer-by-Layer Isolation:** Assumes parameters across different transformer layers do not interact, slicing the giant Hessian into isolated layer blocks.
-  2. **MLP Block Focus:** Isolates computations exclusively to Multi-Layer Perceptron (Feed-Forward) weights, where dense procedural mapping is concentrated.
-  3. **Kronecker-Factoring (K-FAC):** Factors the massive layer Hessian block into a Kronecker product ($\otimes$) of two significantly smaller covariance matrices—layer input activations ($A$) and upstream loss gradients ($\Delta\theta$)—making matrix inversion mathematically tractable.
-  4. **Eigenbasis Re-scaling (The "E"):** Performs this factorization within a specialized eigenvector coordinate system (calibrated using a sample of 100,000 documents) to ensure the approximation preserves structural accuracy.
-
-#### 2. Detailed Breakdown of Finding 5: The Dual Dynamics of Code
-Finding 5 reveals that code and StackExchange datasets are vastly overrepresented at *both* the extreme positive (helpful) and extreme negative (inhibitory) tails of the document influence ranking.
-
-* **High-Saliency vs. Low-Saliency Data:** Unlike standard natural language prose (which exhibits flat, near-zero influence because its structure doesn't register during formal logic evaluation), code is inherently dense with strict algorithmic sequences. Because it aggressively forces parameter optimization during pretraining, it has high saliency, generating massive structural gradients that pull the model's weights heavily in either direction.
-* **The Helper Mechanism (Positive Influence):** Code documents that demonstrate step-by-step logic, variable tracking, or implementation of the targeted mathematical logic provide a structural layout that aligns perfectly with the target query's gradient requirements.
-* **The Distractor Mechanism (Negative Influence):** When a code document mirrors the syntax, variable naming conventions, or formatting of a query prompt but executes a *conflicting or entirely different algorithmic rule* (e.g., computing a distance formula instead of a line slope using identical variable names), it induces localized gradient conflict. This structural overlap pulls the parameter subspace *away* from the correct target reasoning chain, making it a high-magnitude logical inhibitor.
-
-</details>
+> <details>
+> <summary><b>Dongwei's comment</b></summary>
+>
+> #### 1. EK-FAC Attribution Methodology & Approximations
+> To bypass the impossible computational cost of full "Leave-One-Out" retraining across 5 million documents, the authors compute data attribution using Influence Functions. This maps parameter shifts via a first-order Taylor expansion:
+> $$\mathcal{I}_f(x) = -\nabla_{\theta}f(\theta^*)^T H^{-1} \nabla_{\theta}\mathcal{L}(x, \theta^*)$$
+> * **The Math:** It calculates the dot product between the Query Gradient ($\nabla_{\theta}f$, what the prompt needs) and the Document Gradient ($\nabla_{\theta}\mathcal{L}$, how the training text pushes the weights), scaled by the Inverse Hessian ($H^{-1}$, which translates the local curvature and geometry of the loss landscape).
+> * **Scale Approximations (EK-FAC):** To compute this over billions of parameters, several mathematical constraints are applied:
+>   1. **Layer-by-Layer Isolation:** Assumes parameters across different transformer layers do not interact, slicing the giant Hessian into isolated layer blocks.
+>   2. **MLP Block Focus:** Isolates computations exclusively to Multi-Layer Perceptron (Feed-Forward) weights, where dense procedural mapping is concentrated.
+>   3. **Kronecker-Factoring (K-FAC):** Factors the massive layer Hessian block into a Kronecker product ($\otimes$) of two significantly smaller covariance matrices—layer input activations ($A$) and upstream loss gradients ($\Delta\theta$)—making matrix inversion mathematically tractable.
+>   4. **Eigenbasis Re-scaling (The "E"):** Performs this factorization within a specialized eigenvector coordinate system (calibrated using a sample of 100,000 documents) to ensure the approximation preserves structural accuracy.
+>
+> #### 2. Detailed Breakdown of Finding 5: The Dual Dynamics of Code
+> Finding 5 reveals that code and StackExchange datasets are vastly overrepresented at *both* the extreme positive (helpful) and extreme negative (inhibitory) tails of the document influence ranking.
+>
+> * **High-Saliency vs. Low-Saliency Data:** Unlike standard natural language prose (which exhibits flat, near-zero influence because its structure doesn't register during formal logic evaluation), code is inherently dense with strict algorithmic sequences. Because it aggressively forces parameter optimization during pretraining, it has high saliency, generating massive structural gradients that pull the model's weights heavily in either direction.
+> * **The Helper Mechanism (Positive Influence):** Code documents that demonstrate step-by-step logic, variable tracking, or implementation of the targeted mathematical logic provide a structural layout that aligns perfectly with the target query's gradient requirements.
+> * **The Distractor Mechanism (Negative Influence):** When a code document mirrors the syntax, variable naming conventions, or formatting of a query prompt but executes a *conflicting or entirely different algorithmic rule* (e.g., computing a distance formula instead of a line slope using identical variable names), it induces localized gradient conflict. This structural overlap pulls the parameter subspace *away* from the correct target reasoning chain, making it a high-magnitude logical inhibitor.
+>
+> </details>
 
 ---
 
@@ -124,12 +124,12 @@ Finding 5 reveals that code and StackExchange datasets are vastly overrepresente
 
 **Conclusion:** Higher code proportions improve compositional tasks (semantic parsing, arithmetic/math). Conversely, code harms tasks requiring linguistic structure (syntax, morphology) and factual knowledge. Code increases variance across tasks while raising the upper quartile, revealing a fundamental trade-off between structured reasoning and linguistic/factual capabilities.
 
-<details>
-<summary><b>Dongwei's comment</b></summary>
-
-The "code harms NL" framing overstates the disagreement with Aryabumi et al. (2408.10914). Aryabumi also finds code hurts at high proportions — world knowledge drops 86% at 100% code, and the optimal is only 25%. Petty's competitive setting tests up to 90% code, well past what even Aryabumi shows is harmful. The two papers actually agree on the shape of the curve (moderate code helps, too much hurts); they differ on (1) where the sweet spot is, because of code quality (Aryabumi uses synthetic code, Petty uses web-scraped Pile), and (2) what tasks they emphasize (Petty: COGS/passivization, narrow structural; Aryabumi: ARC/HellaSwag/PIQA, broad NL reasoning). The additive setting here is more informative than the competitive one but gets less discussion. Follow-ups (Waheed et al. 2509.21499, Twist et al. 2601.21894) show code complexity profile and programming language choice modulate the effect further.
-
-</details>
+> <details>
+> <summary><b>Dongwei's comment</b></summary>
+>
+> The "code harms NL" framing overstates the disagreement with Aryabumi et al. (2408.10914). Aryabumi also finds code hurts at high proportions — world knowledge drops 86% at 100% code, and the optimal is only 25%. Petty's competitive setting tests up to 90% code, well past what even Aryabumi shows is harmful. The two papers actually agree on the shape of the curve (moderate code helps, too much hurts); they differ on (1) where the sweet spot is, because of code quality (Aryabumi uses synthetic code, Petty uses web-scraped Pile), and (2) what tasks they emphasize (Petty: COGS/passivization, narrow structural; Aryabumi: ARC/HellaSwag/PIQA, broad NL reasoning). The additive setting here is more informative than the competitive one but gets less discussion. Follow-ups (Waheed et al. 2509.21499, Twist et al. 2601.21894) show code complexity profile and programming language choice modulate the effect further.
+>
+> </details>
 
 ---
 
@@ -141,12 +141,12 @@ The "code harms NL" framing overstates the disagreement with Aryabumi et al. (24
 
 **Conclusion:** Best config yields +8.2% NL reasoning, +4.2% world knowledge, +6.6% generative win-rates, 12x code boost vs text-only. Optimal code proportion is 25% — NL reasoning is maintained up to 75% code but world knowledge degrades steadily (−3.4% at 25%, −31% at 75%, −86% at 100% vs text-only). Zero code hurts NL reasoning by 3.4% relative to 25% code. Code performance scales linearly with proportion (2.6x from 25%→100%). Code quality matters significantly — synthetic code (just 10% of code tokens) yields +9% NL reasoning and +44.9% code over web-scraped alone. Including code during cooldown provides additional gains. The Pareto-best recipe is balanced initialization (50% code + 50% text) followed by continued text pretraining — it matches or beats pure code-init on NL reasoning and substantially wins on world knowledge (+21% at 470M). Pure code-only pretraining never beats mixed.
 
-<details>
-<summary><b>Dongwei's comment</b></summary>
-
-The headline finding is simpler than the abstract suggests: always mix code with text, never go code-only. `balanced→text` (50/50 init, then text) is the Pareto-best recipe — it matches `code→text` on NL reasoning and beats it by 21% on world knowledge at 470M. At 2.8B, `balanced→text` actually *wins* on NL reasoning too (57.9 vs 55.8). Section 3.3's proportion results converge with Petty et al. (2409.04556) — both papers agree too much code hurts, they just tested different ranges. The apparent contradiction dissolves: at moderate proportions (25%) with quality code, NL reasoning improves; at high proportions or with low-quality code, it degrades. The remaining gap comes from code quality (synthetic >> web-scraped Pile) and evaluation scope (COGS/passivization vs ARC/HellaSwag). Neither paper isolates what property of code helps — later work (Waheed et al., Twist et al.) shows it's hierarchical/procedural structure, not syntax, and that complexity profiles matter more than raw proportion.
-
-</details>
+> <details>
+> <summary><b>Dongwei's comment</b></summary>
+>
+> The headline finding is simpler than the abstract suggests: always mix code with text, never go code-only. `balanced→text` (50/50 init, then text) is the Pareto-best recipe — it matches `code→text` on NL reasoning and beats it by 21% on world knowledge at 470M. At 2.8B, `balanced→text` actually *wins* on NL reasoning too (57.9 vs 55.8). Section 3.3's proportion results converge with Petty et al. (2409.04556) — both papers agree too much code hurts, they just tested different ranges. The apparent contradiction dissolves: at moderate proportions (25%) with quality code, NL reasoning improves; at high proportions or with low-quality code, it degrades. The remaining gap comes from code quality (synthetic >> web-scraped Pile) and evaluation scope (COGS/passivization vs ARC/HellaSwag). Neither paper isolates what property of code helps — later work (Waheed et al., Twist et al.) shows it's hierarchical/procedural structure, not syntax, and that complexity profiles matter more than raw proportion.
+>
+> </details>
 
 </details>
 
@@ -191,12 +191,12 @@ The headline finding is simpler than the abstract suggests: always mix code with
 
 **Conclusion:** Code fine-tuning does not uniformly improve reasoning — gains depend strongly on structural complexity. The relationship is non-monotonic: accuracy peaks at intermediate complexity (~CC≈10) and degrades for both very simple and very complex code. In 20 of 24 model-dataset combinations (83%), restricting to a specific complexity range outperforms the mixed-complexity control. High complexity can actively harm reasoning — Llama models show near-perfect negative correlations (ρ ≈ −1.00) with CC. Cyclomatic complexity is a more reliable signal than LLOC. Problem-driven complexity (Instruct) shows stronger effects than solution-driven (CodeNet). The absolute CC value matters more than whether complexity comes from solution variation or problem difficulty.
 
-<details>
-<summary><b>Dongwei's comment</b></summary>
-
-The optimal complexity range is post-hoc and model-specific. Figure 3 shows the peak split differs across models (Qwen peaks at LOW/MID on CodeNet CC, Llama declines near-monotonically, Mistral shows the opposite U-shaped curve). The paper says "the effective complexity range itself appears to be model-specific." So the "83%" finding means: for any given model, there exists some restricted split that beats the mixed control — but you can't know which one without trying them all. The CC≈10 heuristic is an average across models, not a reliable predictor for a specific model. This limits practical applicability — you'd need to do the full complexity sweep for your model, which isn't cheaper than just trying different code datasets.
-
-</details>
+> <details>
+> <summary><b>Dongwei's comment</b></summary>
+>
+> The optimal complexity range is post-hoc and model-specific. Figure 3 shows the peak split differs across models (Qwen peaks at LOW/MID on CodeNet CC, Llama declines near-monotonically, Mistral shows the opposite U-shaped curve). The paper says "the effective complexity range itself appears to be model-specific." So the "83%" finding means: for any given model, there exists some restricted split that beats the mixed control — but you can't know which one without trying them all. The CC≈10 heuristic is an average across models, not a reliable predictor for a specific model. This limits practical applicability — you'd need to do the full complexity sweep for your model, which isn't cheaper than just trying different code datasets.
+>
+> </details>
 
 ---
 
@@ -206,7 +206,24 @@ The optimal complexity range is post-hoc and model-specific. Figure 3 shows the 
 
 **Experiment Setup:** Construct parallel datasets of 120K code instructions (solutions generated by GPT-4o-mini in 10 languages: Java, JavaScript, PHP, Python, C#, TypeScript, C, C++, Go, Rust) and 120K NL instructions (from OpenHermes 2.5). Apply controlled perturbations in two categories: rule-based (whitespace removal, variable renaming, keyword replacement with nonsense/non-English tokens, comment removal/swapping) and generative (pseudocode, flowcharts in Mermaid, step-by-step NL procedures, imaginary language, comment enhancement/obfuscation). Fine-tune models from 5 families (Qwen3, Llama3, Gemma3, OLMo2, SmolLM2) at scales from 0.6B to 8B using SFT. Evaluate on NL & general knowledge, math (GSM8K, HRM8K, MMLU math/arithmetic), and code (understanding + generation via LLM-as-judge). 3,331 total experiments.
 
-**Conclusion:** Four main findings: (1) Structural perturbations (whitespace removal, pseudocode, flowcharts) hurt more than semantic ones (variable renaming, keyword replacement), especially on math and code (Figure 3). (2) Pseudocode and flowcharts — which preserve algorithmic structure but remove syntax — can match or surpass unperturbed code on NL and math tasks (Figure 4). Reduced-token variants also perform comparably, meaning models don't need verbose code, just preserved core structure (Figure 5). (3) Even corrupted code with deliberately misleading comments retains competitive performance — models exploit surface-level statistical regularities that persist despite distortion (Figure 6). (4) Programming language matters at the group level: high-scripting languages (Python, PHP, JavaScript, TypeScript) consistently underperform intermediate (Java, C#) and low-system (C, C++, Rust, Go) languages on math tasks. Python leads on NL tasks, likely due to surface similarity to natural language. Individual language rankings are noisier — the paper says lower-level languages "often rank among the top" for math (Figure 7, shown for Qwen3-1.7B; appendix has other models).
+**Conclusion:** Baseline: code fine-tuning consistently outperforms NL-only fine-tuning on math and code tasks across all 5 model families, while matching or slightly improving NL & general performance (Figures 17-22). Four main findings on *why*: (1) Structural perturbations (whitespace removal, pseudocode, flowcharts) hurt more than semantic ones (variable renaming, keyword replacement), especially on math and code (Figure 3). (2) Pseudocode and flowcharts — which preserve algorithmic structure but remove syntax — can match or surpass unperturbed code on NL and math tasks (Figure 4). Reduced-token variants also perform comparably, meaning models don't need verbose code, just preserved core structure (Figure 5). (3) Even corrupted code with deliberately misleading comments retains competitive performance — models exploit surface-level statistical regularities that persist despite distortion (Figure 6). (4) Programming language matters at the group level: high-scripting languages (Python, PHP, JavaScript, TypeScript) consistently underperform intermediate (Java, C#) and low-system (C, C++, Rust, Go) languages on math tasks. Python leads on NL tasks, likely due to surface similarity to natural language. Individual language rankings are noisier — the paper says lower-level languages "often rank among the top" for math (Figure 7, shown for Qwen3-1.7B; appendix has other models).
+
+> <details>
+> <summary><b>Dongwei's comment</b></summary>
+>
+> The main text presents programming language effects using only Qwen3-1.7B (Figure 7), which happens to show the cleanest group-level separation. The appendix (Figures 48-51) tells a different story. Per-language math rankings are highly inconsistent across model families:
+>
+> | Model | Top 3 for Math | Java's rank |
+> |-------|---------------|-------------|
+> | SmolLM2-1.7B | Java (0.142), C (0.139), Rust (0.138) | #1 |
+> | Qwen3-0.6B-Base | Go (0.518), Rust (0.515), Java (0.513) | #3 |
+> | Qwen3-0.6B | Python (0.473), C (0.473), Java (0.468) | #3 |
+> | Qwen3-1.7B | Rust (0.625), Python (0.625), C (0.625) | #10 (last) |
+> | Llama-3.2-1B | Go (0.210), Rust (0.209), CSharp (0.209) | #7 |
+>
+> The abstract's "Java and Rust favor math" is supported for exactly one model (SmolLM2-1.7B). On Qwen3-1.7B, Java is dead last for math and the entire 10-language spread is 0.011 points. The group-level finding (high-scripting < intermediate/low-system) is weakly supported in aggregate, but effect sizes are small enough that individual language choice within groups matters more than group membership. This parallels the model-specificity problem in Twist et al. — just as optimal complexity is model-dependent, optimal language is too.
+>
+> </details>
 
 </details>
 
@@ -241,12 +258,12 @@ The optimal complexity range is post-hoc and model-specific. Figure 3 shows the 
 
 **Conclusion:** Implicit reasoning follows a U-shaped curve with model size -- there exists an optimal size beyond which larger models degrade due to overfitting/memorization. The optimal size scales linearly with graph search entropy (R^2=0.85). Each parameter in an optimally-sized LM can reason over ~0.008 bits vs ~2 bits for memorization, highlighting reasoning is fundamentally harder than storage.
 
-<details>
-<summary><b>Dongwei's comment</b></summary>
-
-The paper conflates implicit, closed-system pattern matching with genuine, open-ended reasoning. By focusing strictly on synthetic pretraining environments, it entirely ignores the inference-time scaling, tool use, and test-time compute where actual agentic AI and reasoning breakthroughs are currently happening.
-
-</details>
+> <details>
+> <summary><b>Dongwei's comment</b></summary>
+>
+> The paper conflates implicit, closed-system pattern matching with genuine, open-ended reasoning. By focusing strictly on synthetic pretraining environments, it entirely ignores the inference-time scaling, tool use, and test-time compute where actual agentic AI and reasoning breakthroughs are currently happening.
+>
+> </details>
 
 ---
 
