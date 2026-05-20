@@ -1,7 +1,7 @@
 # Reasoning & Curriculum: Paper Notes
 
 <details>
-<summary><b>Model Training / Tech Reports</b></summary>
+<summary><h2>Model Training / Tech Reports</h2></summary>
 
 ### [Textbooks Are All You Need (Phi-1)](https://arxiv.org/abs/2306.11644) (Gunasekar et al., 2023)
 
@@ -65,7 +65,7 @@
 
 
 <details>
-<summary><b>Reasoning in Pretraining</b></summary>
+<summary><h2>Reasoning in Pretraining</h2></summary>
 
 ### [Front-Loading Reasoning: Synergy between Pretraining and Post-Training Data](https://arxiv.org/abs/2510.03264) (Akter et al., NVIDIA, 2025)
 
@@ -151,7 +151,7 @@
 </details>
 
 <details>
-<summary><b>Reasoning in Post-Training</b></summary>
+<summary><h2>Reasoning in Post-Training</h2></summary>
 
 ### [Echo Chamber: RL Post-training Amplifies Behaviors Learned in Pretraining](https://arxiv.org/abs/2504.07912) (Zhao et al., 2025)
 
@@ -235,7 +235,7 @@
 </details>
 
 <details>
-<summary><b>Synthetic Data & Tasks</b></summary>
+<summary><h2>Synthetic Data & Tasks</h2></summary>
 
 ### [Demystifying Synthetic Data in LLM Pre-training](https://arxiv.org/abs/2510.01631) (Kang et al., 2025)
 
@@ -360,7 +360,7 @@
 </details>
 
 <details>
-<summary><b>Curriculum & Data Selection</b></summary>
+<summary><h2>Curriculum & Data Selection</h2></summary>
 
 ### [Improving Pretraining Data Using Perplexity Correlations](https://arxiv.org/abs/2409.05816) (Thrush, Potts & Hashimoto, 2025)
 
@@ -414,7 +414,7 @@
 </details>
 
 <details>
-<summary><b>Physics of Language Models</b></summary>
+<summary><h2>Physics of Language Models</h2></summary>
 
 ### [Part 1: Learning Hierarchical Language Structures](https://arxiv.org/abs/2305.13673) (Allen-Zhu & Li, 2023)
 
