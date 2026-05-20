@@ -294,6 +294,16 @@
 
 ---
 
+### [Modeling Rapid Language Learning by Distilling Bayesian Priors into Neural Networks](https://arxiv.org/abs/2305.14701) (McCoy & Griffiths, Princeton, 2023)
+
+**Motivation:** Humans learn language from remarkably little data. Bayesian models explain this via strong inductive biases but can't scale to naturalistic data; neural networks scale but are data-hungry. The authors ask whether you can get both: strong inductive biases with flexible neural representations.
+
+**Experiment Setup:** Three-step "inductive bias distillation" pipeline: (1) Define a target inductive bias as a Bayesian prior over formal languages, using probabilistic context-free grammar primitives (concat, plus/recursion, or, synchrony) to generate a distribution over languages. (2) Sample 25,000 formal languages from this prior. (3) Meta-learn (MAML) a 2-layer LSTM on these sampled languages — each meta-episode trains on one language, then the outer loop updates initialization weights to learn new languages faster. The resulting "prior-trained" LSTM is then evaluated on: (a) 56 held-out formal languages (1-10K examples each), comparing against a Bayesian learner and a standard LSTM; (b) natural language (8.5M-word CHILDES corpus of child-directed speech), measuring perplexity; (c) targeted linguistic evaluations — BLiMP grammaticality, recursion depth (intensifiers, possessives, prepositional phrases up to 10 levels), and priming. Also tested Transformers but found LSTMs captured the formal language primitives better.
+
+**Conclusion:** On formal languages, the prior-trained LSTM matches the Bayesian learner's data efficiency (standard LSTM needs ~10x more examples for the same F-score). On natural language, prior-trained network achieves perplexity 19.67 vs standard LSTM's 19.75 — small overall, but the benefit concentrates where inductive biases matter most: (1) low-data regimes — at 1/32 of CHILDES with hidden size 64, prior-trained gets 51.2 perplexity vs standard's 57.4 (10.8% improvement); (2) deep recursion — prior-trained handles 6+ levels of nesting better than standard (Figure 4C); (3) priming — shows stronger syntactic priming effects. Benefit pattern follows a diagonal in model-size × data-size space: helps most in small-model-small-data and large-model-large-data regimes, less in between. Key distinction from pre-training: prior-training is "learning to learn" (acquiring inductive biases as initialization), not "learning" (acquiring content). The entire prior-training distribution was generated from a 21KB Python file, vs hundreds of GB for standard pre-training.
+
+---
+
 ### [Between Circuits and Chomsky: Pre-pretraining on Formal Languages](https://arxiv.org/abs/2502.19249) (Hu, Petty, Shi, Merrill & Linzen, NYU, 2025)
 
 **Motivation:** Language models require 5-6 orders of magnitude more data than humans. The authors ask whether pre-pretraining on formal languages can impart inductive biases that improve natural language learning efficiency, and which formal language properties (hierarchical structure, transformer-expressibility) drive transfer.
