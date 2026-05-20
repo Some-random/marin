@@ -355,6 +355,17 @@
 
 **Conclusion:** All orderings share the same latent training phases; curricula primarily change within-phase data exposure. For smaller models (14M-160M), curricula reduce gradient noise and prevent late-stage spectral collapse of the output head, improving accuracy. At 410M+, differences diminish, suggesting curricula are most valuable when model capacity is constrained.
 
+> <details>
+> <summary><b>Dongwei comment — HMM methodology, softmax bottleneck, and scale dependence</b></summary>
+>
+> **How the HMM analysis actually works.** The paper doesn't just track loss or accuracy over time — it extracts structural metrics from model checkpoints: "layer-function summaries through trace and singular-value statistics" of the weight matrices. These capture how the model's internal representations are changing structurally, not just how well it predicts. Each metric trajectory is standardized so large-scale quantities don't dominate. Then they fit an HMM to convert these continuous trajectories into discrete states. The critical methodological choice: they don't fit separate HMMs per curriculum. They use BIC and AIC to find a single optimal state count (K=5) across all runs, then "hold the fitted state space fixed across orderings." This means any difference between curricula can only show up as different *time spent* in each of the 5 shared states, not as different states entirely. That's how they prove curricula don't create new learning phases — by construction, the 5-state model is the universal yardstick, and all curricula map onto it.
+>
+> **Softmax bottleneck and why model size matters.** The bottleneck isn't about vocabulary size (the "exit door" is the same ~50K tokens for all models). It's about the effective rank of the hidden state — the "width of the hallway" leading to that exit. Small models have narrow hidden states that can't represent the high-rank distributions needed for complex language. When random, noisy text hits a small model late in training, its output head saturates (singular entropy spikes) because it can't push complex distributions through its narrow hidden representation. Large models have wide hidden states with high effective rank, so they process complex text without bottlenecking. That's why curriculum ordering (easy-to-hard) helps small models — it delays the point where complexity overwhelms the output head — but barely matters for large ones whose "highway" is wide enough to handle anything.
+>
+> **Gradient Noise Scale.** Measures how noisy stochastic gradients are relative to their signal. Random ordering produces much higher gradient noise in small models (14M-70M), meaning the model gets contradictory, noisy corrections. Curricula calm this down by presenting coherent, progressively complex data. At larger scales, the model has enough capacity to average out the noise regardless of ordering.
+>
+> </details>
+
 ---
 
 ### [Beyond Random Sampling: Efficient Language Model Pretraining via Curriculum Learning](https://arxiv.org/abs/2506.11300) (Zhang, Mohamed, Abdine, Shang & Vazirgiannis, Ecole Polytechnique & MBZUAI, 2026)
