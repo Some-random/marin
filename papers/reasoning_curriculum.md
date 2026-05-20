@@ -357,6 +357,29 @@
 
 ---
 
+### [Beyond Random Sampling: Efficient Language Model Pretraining via Curriculum Learning](https://arxiv.org/abs/2506.11300) (Zhang, Mohamed, Abdine, Shang & Vazirgiannis, Ecole Polytechnique & MBZUAI, 2026)
+
+**Motivation:** LLMs train on randomly sampled data, ignoring the easy-to-hard progression that benefits human learning. Curriculum learning (CL) has improved efficiency in vision and NLP fine-tuning, but remains underexplored for LLM *pretraining* — partly because defining "difficulty" for raw text and designing scalable curricula is hard.
+
+**Experiment Setup:** Over 200 models trained, 0.5B parameter LLaMA 3.2 architecture (also 1B and 3B for scaling), on CulturaX English subset with up to 100B tokens. Select 6 difficulty metrics from 15 candidates via Spearman correlation analysis to ensure orthogonality: Compression Ratio (information density), Fertility (tokenization complexity), Flesch Reading Ease (readability), MTLD (lexical diversity), Number of Tokens (sequence length), and Perplexity (model-perceived difficulty). Test three curriculum strategies: (i) vanilla CL — strict easy-to-hard ordering on a fixed 10B-token dataset; (ii) pacing-based sampling — linear, quadratic, or inverse quadratic pacing functions controlling difficulty group exposure over time from a large pool; (iii) interleaved curricula — mix difficulty levels within each training segment while maintaining progressive structure. Three training scenarios: S1 (limited fixed data, 10B), S2 (unlimited data with pacing, 10B), S3 (continual training — CL warmup then random sampling). Evaluate 0-shot on 8 benchmarks: PIQA, COPA, OpenBookQA (commonsense), HellaSwag, WinoGrande, xwinograd_en (language understanding), BoolQ (reading comprehension), ArcChallenge (world knowledge).
+
+**Conclusion:** CL consistently accelerates convergence, reducing training steps by 18-45% to reach baseline performance. Best difficulty metrics: Compression Ratio, MTLD, and Flesch Reading Ease — all linked to linguistic diversity and information density. Perplexity is *less* effective: high-perplexity samples tend to be noisy, causing instability in later training. For pacing, linear works best for linguistic metrics (Compression Ratio reaches baseline in 39.5% fewer steps); quadratic best for Flesch Reading Ease (+1.6% above baseline at end) and Number of Tokens. Interleaving only consistently helps for Compression Ratio and Number of Tokens. Most practical finding: **CL as warmup** — train with curriculum ordering first, then continue with random sampling — yields sustained improvements up to +3.5% that persist even when the random baseline trains on 2x the data. This warmup benefit holds across 0.5B, 1B, and 3B model sizes and scales to 100B tokens (+3.1%). The early convergence is partly data filtering (easy = higher quality first) but ordering provides additional benefit beyond filtering alone (Appendix E: shuffling the same early-stage subset beats random baseline but still loses to the ordered version). Computational overhead is negligible (~$1-2 to compute metrics for 10B tokens vs ~84 GPU-hours of A100 for training). Limitations: only decoder-only LLaMA 3.2, only English, static difficulty scores (no adaptive/dynamic curricula), only pretraining (no fine-tuning evaluation), perplexity conflates difficulty with noise.
+
+> <details>
+> <summary><b>Dongwei comment</b></summary>
+>
+> This is the most comprehensive curriculum learning study for LLM pretraining I've seen — 200+ models, multiple strategies, proper scaling. The key takeaway for us: curriculum learning is *orthogonal* to data selection/filtering. We've been focused on *what* data to train on (DCLM vs OWM, reasoning vs NL); this paper says the *ordering* of that data also matters, independently. The warmup finding is particularly practical — you don't need to reorganize your entire dataset, just order a fraction of it easy-to-hard at the start and then switch to random.
+>
+> The Flesch Reading Ease result is interesting: it consistently improves *without converging*, unlike other metrics that plateau. The paper doesn't fully explain why, just notes it "shows a constant rate of improvement." Worth investigating if this generalizes beyond CulturaX.
+>
+> Key limitation: the Elgaar & Amiri paper (above) found curriculum benefits diminish at 410M+, while this paper claims benefits at 0.5B-3B. The difference might be dataset (The Pile vs CulturaX), metric choices, or the warmup setup specifically. The two papers don't directly contradict — Elgaar analyzes *learning dynamics* while this paper measures *downstream benchmark accuracy* — but the scale dependence question is still open.
+>
+> Also notable: perplexity-based ordering hurts in later training due to noisy high-perplexity samples. This aligns with the Open Thoughts finding that classical filtering (which often uses perplexity) underperforms LLM-based difficulty scoring.
+>
+> </details>
+
+---
+
 ### [General Intelligence Requires Reward-based Pretraining](https://arxiv.org/abs/2502.19402) (Han, Pari, Gershman & Agrawal, 2025)
 
 **Motivation:** LLM reasoning is fragile and overfits to training data patterns rather than learning generalizable algorithms. Drawing an analogy to AlphaGo vs AlphaZero: supervised pretraining on demonstrations constrains subsequent RL to local minima, while RL from scratch discovers superior strategies.
