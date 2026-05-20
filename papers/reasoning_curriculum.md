@@ -302,6 +302,21 @@
 
 **Conclusion:** On formal languages, the prior-trained LSTM matches the Bayesian learner's data efficiency (standard LSTM needs ~10x more examples for the same F-score). On natural language, prior-trained network achieves perplexity 19.67 vs standard LSTM's 19.75 — small overall, but the benefit concentrates where inductive biases matter most: (1) low-data regimes — at 1/32 of CHILDES with hidden size 64, prior-trained gets 51.2 perplexity vs standard's 57.4 (10.8% improvement); (2) deep recursion — prior-trained handles 6+ levels of nesting better than standard (Figure 4C); (3) priming — shows stronger syntactic priming effects. Benefit pattern follows a diagonal in model-size × data-size space: helps most in small-model-small-data and large-model-large-data regimes, less in between. Key distinction from pre-training: prior-training is "learning to learn" (acquiring inductive biases as initialization), not "learning" (acquiring content). The entire prior-training distribution was generated from a 21KB Python file, vs hundreds of GB for standard pre-training.
 
+> <details>
+> <summary><b>Dongwei comment — how MAML works and why the prior transfers</b></summary>
+>
+> **How MAML actually works here (the two-loop process).** The data for meta-learning isn't a static dataset — it's a continuous stream of synthetic language *tasks* sampled from the Bayesian prior. Each meta-episode goes like this:
+>
+> 1. Sample a language L from the prior (e.g., `concat(A, plus(C), or(F, B))` which generates strings like ACF, ACCB, ACCCF...).
+> 2. **Inner loop (adaptation):** Sample a small *support set* of strings from L (e.g., just ACF and ACCF). Do a standard gradient update on the current weights M_t to get temporary task-specific weights M'. This is the model "learning" one specific language.
+> 3. **Outer loop (meta-update):** Sample a separate *query set* from the same language L. Evaluate how well M' does on this query set. Compute the gradient of *that* error with respect to the *original* M_t (not M'), and update M_t → M_{t+1}.
+>
+> The outer loop is what makes this different from just training on many languages sequentially (standard multi-task learning). Without it, you'd find one set of weights that's okay at the *average* of all tasks — a compromise solution. The outer loop explicitly optimizes the *starting point* so that after just a few gradient steps on any new language, the model is already high-performing. It's optimizing the learning process itself, not direct performance on the tasks.
+>
+> **Why the prior is useful for human language.** The Bayesian prior assigns high probability to languages built from few simple primitives (concat, plus/recursion, or) and low probability to complex/random ones. This "simplicity bias" is useful for language because human languages actually do exhibit these structural regularities — recursion (nested prepositional phrases), concatenation (subject-verb-object ordering), alternation (grammatical choices). When MAML sees thousands of languages drawn from this prior, the network's initialization gets tuned to be maximally sensitive to exactly these kinds of rule-based patterns. So when it encounters actual English, it doesn't search the infinite space of all possible patterns — it's already primed to look for the simple, recursive, compositional structures that human grammar actually uses. This is the paper's answer to the "poverty of the stimulus" problem: the model arrives at language learning with a prior that constrains the hypothesis space to structurally plausible grammars.
+>
+> </details>
+
 ---
 
 ### [Between Circuits and Chomsky: Pre-pretraining on Formal Languages](https://arxiv.org/abs/2502.19249) (Hu, Petty, Shi, Merrill & Linzen, NYU, 2025)
