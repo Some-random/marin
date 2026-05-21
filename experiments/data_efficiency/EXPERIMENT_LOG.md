@@ -24,7 +24,19 @@ Expanded the paper reading from the May 11 survey into deep dives on the actual 
 
 All prior experiments (May 1–11) showed the same result: reasoning data (OpenThoughts, OWM, code) injected during pretraining does not help downstream benchmarks compared to pure DCLM, across 300M–1.4B scales. The literature review has identified several mechanisms that *should* work based on theory, but we haven't found an experiment design that bridges the gap between "formal language pre-pretraining improves data efficiency" and "reasoning data during pretraining improves downstream reasoning."
 
-**Open question: What experiment to run next?** The literature points to several directions but none have been concretely designed:
+### Research objectives
+
+Using reasoning/synthetic data in pre-pretraining or pretraining should achieve three things simultaneously:
+
+1. **Data efficiency**: The model reaches the same loss with less general data or less training time
+2. **Reasoning quality**: The trained model performs better on reasoning tasks, hallucinates less, reasons more reliably
+3. **General NL performance**: Normal natural language benchmarks also improve (not just reasoning — no regression)
+
+These three objectives are the success criteria for any experiment going forward. An approach that only achieves (1) but hurts (2) or (3) is not useful. The Between Circuits paper achieves (1) and (3) but doesn't measure (2). The code papers (Twist et al., Aryabumi et al.) show (2) in fine-tuning but we haven't shown it in pretraining. Our prior experiments failed all three — reasoning data injection hurt general benchmarks and didn't help reasoning ones.
+
+### Open question: What experiment to run next?
+
+The literature points to several directions but none have been concretely designed:
 - Curriculum ordering (easy-to-hard) of existing web data — orthogonal to data selection, shown to help by Zhang et al.
 - Formal language pre-pretraining — shown to work by Hu et al. but only tested in blocked setting, not mixed
 - Data selection via perplexity correlations — Thrush et al. showed this beats DSIR, could apply to our DCLM subset
