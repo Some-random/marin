@@ -370,6 +370,21 @@
 
 **Conclusion:** At 160M, perplexity correlations outperform DSIR on every benchmark and match DataComp-LM's handcrafted fastText classifier without parameter tuning or human curation. Improvements increase at 1.4B scale, demonstrating simple loss-performance correlations from public models are an effective training-free data selection signal.
 
+> <details>
+> <summary><b>Dongwei comment — the correlation formula, domains, and how selection works</b></summary>
+>
+> **What "domains" means.** A domain is a top-level web address (e.g., `wikipedia.org`, `arxiv.org`, `willys-hifi.com`). The paper uses RedPajama V2, which is already partitioned into ~9,841 such domains. For each domain j, they compute the average bits-per-byte loss L_{k,j} for each of 90 Open LLM Leaderboard models k. Bits-per-byte = -(1/B(x)) * log2(p_k(x)), where B(x) is the number of UTF-8 bytes — this normalization lets them compare models with different tokenizers.
+>
+> **The correlation coefficient γ_j.** For each domain j, they compute: γ_j = E_{k,l ~ M} [sign(P_k - P_l) · sign(L_{l,j} - L_{k,j})]. Pick any pair of models k and l. The first term sign(P_k - P_l) tells you which model is "smarter" on the target benchmark. The second term sign(L_{l,j} - L_{k,j}) tells you which model finds domain j more predictable (lower loss). If these agree — i.e., the smarter model also has lower loss on domain j — the product is positive. Average over all model pairs: a high positive γ_j means "models that do well on this benchmark are consistently the ones that find this domain easy to read." This is rank-based (using sign, not raw values) to be robust to outliers in log-likelihoods.
+>
+> **Concrete example.** When targeting SciQ (science questions), domains like `arxiv.org` and `cell.com` have the highest γ_j — models good at science consistently find scientific papers easy. `willys-hifi.com` (audio equipment store) has near-zero γ_j — predicting hifi text tells you nothing about a model's science ability. For GSM8K (math), selecting by this method gave a 160M model 5.8% accuracy vs DSIR's 1.8%.
+>
+> **How they scale it.** Domain-level γ_j gives noisy labels: top 5% of domains → positive, bottom 50% → negative. They train a fastText classifier on these labels, which learns the linguistic features distinguishing high-correlation domains from low-correlation ones. This classifier can then score individual pages, not just whole domains — so it can find a good scientific snippet buried inside an otherwise mediocre website. Two-stage process: domain-level ranking → page-level classification.
+>
+> **DSIR comparison.** DSIR (Data Selection with Importance Resampling) selects data by matching n-gram statistics to a human-chosen target corpus. It requires knowing what "good data" looks like in advance. This paper's method doesn't — it discovers what data matters by looking at what existing models actually find useful, which is why it outperforms DSIR on every benchmark tested.
+>
+> </details>
+
 ---
 
 ### [Curriculum Learning for LLM Pretraining: An Analysis of Learning Dynamics](https://arxiv.org/abs/2601.21698) (Elgaar & Amiri, 2026)
