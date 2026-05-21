@@ -1,5 +1,37 @@
 # Experiment Log: Data Efficiency & Reasoning Pretraining
 
+## May 17–21: Deep Literature Review — Curriculum, Formal Languages, and Data Selection
+
+Expanded the paper reading from the May 11 survey into deep dives on the actual mechanics behind each approach. Read full papers (including appendices) and documented detailed notes with Dongwei comments on the underlying theory. Papers added/updated in [papers/reasoning_curriculum.md](../../papers/reasoning_curriculum.md):
+
+### Papers read in full (with Dongwei comments)
+
+1. **Between Circuits and Chomsky** (Hu et al., 2025) — Pre-pretraining on formal languages. Key insight: hierarchy matters, not just Chomsky complexity class. k-Shuffle Dyck (context-sensitive + hierarchical + in C-RASP) gives 33% token efficiency gain at 1B; ww (context-sensitive but non-hierarchical) actively hurts. Mechanistic proof via circuit discovery shows the model reuses the exact same attention heads for English syntax. Commented on: Chomsky hierarchy, C-RASP (what Transformers can express in constant depth), the 2x2 grid of formal languages, and the 3-step mech interp proof (pruning → NL training → targeted ablation).
+
+2. **McCoy & Griffiths — Bayesian Inductive Bias Distillation** (2023) — Meta-learn (MAML) an LSTM on 25K formal languages sampled from a Bayesian prior. The prior-trained LSTM matches Bayesian data efficiency on formal languages and gains ~11% perplexity on low-data natural language. Commented on: how MAML's inner/outer loop works concretely (support set → temporary update → query set → meta-update of initialization), and why the simplicity prior transfers to human language (recursion, concatenation, alternation match NL structure).
+
+3. **Curriculum Learning for LLM Pretraining** (Elgaar & Amiri, 2026) — All curricula share the same 5 latent training phases (proven via HMM with BIC/AIC); curricula only change time spent in each phase. Benefits diminish at 410M+. Commented on: HMM methodology (observable metrics are trace/singular-value statistics, not loss; state space held fixed across curricula), softmax bottleneck (effective rank of hidden state, not vocab size), gradient noise scale.
+
+4. **Beyond Random Sampling** (Zhang et al., 2026) — Most comprehensive CL study for pretraining (200+ models, up to 100B tokens). CL as warmup yields +3.5% sustained improvement. Best metrics: compression ratio, MTLD, Flesch Reading Ease. Perplexity-based ordering hurts late training.
+
+5. **Perplexity Correlations for Data Selection** (Thrush et al., 2025) — Use 90 existing LLMs to compute rank correlation γ_j between per-domain loss and benchmark performance. Select high-correlation domains, train fastText classifier to scale to page-level. Commented on: the γ_j formula, what "domains" means (top-level web addresses in RedPajama V2), two-stage pipeline (domain ranking → page-level classification), and why it beats DSIR.
+
+6. **Open Thoughts** (2025) — Full 72-page paper including appendix. Concentration > diversity for question sources. Self-reflection critical (-49.1% without it). Cross-domain transfer vanishes when in-domain data mixed in. Single-model limitation (all 1000+ ablations on Qwen2.5-7B-Instruct only).
+
+7. **On Code-Induced Reasoning** (Aryabumi et al., 2025) — Java-favors-math claim from abstract only holds for 1/5 models. Code fine-tuning consistently beats NL-only fine-tuning as a baseline.
+
+### Current state
+
+All prior experiments (May 1–11) showed the same result: reasoning data (OpenThoughts, OWM, code) injected during pretraining does not help downstream benchmarks compared to pure DCLM, across 300M–1.4B scales. The literature review has identified several mechanisms that *should* work based on theory, but we haven't found an experiment design that bridges the gap between "formal language pre-pretraining improves data efficiency" and "reasoning data during pretraining improves downstream reasoning."
+
+**Open question: What experiment to run next?** The literature points to several directions but none have been concretely designed:
+- Curriculum ordering (easy-to-hard) of existing web data — orthogonal to data selection, shown to help by Zhang et al.
+- Formal language pre-pretraining — shown to work by Hu et al. but only tested in blocked setting, not mixed
+- Data selection via perplexity correlations — Thrush et al. showed this beats DSIR, could apply to our DCLM subset
+- Better reasoning data structure — McCoy & Griffiths suggest recursive/compositional structure matters, not just "hard" data
+
+---
+
 ## May 11: Literature Review & Hypothesis Refinement
 
 After the H1 experiment showed no clear benefit from reasoning data injection, we stepped back to survey the literature on what makes reasoning data effective for pretraining. Reviewed 15+ papers across synthetic data composition, pretraining vs post-training, code and reasoning, abstract reasoning transfer, and data selection/curriculum. Paper notes organized by category in [papers/reasoning_curriculum.md](../../papers/reasoning_curriculum.md) and [papers/causal_bridge.md](../../papers/causal_bridge.md). Downloaded all cited paper PDFs to `papers/`.
