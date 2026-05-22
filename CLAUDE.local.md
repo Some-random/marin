@@ -27,6 +27,7 @@
 - If you CAN'T deliver what the user asked for, DO NOT silently give them an alternative. Stop, explain the blocker, and discuss. Never present a different solution as if it fulfills the original request.
 
 ## Research rules
+- Do NOT write anything that isn't directly backed by evidence. If you can't point to the specific source (paper figure, code, log, data), don't write it.
 - Before speculating about WHY something happens (e.g. "data diversity causes the loss gap"), READ THE CODE to verify the mechanism. Don't assume — trace the actual code path.
 - When a config parameter controls behavior (e.g. max_train_batches, shuffle, epochs), read the implementation to understand what it ACTUALLY does, not what the name suggests.
 - NEVER make up explanations for experimental results without evidence. Say "I don't know" instead of guessing.

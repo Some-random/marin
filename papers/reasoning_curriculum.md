@@ -355,6 +355,8 @@
 >
 > **Implications for our data efficiency work.** The key insight: *hierarchy* is what matters for transfer, not just complexity class. ww and k-Shuffle Dyck are both Context-Sensitive, but only k-Shuffle Dyck helps because it has hierarchical, crossing structure that matches human syntax. For reasoning curricula, this suggests we should look for data with nested/recursive/crossing structure rather than just "hard" sequences. Also notable: they only test blocked training (all formal tokens first, then NL). Our setup mixes reasoning data with NL data, which might transfer differently — the paper explicitly flags this as an open question (Section 9).
 >
+> **Daniel Khashabi's note.** The Chomsky hierarchy + C-RASP conditions may be sufficient but not necessary. Genomics and NCA data (which don't obviously satisfy these conditions) have also shown transfer benefits for language models. The theoretical framework here explains *why* k-Shuffle Dyck works, but doesn't rule out other mechanisms of transfer.
+>
 > </details>
 
 </details>
