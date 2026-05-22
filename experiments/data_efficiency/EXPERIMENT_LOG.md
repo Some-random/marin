@@ -32,15 +32,7 @@ Using reasoning/synthetic data in pre-pretraining or pretraining should achieve 
 2. **Reasoning quality**: The trained model performs better on reasoning tasks, hallucinates less, reasons more reliably
 3. **General NL performance**: Normal natural language benchmarks also improve (not just reasoning — no regression)
 
-These three objectives are the success criteria for any experiment going forward. An approach that only achieves (1) but hurts (2) or (3) is not useful. The Between Circuits paper achieves (1) and (3) but doesn't measure (2). The code papers (Twist et al., Aryabumi et al.) show (2) in fine-tuning but we haven't shown it in pretraining. Our prior experiments failed all three — reasoning data injection hurt general benchmarks and didn't help reasoning ones.
-
-### Open question: What experiment to run next?
-
-The literature points to several directions but none have been concretely designed:
-- Curriculum ordering (easy-to-hard) of existing web data — orthogonal to data selection, shown to help by Zhang et al.
-- Formal language pre-pretraining — shown to work by Hu et al. but only tested in blocked setting, not mixed
-- Data selection via perplexity correlations — Thrush et al. showed this beats DSIR, could apply to our DCLM subset
-- Better reasoning data structure — McCoy & Griffiths suggest recursive/compositional structure matters, not just "hard" data
+These three objectives are the success criteria for any experiment going forward. An approach that only achieves (1) but hurts (2) or (3) is not useful. Aryabumi et al. is the closest to achieving all three in pretraining: 25% code gives +8.2% NL reasoning, +4.2% world knowledge, and 12x code boost — but we haven't replicated this at our scale/data budget. Our prior experiments failed all three — reasoning data injection hurt general benchmarks and didn't help reasoning ones.
 
 ---
 
