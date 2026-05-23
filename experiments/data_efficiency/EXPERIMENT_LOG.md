@@ -1,5 +1,56 @@
 # Experiment Log: Data Efficiency & Reasoning Pretraining
 
+## May 22: Comprehensive Evaluation Suite
+
+### Motivation
+
+Prior experiments only evaluated on 7 benchmarks (ARC-E/C, PIQA, SciQ, HellaSwag, WinoGrande, MMLU). The papers we're comparing against use much broader eval suites — Aryabumi uses 11 NL reasoning + TriviaQA/NQ + HumanEval/MBPP, Petty uses 204 BigBench tasks, Between Circuits uses BLiMP grammaticality. To properly measure our three research objectives, we need benchmarks covering all of them.
+
+### What was added
+
+Expanded from 7 to 28 benchmarks in `experiments/data_efficiency/run_comprehensive_evals.py`, organized by category:
+
+| Category | Benchmarks | Covers objective |
+|---|---|---|
+| NL Reasoning (12) | ARC-E/C, HellaSwag, PIQA, WinoGrande, OpenBookQA, COPA, BoolQ, SocialIQA, CommonsenseQA, LogiQA, SciQ | (3) General NL |
+| World Knowledge (4) | MMLU, TruthfulQA (logprob); TriviaQA, NQ Open (generation) | (3) General NL |
+| Math (4) | GSM8K, MathQA (logprob); GSM8K-CoT, Minerva MATH (generation) | (2) Reasoning |
+| Code (2) | HumanEval, MBPP (generation) | (2) Reasoning |
+| Linguistic (2) | BLiMP (67 subtasks), LAMBADA | (3) General NL |
+| BigBench Hard (1→27) | BBH zero-shot (27 subtasks, logprob); BBH CoT few-shot (generation) | (2) Reasoning |
+| Reading (2) | RACE (logprob); DROP (generation) | (3) General NL |
+
+### Implementation notes
+
+- **Logprob vs generation**: 20 tasks are logprob-based (multiple choice, fast), 8 require generation (slower). Organized into separate suites (`--suite logprob` vs `--suite generation` vs `--suite all`).
+- **`social_iqa`** requires `HF_DATASETS_TRUST_REMOTE_CODE=1` (custom dataset loader).
+- **`humaneval`/`mbpp`** require `HF_ALLOW_CODE_EVAL=1` and `confirm_run_unsafe_code=True` (executes model-generated code).
+- **`minerva_math`** requires `sympy`, `math_verify`, `antlr4-python3-runtime==4.11` (installed via `pip install lm-eval[math]`).
+- **Metric extraction**: Different tasks use different metric keys — `acc,none`, `exact_match,flexible-extract`, `exact_match,get-answer`, `pass@1,create_test`, `pass_at_1,none`, `f1,none`, etc. The script handles all of them via a priority list.
+- **Large eval sets**: TriviaQA has ~17K test examples requiring generation — use `limit=N` for smoke testing. For full evals, parallelize across GPUs (8x A100-40GB available).
+
+### Not included
+
+- **COGS, COGS-vf, English Passivization** (Petty et al.): These require finetuning for 10K steps then measuring full-sequence accuracy. Not a standard eval — would need a custom training+eval loop.
+- **Full BigBench (204 tasks)**: Available in lm-eval-harness but most would be noise at 300M scale. BBH (27 hard tasks) is the standard subset.
+
+### Verification
+
+All 28 tasks verified working on the 300M DCLM baseline checkpoint. Key results:
+
+| Benchmark | 300M baseline |
+|---|---|
+| BLiMP (aggregate) | 78.9% |
+| BoolQ | 60.9% |
+| COPA | 60.0% |
+| PIQA | 60.2% |
+| BBH zero-shot | 16.1% |
+| TruthfulQA MC2 | 44.9% |
+| HumanEval | ~0% (expected at 300M/200M tokens) |
+| GSM8K-CoT | 0% (expected) |
+
+---
+
 ## May 17–21: Deep Literature Review — Curriculum, Formal Languages, and Data Selection
 
 Expanded the paper reading from the May 11 survey into deep dives on the actual mechanics behind each approach. Read full papers (including appendices) and documented detailed notes with Dongwei comments on the underlying theory. Papers added/updated in [papers/reasoning_curriculum.md](../../papers/reasoning_curriculum.md):
