@@ -48,9 +48,11 @@ H1 and H2 are independent and both required. Without H1 (good reasoning data), H
 
 ## May 25: Cross-doc-attention ablation + WD-vs-epochs ablation + Aryabumi code-mix planning
 
-This section is newest-first within the day: Step 12 (code-mix design discussion) was the last thing of the day; Step 11 (WD-vs-epochs ablation) was the training that ran through the afternoon and into May 26; Step 10 (cross-doc-attention) finished earlier in the day.
+This section is newest-first within the day. The code-mix experiment design is its own thing (pivot to the active H1 hypothesis); Steps 10 and 11 continue the looping investigation that started May 23.
 
-### Step 12: Code-mix experiment design (Aryabumi-inspired probe) — evening discussion
+### Aryabumi-inspired code-mix experiment design — evening discussion
+
+*This is the start of a new research thread (active H1 hypothesis: what data teaches reasoning capability?), separate from the Steps 1–11 looping investigation.*
 
 After the looping investigation closed, attention turned to the active hypothesis (H1 from the header): what data teaches reasoning capability without hurting NL? Aryabumi (2408.10914) is the closest published result — 25% code at 470M/2.8B / 200B-token scale yields +8.2% NL reasoning, +4.2% world knowledge, 12× code. Goal: probe whether this transfers to our 1.4B / 3.34B-token regime with **open-source** code data (Aryabumi's synthetic Python is proprietary).
 
@@ -138,7 +140,7 @@ After the looping investigation closed, attention turned to the active hypothesi
 - Downloaded OpenCodeReasoning (5.4 GB total raw, 30 parquets) — kept as a separate "competitive Python verified" data source, may use as a comparison point
 - Tokenized 3 code variants: `aryabumi_code_web` (1.35B tokens, multi-language web code), `aryabumi_code_synth_solution` (183M, OCR solutions), `aryabumi_code_synth_full` (5.42B, OCR full)
 - Wrote training scripts: `run_1_4b_25code_web.py`, `run_1_4b_25code_synth_full.py`
-- Initial plan doc: `ARYABUMI_REPLICATION_PLAN.md` (now somewhat outdated — superseded by this Step 12 entry)
+- Initial plan doc: `ARYABUMI_REPLICATION_PLAN.md` (now somewhat outdated — superseded by this section)
 
 **Open / next**:
 - Download `OpenCoder-LLM/opc-annealing-corpus` (synthetic_code_snippet at minimum, plus algorithmic_corpus and synthetic_qa for comparison) — these are now the preferred code sources over OCR
