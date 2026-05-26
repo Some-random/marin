@@ -47,6 +47,21 @@
 - When comparing papers, state the specific experimental differences (model size, data, eval tasks, proportions) before drawing any conclusion.
 - If you only read part of the paper, say exactly which pages/sections you read — do not present partial reading as a full reading.
 - Do not invent "confounds" or "explanations" for why papers disagree. Present the differences and let the user interpret.
+- **When making any claim about what a paper says — its method, data, training setup, results, framing — READ the relevant section and QUOTE the exact text.** Do not paraphrase from memory, summary notes, or by projecting from another paper's approach. If a claim about paper X cannot be backed by a verbatim quote from paper X, do not make the claim. State "I don't have the quote — let me read it" and read.
+- Do not project one paper's mechanism onto another (e.g., do not assume Aryabumi's synthetic code is "textbook-style with NL explanations" because Phi does that — read what Aryabumi actually says).
+
+## Experiment design rules
+- BEFORE launching ANY experiment, EXPLICITLY DISCUSS each of the following with the user, IN THE CHAT, and wait for confirmation. Do NOT just write them in a script comment. Do NOT launch until the user has acknowledged each one.
+  1. **Hypothesis being tested.** State the falsifiable claim — what would success look like, what would failure look like.
+  2. **Why this hypothesis.** What observation or prior result motivates testing it. If the goal is to fix a problem, name the problem and the proposed cause.
+  3. **Why this specific configuration tests the hypothesis.** Justify each non-default choice (data, hyperparams, eval set) by how it relates to the hypothesis. If a config matches a reference run, name the reference run and confirm that reference run actually exhibits the behavior we want to study.
+  4. **Data.** Exact dataset, revision/hash, total tokens, source path. Do NOT use vague names ("DCLM") — name the specific subset.
+  5. **Hyperparameters.** Every non-default param, including: LR, WD, schedule, min_lr_ratio, batch size, seq len, steps, epochs, data_seed, optimizer betas, warmup, max_grad_norm. Cross-check against the reference run if there is one.
+  6. **Eval sets.** Which datasets, why each one. Eval sets must enable the comparison the hypothesis demands. If the hypothesis is "match konwoo's loss", we must eval on the SAME sets konwoo evaluated on, not adjacent ones.
+  7. **What result would confirm the hypothesis** and **what result would refute it.** If you can't say in advance, the experiment is not well-designed.
+- Format: present these as a clear numbered list in chat. Mark anything you are unsure about. Pause and ask before proceeding to the next step.
+- Critical anti-pattern to avoid: replicating a config that already exhibits the bug you want to fix. If model X with config C has problem P, replicating config C will reproduce problem P — that does not fix P. To fix P, pick the config of the model that DOES NOT have P.
+- When the user's goal is "fix behavior X" (e.g. fix looping), the reference run to match is the one that DOES NOT exhibit X, not the one that does.
 
 ## Experiment logging
 - NEVER leave blanks in experiment log tables — if a result is missing, re-run the eval to fill it in

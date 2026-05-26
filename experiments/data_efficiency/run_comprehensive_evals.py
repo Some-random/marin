@@ -206,12 +206,25 @@ def _best_metric_value(metrics: dict) -> float | None:
     return None
 
 
-def run_eval(label: str, hf_path: str, task_list: list[str], batch_size: int = 32) -> dict | None:
+def run_eval(
+    label: str,
+    hf_path: str,
+    task_list: list[str],
+    batch_size: int = 32,
+    limit: int | None = None,
+    samples_dir: str | None = None,
+) -> dict | None:
+    """Run lm-eval-harness with per-example sample logging.
+
+    Per-sample outputs (prompt, model response, target, score) are always saved when
+    `samples_dir` is provided. We never just save aggregate scores — per-example
+    outputs are required by the project's eval rules.
+    """
     import torch
     from lm_eval import simple_evaluate
     from lm_eval.models.huggingface import HFLM
 
-    if not os.path.exists(hf_path):
+    if not os.path.exists(hf_path) and "/" not in hf_path:
         log.error("Checkpoint not found: %s — skipping %s", hf_path, label)
         return None
 
@@ -222,7 +235,14 @@ def run_eval(label: str, hf_path: str, task_list: list[str], batch_size: int = 3
     t0 = time.time()
 
     model = HFLM(pretrained=hf_path, dtype="bfloat16", device="cuda:0", batch_size=batch_size)
-    results = simple_evaluate(model=model, tasks=task_list, batch_size=batch_size, confirm_run_unsafe_code=True)
+    results = simple_evaluate(
+        model=model,
+        tasks=task_list,
+        batch_size=batch_size,
+        limit=limit,
+        confirm_run_unsafe_code=True,
+        log_samples=True,
+    )
     elapsed = time.time() - t0
 
     extracted = {}
@@ -232,6 +252,15 @@ def run_eval(label: str, hf_path: str, task_list: list[str], batch_size: int = 3
     log.info("Finished %s in %.1fs", label, elapsed)
     for task in sorted(extracted.keys()):
         log.info("  %s: %s", task, _best_metric(extracted[task]))
+
+    if samples_dir is not None:
+        task_samples_dir = os.path.join(samples_dir, label)
+        os.makedirs(task_samples_dir, exist_ok=True)
+        samples = results.get("samples", {}) or {}
+        for task_name, task_samples in samples.items():
+            with open(os.path.join(task_samples_dir, f"{task_name}.json"), "w") as f:
+                json.dump(task_samples, f, indent=2, default=str)
+        log.info("Saved per-sample outputs for %d tasks to %s", len(samples), task_samples_dir)
 
     del model
     torch.cuda.empty_cache()
@@ -282,7 +311,11 @@ def main():
     parser.add_argument("--suite", type=str, default="logprob", choices=list(SUITES.keys()),
                         help="Which benchmark suite to run")
     parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Limit examples per task (useful for smoke tests)")
     parser.add_argument("--output", type=str, default=None, help="Output JSON path (default: auto)")
+    parser.add_argument("--samples-dir", type=str, default=None,
+                        help="Directory to save per-sample outputs (default: <output_dir>/samples_<suite>)")
     parser.add_argument("--dry-run", action="store_true", help="Just print what would be evaluated")
     parser.add_argument("--resume", action="store_true", help="Skip checkpoints already in output file")
     args = parser.parse_args()
@@ -304,6 +337,7 @@ def main():
         return
 
     output_path = args.output or os.path.join(RESULTS_DIR, f"comprehensive_{args.suite}.json")
+    samples_dir = args.samples_dir or os.path.join(RESULTS_DIR, f"samples_{args.suite}")
 
     all_results = {}
     if args.resume and os.path.exists(output_path):
@@ -326,7 +360,12 @@ def main():
             continue
 
         try:
-            result = run_eval(label, path, task_list, args.batch_size)
+            result = run_eval(
+                label, path, task_list,
+                batch_size=args.batch_size,
+                limit=args.limit,
+                samples_dir=samples_dir,
+            )
             if result is not None:
                 all_results[label] = result
                 with open(output_path, "w") as f:

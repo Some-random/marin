@@ -1,5 +1,403 @@
 # Experiment Log: Data Efficiency & Reasoning Pretraining
 
+---
+
+## ⭐ CURRENT GOALS & OVERARCHING HYPOTHESES (READ FIRST)
+
+### Three success criteria (every experiment must achieve ALL three)
+1. **Data efficiency** — same loss with less data or less training time
+2. **Reasoning quality** — better on reasoning tasks, less hallucination, more reliable reasoning
+3. **General NL performance** — no regression on standard benchmarks (ARC, MMLU, PIQA, HellaSwag, etc.)
+
+A recipe that achieves (1) but hurts (2) or (3) is not useful.
+
+### Overarching research hypotheses
+
+**H1 — What kind of data teaches reasoning *capability* (not just domain knowledge)?**
+
+The question is what STRUCTURE in pretraining data teaches transferable reasoning skill, separately from teaching domain knowledge. Many data types help WITHIN a domain (OWM → SciQ, code → HumanEval) but don't transfer (OWM hurts ARC/PIQA, code hurts NL). The hypothesis space includes the tension between code-style reasoning and natural-language reasoning (Aryabumi vs Petty: code helps arithmetic/composition, hurts linguistic/factual), and whether there exists a kind of data that teaches general reasoning capability without the domain-specific tradeoff.
+
+**Candidate experiments under H1** (not the hypothesis itself — these are tests *of* H1):
+- Aryabumi-style code mix at 1.4B (does 25% code with text achieve all three criteria at our scale?)
+- Synthetic structural data (formal languages, procedural data) — does abstract structure transfer to NL reasoning?
+- Domain-controlled data (math-only, code-only, mixed) — what's the transfer pattern?
+
+**What's been ruled out for H1**: pure OpenThoughts / OWM / code-only — all failed criterion (3) by hurting NL benchmarks at our scale (300M–1.4B).
+
+**H2 — Once a model has reasoning capability, how do we retain & use it through general pretraining?**
+
+Even if H1 is solved (we find data that builds reasoning capability), two failure modes can erase that capability during subsequent general web text training:
+
+- **H2a — Catastrophic forgetting**: web text overwrites the reasoning representations. *Candidate mitigation*: replay — mix a small fraction of reasoning data throughout web text training. **Untested at our scale.**
+- **H2b — No training pressure to use reasoning circuits**: even if reasoning circuits exist after phase 1, next-token prediction on standard web text doesn't activate them, so they sit dormant — replay alone doesn't fix this. *Candidate mitigations*: perplexity-filtered web text (train only on documents the reasoning-capable model finds surprising), joint training objectives that tie reasoning eval to web prediction. **Speculative and untested.**
+
+H1 and H2 are independent and both required. Without H1 (good reasoning data), H2 has nothing to retain. Without H2 (retention mechanism), H1 gains are erased.
+
+### Status of work as of May 25
+
+- **Looping investigation (Steps 1–10 below)** is **methodology cleanup**, not directly testing H1 or H2. Established that our framework reproduces konwoo's recipes faithfully; wd=1.6/x16 doesn't loop while wd=3.2/x8 does. wd-vs-epoch ablation (wd=3.2/x16) currently running.
+- **Pivot after ablation**: most promising next H1 candidate is the Aryabumi code-mix at 1.4B — closest published result that hits all three criteria at scales we can match. Concrete plan to be drafted.
+
+### Historical hypotheses superseded by the H1/H2 framing above
+
+- **Causal bridge** (May 11) — old candidate for H1; Wikipedia-wikilink conditional generation. Shelved.
+- **OWM curriculum / OpenThoughts injection** (May 1–10) — tested at 300M–1.4B, failed all three criteria (only SciQ improved, ARC/PIQA degraded).
+- **Procedural knowledge / Dyck / NCA** (May 4 + lit review May 17–21) — explored as H1 candidates; not pursued empirically beyond initial 300M procedural-knowledge runs.
+
+---
+
+## May 23: Looping investigation + Konwoo replication
+
+### The observation that started it
+
+Our 1.4B baseline (`8be9dtfq` / super-glade-5, trained on `konwoo/dclm-164k-docs-train` with WD=3.2, 8 epochs, LR=1e-3 cosine) **loops** on gsm8k_cot generation. Greedy generation locks into n-gram repetition almost immediately:
+
+- Sample 0 (Janet's eggs, target 18): `Janet's ducks lay 16 eggs per day. She buys 4 eggs per day. The answer is 4. The answer is 4. The answer is 4...` × ~40 → 738 chars total
+- Sample 1 (robe, target 3): `3 + 2 = 5. The answer is 3 + 2 = 5. The answer is 3 + 2 = 5...` × ~22 → 530 chars
+
+Loop is also present at 300M and 600M baseline.
+
+### Step 1: Rule out decoding artifacts
+
+Verified that decoding params at the lm_eval level are identical across all models: `do_sample=False, until=['Q:', '</s>', '<|im_end|>'], max_gen_toks=256`. So it's not a decoding-config mismatch.
+
+### Step 2: Compare to other base models (no instruction tuning)
+
+Tested gsm8k_cot (limit=2, log_samples=True) on:
+
+| Model | Coherent tokens before lock-in | Loops? |
+|---|---|---|
+| Our 300M baseline | 0 | yes — immediate `She sells 2,000 to 3,000 pounds of duck egg per day` × ∞ |
+| Our 600M baseline | 0 | yes — `10 eggs per day` × ∞ |
+| **Our 1.4B baseline** | **0** | **yes — `The answer is 4` × ∞** |
+| Qwen2-0.5B-base | ~30 | no — produces coherent attempt then `Q:` next-prompt continuation |
+| Qwen3-0.6B-Base | ~50 | no — gets robe question correct |
+| OLMo-2-0425-1B | ~80 | no — gets eggs question correct (answer `$18`) |
+| `konwoo/1_4b4k-209Mx16-wd1.6` (best) | ~25 | **no** — terminates cleanly within 75-189 chars |
+| `konwoo/1_4b4k-209Mx8-wd3.20` | partial | **yes on robe** — `2 = 3. 3 = 3.` × ∞, sample 0 happens to terminate short |
+| Our `1_4b_konwoo_match` (wd=3.2, x8, post-replication) | 0 | **yes** — `16 - 16 = 16 dollars` × ~13 → 612 chars |
+
+Outputs saved under `/fsx/users/dongweij/marin/outputs/eval_results/base_model_loop_comparison/`.
+
+### Step 3: Verify EOS handling
+
+For our 1.4B and konwoo's 1.4B both: ran free-generation test (`max_new_tokens=300, do_sample=False, eos_token_id=None`). Both emit **0** EOS tokens in 300 generated tokens. So neither model is trained to emit `<|end_of_text|>`. Konwoo's appears to "stop" only because his model is coherent enough to generate the few-shot `Q:` marker, which lm-eval treats as a stop token. Our model never produces `Q:` because it locks into repetition first.
+
+Tokenizer configs and `eos_token_id` are byte-identical between our and konwoo's HF checkpoints.
+
+### Step 4: Identify the recipe difference
+
+Konwoo's runs come from `stanford-mercury/suhas-data-efficiency` WandB project. His HF uploads at `konwoo/*` materialize specific runs from there. Three relevant variants:
+
+| Run | WD | Epochs | Total tokens | Loops on gsm8k_cot? |
+|---|---|---|---|---|
+| `1_4b4k-209Mx16-wd1.60` (his "best") | 1.6 | 16 | 3.34B | **NO** |
+| `1_4b4k-209Mx8-wd3.20` | 3.2 | 8 | 1.67B | **YES** |
+| `1_4b4k-209Mx4-lr0.0003` | 0.1 | 4 | 836M | not tested |
+
+Our baseline (`8be9dtfq`) matches the wd=3.20/x8 recipe almost exactly. The non-looping konwoo recipe (wd=1.6/x16) has both **2× more total training tokens** and **half the weight decay**.
+
+### Step 5: Verify data identity
+
+Konwoo's wd=3.20 run draws data from `gs://marin-us-central2/tokenized/dclm_baseline-0206f1/` (the canonical Marin DCLM cache) with `max_train_batches={dclm: 800}` — limits training to 800 batches × 64 × 4096 = 209,715,200 tokens per epoch. With `stop_strategy=restart`, training cycles through these same 209M tokens 8 times (6400 steps total).
+
+Verified our local cache (35.5B tokens, 8 parts) is consistent with the canonical `dclm_baseline-0206f1` naming (source: `mlfoundations/dclm-baseline-1.0 @ a3b142c`, tokenizer: `Llama-3.1-8B`). The cache is enough for the experiment (need only 1.67–3.34B of 35.5B available locally).
+
+Verified konwoo's HF dataset `konwoo/dclm-164k-docs-train` is a real subset of DCLM-baseline-1.0 (sampled docs found in raw `global-shard_01_of_10/local-shard_0_of_10/shard_00000000_processed.jsonl.zst`). Doc count = 164,459 matches the 800-batches × 64-batch slice exactly. Our run uses this HF dataset directly; konwoo's runs use the cache-with-batch-cap mechanism.
+
+### Step 6: Comprehensive eval suite expansion
+
+To make eval losses directly comparable to konwoo's wandb numbers, downloaded and tokenized all 16 Paloma subsets locally:
+
+| Path | Size | Used by |
+|---|---|---|
+| `/fsx/users/dongweij/marin/outputs/raw/paloma-fc6827/65cd6fc/` | ~1.2 GB | (raw HF download) |
+| `/fsx/users/dongweij/marin/outputs/tokenized/paloma/<name>-<hash>/` | ~few MB each | training/eval components |
+
+16 subsets tokenized: 4chan, c4_100_domains, c4_en, dolma-v1_5, dolma_100_programing_languages, dolma_100_subreddits, falcon-refinedweb, gab, m2d2_s2orc_unsplit, m2d2_wikipedia_unsplit, manosphere_meta_sep, mc4, ptb, redpajama, twitterAAE_HELM_fixed, wikitext_103. Cache hash suffixes match konwoo's wandb config exactly (e.g., `c4_en-cf1f79`, `4chan-496ad5`), confirming canonical naming consistency.
+
+Note: `allenai/paloma` is a gated HF dataset. Requesting access via the HF "Request Access" button worked within minutes.
+
+### Step 7: Replication run #1 — konwoo-match (wd=3.2, x8)
+
+Goal: rule out framework / code drift as the cause of our looping. Match konwoo's wd=3.20/x8 config as closely as possible on our Levanter version.
+
+Run name: `icy-snowflake-98` / `4m4o7xvd` (`dongwei_jiang/dongwei-data-efficiency`).
+Diffs from our 8be9dtfq baseline:
+- `data_seed`: 42 → 0 (matches konwoo)
+- `optimizer.min_lr_ratio`: 0.1 → 0.0 (matches konwoo)
+- Add 16 Paloma val components (weight=0) so eval losses are apples-to-apples with konwoo
+- Otherwise identical: model 1_4b4k, data = `konwoo/dclm-164k-docs-train`, WD=3.2, LR=1e-3 cosine, batch=64, 8 epochs, 6400 steps, seed=0
+
+Total time: ~4h 15min on 8× A100-40GB. Final eval losses (subset):
+
+| Subset | Ours `4m4o7xvd` | Konwoo `1_4b4k-209Mx8-wd3.20` |
+|---|---|---|
+| eval/loss (overall avg) | 2.88 | 3.53 |
+| eval/dclm_200m/loss (held-out, our val) | 3.42 | — |
+| eval/dclm_200m/loss (train data, near-memorization) | 2.67 | — |
+| paloma/c4_en/loss | 3.78 | 3.61 |
+| paloma/dolma-v1_5/loss | 3.61 | 3.52 |
+| paloma/dolma_100_subreddits/loss | 3.85 | 3.75 |
+| paloma/falcon-refinedweb/loss | 3.87 | 3.70 |
+| paloma/c4_100_domains/loss | 3.55 | 3.48 |
+| paloma/m2d2_wikipedia_unsplit/loss | 3.41 | 3.36 |
+| paloma/macro_loss | 3.81 | 3.72 |
+
+Our losses are 0.05–0.16 nats *higher* than konwoo's wd=3.20 across most Paloma subsets. Plausible drivers (we did NOT isolate): Levanter version drift, specific docs differ (ours uses konwoo's 164k-docs HF upload vs his original cache-batch-cap), `min_lr_ratio` previously different in our baseline (now matched). The `eval/dclm_200m/loss` of 2.67 is on training data so it's a memorization signal, not generalization.
+
+**On gsm8k_cot the konwoo-match model still loops** — same n-gram repetition as our baseline. Confirmed that:
+1. Konwoo's own wd=3.20/x8 run also loops (sample 1 locks into `2 = 3. 3 = 3.` × ∞)
+2. So our framework is faithfully reproducing the wd=3.20/x8 recipe — and that recipe produces loop-prone models
+3. The "non-looping" reference model is `wd=1.6/x16` (different recipe), not anything matching our baseline
+
+### Step 8: Anti-pattern caught
+
+Replication #1 answered a narrower question ("does our framework drift from konwoo's") than the question that matters ("how do we fix looping"). The reference run to replicate, if the goal is to fix looping, is **the one that does NOT exhibit the bug** — i.e. konwoo's wd=1.6/x16, not wd=3.20/x8. New rule added to `CLAUDE.local.md`:
+
+> Critical anti-pattern: replicating a config that already exhibits the bug you want to fix.
+> When the user's goal is "fix behavior X", the reference run to match is the one that does NOT exhibit X.
+
+### Step 9: Replication run #2 — wd=1.6 / x16 (May 24-25)
+
+Hypothesis: a 1.4B trained with WD=1.6, 16 epochs (3.34B total tokens) on the same data does NOT loop. This tests whether the recipe difference alone is sufficient to fix looping in our framework.
+
+Run script: `experiments/data_efficiency/run_1_4b_wd1_6_x16.py`. Diffs from konwoo-match: `weight_decay 3.2 → 1.6`, `num_train_steps 6400 → 12800`. Same data, eval, model, seed, schedule. Save to `checkpoints/1_4b_wd1_6_x16/`.
+
+Run name: `divine-dream-99` / `iue9to5a` (`dongwei_jiang/dongwei-data-efficiency`). Total time ~7h 50min.
+
+**Looping result: HYPOTHESIS CONFIRMED.** gsm8k_cot at limit=2 and limit=20:
+- 0/2 and 0/40 samples loop
+- Median response length 52 chars (well under the 256-token budget)
+- Max 217 chars
+- Compare to wd=3.2/x8 (looped): all samples filled the 256-token budget with n-gram repetition
+- Konwoo's matching wd=1.6/x16 also 0/40 loops (his median 90 chars)
+
+**But generalization is meaningfully worse**, as predicted by Konwoo's own wandb numbers:
+
+| Model | Paloma macro | dclm_200m_val | gsm8k_cot loops |
+|---|---|---|---|
+| Konwoo wd=3.2/x8 | 3.72 (best) | — | YES |
+| Our konwoo-match wd=3.2/x8 | 3.81 | 3.42 | YES |
+| Konwoo wd=1.6/x16 | 4.43 | 4.06 | NO |
+| Our wd=1.6/x16 | ~4.72 | 4.09 | **NO** |
+
+**Observed pattern (from 2 recipes, not a general law):** the wd=3.2/x8 recipe (best Paloma PPL we've measured) loops on gsm8k_cot, while wd=1.6/x16 (worse Paloma PPL by ~0.7 nats) does not loop. We cannot conclude PPL and looping are anticorrelated in general — this is two data points along a confounded axis (WD AND epochs changed together). Possible causes: (a) more epochs → more exposure → softer distribution; (b) lower WD → less weight regularization → softer argmax; (c) both interact. **To isolate**, we'd need to ablate `wd=3.2/x16` and `wd=1.6/x8` separately.
+
+Mechanistic intuition (not verified): higher WD + fewer epochs → less peaked softmax → less prone to greedy lockup but better OOD generalization on PPL because weights stay close to prior. Lower WD + more epochs → distribution sharpens around training distribution → memorizes (low PPL on similar data) but pathological under greedy decoding.
+
+**Outstanding gap**: our wd=1.6/x16 paloma_macro (~4.72) is ~0.2-0.3 nats worse than konwoo's (4.43) across every subset. One config difference identified: we trained with `block_cross_document_attention=True` while konwoo's wandb shows `None` which the Levanter code (`LmExample.causal()`) treats as False (no within-sequence attention masking across doc boundaries).
+
+### Step 10: Cross-doc-attention ablation — wd=1.6 / x16 with `block_cross_document_attention=False` (completed May 25)
+
+Run script: `experiments/data_efficiency/run_1_4b_wd1_6_x16_nocrossblock.py`. Diff from Step 9: flip `block_cross_document_attention: True → False`. Otherwise identical.
+
+Run name: `peach-thunder-100` / `6xx0hu3l`. Total time ~7h 50min.
+
+**Hypothesis 1 (paloma gap closes): REFUTED.** Final eval losses are within <0.03 nats of the `block=True` version on every subset — well within run-to-run noise. We are still ~0.27 nats worse than konwoo's matching run.
+
+| Subset | block=True | **block=False** | Konwoo |
+|---|---|---|---|
+| paloma c4_en | 4.554 | 4.547 | **4.264** |
+| paloma dolma-v1_5 | 4.355 | 4.348 | **4.141** |
+| paloma wikitext_103 | 4.213 | 4.195 | **4.093** |
+| paloma 4chan | 3.669 | 3.640 | **3.428** |
+| paloma macro | ~4.72 | ~4.71 | **4.43** |
+
+**Hypothesis 2 (looping preserved): CONFIRMED.** 0/40 loops at limit=20, same as the prior wd=1.6/x16 run.
+
+**Unexpected secondary finding: `block_cross_document_attention` DOES affect generation behavior despite not affecting Paloma PPL.**
+
+| gsm8k_cot metric | block=True | block=False | Konwoo |
+|---|---|---|---|
+| em_strict | 0.0 | 0.0 | 0.0 |
+| em_flexible | 0.0 | **0.10** (4/40 correct) | 0.0 |
+| median response length | 52 chars | 143 chars | 90 chars |
+| max response length | 217 chars | 761 chars | 563 chars |
+
+Setting `block=False` produces longer, more varied responses with marginal math accuracy improvement. Sample 0 illustrates the qualitative difference:
+- `block=True`: `16 bucks for 3 chickens\n\n` (terse, terminates fast)
+- `block=False`: `$2 per duck egg is 16 - 16 = $6. So the answer is $6. $6 - 16 = $6. The answer is 16 - 16 = $6...` (more attempts, longer, not strictly looping)
+- Konwoo: `Janet's ducks take 16 eggs. 3 dollars for 16 eggs is 4. The answer is 4.` (cleanest, also terminates)
+
+So cross-document attention during training produces a more conservative model in generation — fewer continuation attempts, shorter responses. Possibly because the model never learned cross-document continuation patterns during training so it doesn't try to riff after committing to one answer.
+
+**Outstanding 0.27 nat Paloma gap to konwoo — unexplained.** Candidate causes (none isolated):
+1. Levanter version drift (konwoo's commit was June 2025; ours is newer with unknown subtle changes to init, optimizer math, kernel selection, mask construction, etc.)
+2. Data ordering / sequence packing differences — we use `konwoo/dclm-164k-docs-train` HF parquet directly; he uses cache-with-batch-cap from `dclm_baseline-0206f1` which packs and shuffles differently
+3. Hardware-driven numerical differences (his per_device_parallelism=1 vs ours=8)
+
+None of these are hypothesis-relevant for our research questions about reasoning curriculum / data efficiency — they're framework noise.
+
+### Summary of Steps 7-10
+
+| Run | WD | Epochs | Loops? | paloma macro | dclm_200m_val |
+|---|---|---|---|---|---|
+| Konwoo wd=3.2/x8 | 3.2 | 8 | YES | 3.72 (best) | — |
+| Our konwoo-match | 3.2 | 8 | YES | 3.81 | 3.42 |
+| Konwoo wd=1.6/x16 | 1.6 | 16 | NO | 4.43 | 4.06 |
+| Our wd=1.6/x16 (block=True) | 1.6 | 16 | **NO** | ~4.72 | 4.09 |
+| Our wd=1.6/x16 (block=False) | 1.6 | 16 | **NO** | ~4.71 | 4.07 |
+
+**Takeaways:**
+1. Looping IS recipe-dependent across the two recipes we tested (wd=3.2/x8 loops, wd=1.6/x16 doesn't) — but we cannot attribute this to either WD or epochs alone since both changed simultaneously.
+2. Our framework faithfully reproduces both behaviors at recipe-specific level.
+3. There is a persistent ~0.27 nat absolute-PPL gap to konwoo across all our replications, not closed by `block_cross_document_attention`. Likely framework-version drift, not hypothesis-relevant.
+
+**Open question for follow-up**: ablate `wd=3.2/x16` and `wd=1.6/x8` to isolate which factor (epochs or WD) drives the looping change.
+
+### Step 11: WD-vs-epochs ablation — wd=3.2/x16/block=False (completed May 26)
+
+Run name: `fiery-paper-101` / `gm6by3tb`. ~8h on 8× A100-40GB.
+
+**Tests**: holding epochs=16 and flipping WD from 1.6 → 3.2 (matching our konwoo-match baseline's WD but with double the epochs). If this loops, low WD is the looping fix; if it doesn't, extra epochs are sufficient.
+
+**Result: PARTIAL loop — 30% loop rate (12/40 samples).**
+
+Comparison across all 1.4B 16-epoch variants (gsm8k_cot, limit=20):
+
+| Recipe | Loop rate | Median resp len | Max resp len |
+|---|---|---|---|
+| wd=3.2/x8 (konwoo-match baseline) | 100% | (token budget) | (token budget) |
+| **wd=3.2/x16 (this run)** | **30% (12/40)** | 133 chars | 1301 chars |
+| wd=1.6/x16 (non-looping) | 0% | 143 chars | 761 chars |
+
+**Attribution: low WD is the dominant lever; more epochs is complementary but insufficient alone.**
+- More epochs alone at wd=3.2: 100% → 30% looping (helps but not enough)
+- Low WD alone at x16: 30% → 0% looping (fully closes)
+
+**PPL trade-off** (apples-to-apples, paloma + held-out dclm):
+
+| Subset | wd=3.2/x16 | wd=1.6/x16 | Konwoo wd=1.6/x16 |
+|---|---|---|---|
+| dclm_200m (training data) | 2.09 | 1.63 | — |
+| dclm_200m_val (held-out) | 3.67 | 4.07 | — |
+| paloma c4_en | 4.09 | 4.55 | 4.26 |
+| paloma dolma-v1_5 | 3.89 | 4.35 | 4.14 |
+| paloma macro | **4.20** | 4.71 | 4.43 |
+
+Higher WD = less memorization (training loss 2.09 vs 1.63), better OOD generalization (paloma 4.20 vs 4.71, ~0.5 nats better). So **wd=3.2/x16 trades 30% looping for ~0.5 nats better Paloma PPL** vs wd=1.6/x16.
+
+**Conclusion**: in our token-limited regime (1.4B model, 3.34B total training tokens, 209M unique base data), there's a real trade-off along the WD axis between memorization-flavored generalization (lower with high WD) and loop-prone generation (higher with high WD). Neither recipe wins both objectives. The "fix" likely requires moving along a different axis — data composition, training-data scale, or recipe — not just WD/epoch tuning.
+
+**Unanswered question — why does higher WD cause more looping?**
+
+Three plausible mechanisms exist but we have NOT tested any of them:
+
+1. *Representational compression*: high WD prevents the model from representing the diversity of natural text → it learns average continuation patterns → greedy decoding lands in the same most-common phrase repeatedly. Predicts our pattern.
+2. *Memorization-driven diversity*: low WD lets the model overfit to specific document continuations from training. At inference, it can recall these varied trajectories rather than producing average loops. Also predicts our pattern.
+3. *Standard intuition (FAILS)*: high WD → smaller weights → smaller logits → less peaked softmax → MORE diverse generation. This contradicts our observation, so either it's wrong or another effect dominates.
+
+(1) and (2) both predict the data but we can't distinguish them. (3) is what one would naively predict and is refuted.
+
+**To test**: measure per-position output entropy / argmax probability at decoding time on each of the three checkpoints (wd=3.2/x8, wd=3.2/x16, wd=1.6/x16) on the same prompts. If (1) is right, high WD should have *lower* entropy. If (3) were right, high WD should have *higher* entropy. Cheap follow-up — single inference pass on each model, no training needed.
+
+---
+
+### Step 12: Code-mix experiment design (Aryabumi-inspired probe) — May 25 evening discussion
+
+After the looping investigation closed, attention turned to the active hypothesis (H1 from the header): what data teaches reasoning capability without hurting NL? Aryabumi (2408.10914) is the closest published result — 25% code at 470M/2.8B / 200B-token scale yields +8.2% NL reasoning, +4.2% world knowledge, 12× code. Goal: probe whether this transfers to our 1.4B / 3.34B-token regime with **open-source** code data (Aryabumi's synthetic Python is proprietary).
+
+#### What we figured out today about the data
+
+**Aryabumi paper re-read (with exact quotes from Section 2.1):**
+- Web Stack: "We apply quality filters" — only filtering, not verification
+- Synthetic Code: "Python programming problems that have been **formally verified**" — verification is the explicit quality marker. The paper "treat[s] this as a high-quality source" specifically because of verification.
+- So the implicit mechanism Aryabumi proposes is: **verified code is high-quality code, and high-quality code teaches reasoning**. Synthetic-vs-human-written is NOT the operative axis the paper isolates.
+
+**OpenCodeReasoning is NOT a faithful Aryabumi-synthetic proxy** (verified after reading the OCR README + sampling rows):
+- OCR's `solution` field is **human-written competitive programming code** from codeforces/codechef/atcoder/aizu/hackerearth, test-case verified
+- Aryabumi's synthetic is **AI-generated and "formally verified"**
+- Both are Python ✓, both are problem-solutions ✓, but origin differs (human vs synthetic) and verification standard differs (test-case vs formal)
+- Best characterization: OCR-solution is "test-case-verified competitive Python," not "AI-generated formally-verified Python"
+- The original `aryabumi_code_synth_solution` naming is misleading; better names: `ocr_solution` or `verified_python_ocr`
+
+**Better open candidate identified: `OpenCoder-LLM/opc-annealing-corpus`** (Huang et al. 2024, arxiv 2411.04905):
+- License: odc-by (clean open license)
+- Three subsets, each tested in OpenCoder paper ablations:
+  - `algorithmic_corpus`: curated algorithmic code from The Stack v2
+  - `synthetic_code_snippet`: AI-rewritten code (rewrites of algorithmic_corpus seeds)
+  - `synthetic_qa`: AI-generated code Q&A pairs
+- **Caveat**: the OpenCoder paper evaluates *code* capabilities (HumanEval/MBPP), NOT general NL reasoning. So while the data is published with effectiveness evidence, that evidence is for code performance, not the NL-reasoning gain we actually care about. Using this data for our experiment is a **novel probe** of whether the same data also helps NL reasoning at our scale.
+
+**Scale honesty**: Aryabumi trained 470M and 2.8B for 200B tokens (~60× more than our 3.34B total). At our scale most NL reasoning benchmarks our 1.4B baseline scores at-or-below random:
+
+| Benchmark | Random | Our 1.4B baseline | Above random? |
+|---|---|---|---|
+| sciq | 25% | 71.7% | +47 ✓ strong |
+| arc_easy | 25% | 43.6% | +19 ✓ usable |
+| piqa | 50% | 62.6% | +13 ✓ usable |
+| boolq | 50% | ~60% | +10 ✓ usable |
+| arc_challenge | 25% | 23.5% (norm) | random ✗ |
+| hellaswag | 25% | 26.4% | random ✗ |
+| winogrande | 50% | 48.7% | random ✗ |
+| mmlu | 25% | ~23% | random ✗ |
+| commonsense_qa | 20% | 19.9% | random ✗ |
+| social_iqa | 33% | 35.3% | random ✗ |
+| logiqa | 25% | 21.2% | random ✗ |
+| openbookqa | 25% | ~17% | below random ✗ |
+
+4 of 12 benchmarks have signal at our scale. The Aryabumi-style aggregate (+8.2% averaged across all 11) is **not measurable** in our regime — averaging mostly-noise dilutes any signal. We have to scope the eval accordingly.
+
+#### Refined experiment plan (Aryabumi-inspired probe, scaled to our regime)
+
+**1. Hypothesis.** Mixing 25% high-quality code (`opc-annealing-corpus`) with 75% DCLM during pretraining improves NL performance at our 1.4B / 3.34B-token scale, measured by metrics that have signal at our scale.
+
+**2. Why.** Aryabumi published a +8.2% NL reasoning gain at 470M-2.8B / 200B tokens. Two questions:
+- Does the effect direction hold at our 60×-smaller-data regime?
+- Does an *open* high-quality code corpus (OpenCoder annealing data) replicate it, even though that data was originally evaluated on code, not NL?
+
+**3. Why this configuration.** Single-variable change from our baseline: replace 25% of the text mix with high-quality code. Hold all other variables (model, recipe, eval set, seed) constant.
+
+**4. Data.**
+- Text base: `konwoo/dclm-164k-docs-train` (209M tokens) — same as our existing baseline
+- Code source: `OpenCoder-LLM/opc-annealing-corpus`, specifically the `synthetic_code_snippet` subset (closest to Aryabumi's "high-quality synthetic verified")
+- Mix: 75% text, 25% code (Aryabumi's optimum), via Levanter `train_weights`
+
+**5. Hyperparameters.** Identical to our `wd=1.6/x16/block=False` non-looping baseline (script `run_1_4b_wd1_6_x16_nocrossblock.py`):
+- LR=1e-3 cosine to 0, WD=1.6, min_lr_ratio=0, β₁/β₂=0.9/0.95, warmup=0.01, max_grad_norm=1
+- batch=64, seq=4096, num_train_steps=12800, seed=0, data_seed=0
+- `block_cross_document_attention=False`, `stop_strategy=restart`
+
+**6. Eval sets** — only metrics that actually have signal at our scale:
+- **Paloma macro PPL** (continuous, sensitive — primary signal)
+- **dclm_200m_val PPL** (held-out NL)
+- **4 above-random benchmarks**: arc_easy, sciq, piqa, boolq (where our baseline scores meaningfully above random)
+- **gsm8k_cot generation behavior** (does adding code cause regressions in generation? does it improve or worsen looping?)
+- *Not used as outcome metrics* (because too noisy at our scale): hellaswag, winogrande, arc_challenge, mmlu, openbookqa, commonsense_qa, social_iqa, logiqa, HumanEval, MBPP, GSM8K aggregates. These will still be logged for completeness but not the primary signal.
+
+**7. Confirm/refute criteria.**
+- **Confirm Aryabumi-style effect at our scale**: Paloma macro improves (strictly lower loss vs baseline) AND ≥2 of {arc_easy, sciq, piqa, boolq} strictly improve AND no benchmark falls below baseline-minus-noise.
+- **Refute (null result)**: Paloma macro flat-or-worse OR none of the 4 benchmarks improve. This would suggest the Aryabumi effect doesn't manifest with this data at our scale.
+- **Partial**: some benchmarks improve, some hurt — informative, suggests data/scale interaction.
+
+**8. Caveats acknowledged in advance.**
+- A null result would NOT refute Aryabumi — our scale is 60× smaller and our code data is open, not his proprietary set.
+- A positive result would be a *novel* finding (no published study has shown this open code data improves NL reasoning at 1.4B scale).
+- We are NOT testing the headline "+8.2% NL reasoning aggregate" claim — that requires above-random performance on all 11 benchmarks, which we don't have.
+
+#### Status of preparation
+
+**Done today:**
+- Downloaded OpenCodeReasoning (5.4 GB total raw, 30 parquets) — kept as a separate "competitive Python verified" data source, may use as a comparison point
+- Tokenized 3 code variants: `aryabumi_code_web` (1.35B tokens, multi-language web code), `aryabumi_code_synth_solution` (183M, OCR solutions), `aryabumi_code_synth_full` (5.42B, OCR full)
+- Wrote training scripts: `run_1_4b_25code_web.py`, `run_1_4b_25code_synth_full.py`
+- Initial plan doc: `ARYABUMI_REPLICATION_PLAN.md` (now somewhat outdated — superseded by this Step 12 entry)
+
+**Open / next**:
+- Download `OpenCoder-LLM/opc-annealing-corpus` (synthetic_code_snippet at minimum, plus algorithmic_corpus and synthetic_qa for comparison) — these are now the preferred code sources over OCR
+- Tokenize via marin
+- Rename existing tokenized dirs to drop misleading `aryabumi_` prefix (use `ocr_*` and `opencoder_*` instead)
+- Write training script using opc-annealing-corpus
+- Launch comparison vs baseline (`divine-dream-99` / `iue9to5a`, our wd=1.6/x16/block=False text-only)
+- Compare on Paloma macro + 4 benchmarks per the refined criteria above
+
+**Decisions still owed to user**:
+- Which opc-annealing-corpus subset to use as primary (synthetic_code_snippet vs algorithmic_corpus vs synthetic_qa, or all three concat)
+- Whether to also run the OCR comparison as a separate experiment, or skip it (since OCR isn't a faithful Aryabumi proxy anyway)
+
+---
+
 ## May 22: Comprehensive Evaluation Suite
 
 ### Motivation
