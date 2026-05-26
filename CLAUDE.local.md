@@ -11,6 +11,7 @@
 - Don't sleep for long periods when checking progress — keep it short
 - User is in PST (Pacific Standard Time, UTC-8)
 - ALWAYS display timestamps in PST. Convert any UTC/other timezone to PST before showing to user.
+- **Print PST timestamp before each meaningful tool action, not just at the start of a turn.** For chained operations (multiple tool calls, lots of text between them), run `TZ='America/Los_Angeles' date '+%H:%M:%S %Z'` before each significant step. Reason: the user may be asleep during long sessions and needs to scrub the transcript to see exactly when each step happened ("step 5 ran at 02:45" vs "this turn started at 02:00, somewhere in here step 5 ran"). Compact `%H:%M:%S %Z` is enough unless we cross midnight. Skip for trivial single-line acknowledgments.
 
 ## Honesty rules
 - NEVER say data/files are "ready" or "usable" without actually verifying (e.g. .tmp files are NOT usable)
