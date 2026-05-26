@@ -46,7 +46,9 @@ H1 and H2 are independent and both required. Without H1 (good reasoning data), H
 
 ---
 
-## May 23: Looping investigation + Konwoo replication
+## May 23: Looping investigation — diagnostic phase
+
+Initial observation and ruling-out-easy-causes work happened May 23. Konwoo replication runs that bled into May 24-25 are in the next section.
 
 ### The observation that started it
 
@@ -158,7 +160,9 @@ Replication #1 answered a narrower question ("does our framework drift from konw
 > Critical anti-pattern: replicating a config that already exhibits the bug you want to fix.
 > When the user's goal is "fix behavior X", the reference run to match is the one that does NOT exhibit X.
 
-### Step 9: Replication run #2 — wd=1.6 / x16 (May 24-25)
+## May 24-25: Replication runs #2-3 (wd=1.6/x16 and cross-doc-attention ablation)
+
+### Step 9: Replication run #2 — wd=1.6 / x16 (launched May 24, finished May 25)
 
 Hypothesis: a 1.4B trained with WD=1.6, 16 epochs (3.34B total tokens) on the same data does NOT loop. This tests whether the recipe difference alone is sufficient to fix looping in our framework.
 
@@ -246,7 +250,9 @@ None of these are hypothesis-relevant for our research questions about reasoning
 
 **Open question for follow-up**: ablate `wd=3.2/x16` and `wd=1.6/x8` to isolate which factor (epochs or WD) drives the looping change.
 
-### Step 11: WD-vs-epochs ablation — wd=3.2/x16/block=False (completed May 26)
+## May 25-26: WD-vs-epochs ablation + Aryabumi code-mix planning
+
+### Step 11: WD-vs-epochs ablation — wd=3.2/x16/block=False (launched May 25, finished May 26)
 
 Run name: `fiery-paper-101` / `gm6by3tb`. ~8h on 8× A100-40GB.
 
