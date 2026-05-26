@@ -154,7 +154,7 @@ After the looping investigation closed, attention turned to the active hypothesi
 
 ---
 
-### Step 11: WD-vs-epochs ablation — wd=3.2/x16/block=False (launched May 25, finished May 26)
+### Step 11: WD-vs-epochs ablation — wd=3.2/x16/block=False (launched and finished May 25 PDT; final checkpoint at 20:57 PDT)
 
 Run name: `fiery-paper-101` / `gm6by3tb`. ~8h on 8× A100-40GB.
 
