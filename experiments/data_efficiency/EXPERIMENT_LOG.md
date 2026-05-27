@@ -4,16 +4,28 @@
 
 ## ⭐ CURRENT GOALS & OVERARCHING HYPOTHESES (READ FIRST)
 
-### Success criterion (revised May 27 — single axis)
+### Success criterion (revised May 27)
 
-**Token efficiency** — better quality per training token across every eval mechanism, with no regression on any.
+A recipe is judged against the capability it is supposed to teach, **not** uniformly across all evals. Trading tokens away from natural language to add (e.g.) code reduces NL exposure — small NL regressions are expected, not failures. The criterion has three parts:
 
-Why one criterion, not three:
-- The earlier framing split this into (1) "same loss with less data", (2) "better reasoning", (3) "no NL regression". (1) and (2)+(3) are duals of the same axis — "same perf, less data" is "more perf, same data" viewed differently. Three slots for one quantity.
-- "Better quality per token" is necessary but **not sufficient** to claim a recipe taught *reasoning capability*. The May 26 code-mix result is a clean example: it satisfied the old three-criteria (sciq +6pt, boolq +7pt, no regression), but sample inspection showed those gains came from passage-grounded extraction, not reasoning. The three-criteria framing produced a false positive for reasoning.
-- So token efficiency is the baseline gate — necessary for a recipe to be a candidate at all. Whether the recipe also taught reasoning capability is a **separate question** answered by the H1 / H2 probes below.
+1. **Target capability** — the capability the recipe is designed to teach (e.g. *reasoning* for the code-mix recipe).
+   - Required: **strictly improves**, measured on probes that test the target capability under conditions where surface pattern-matching can't substitute (see H1 probes below).
+2. **Substrate capability** — capabilities the model needs to even attempt the task: basic NL fluency, ability to read and write coherent English, absence of generation pathologies (looping, gibberish).
+   - Required: **preserved within reason**. Measured by Paloma macro PPL, dclm_200m_val PPL, and generation smoke tests (gsm8k_cot loop check). Floor: if substrate collapses, the model can't be evaluated at all on the target.
+3. **Non-target capabilities** — everything else (e.g. knowledge benchmarks, lexical pattern-matching tasks, code metrics for an NL-targeted recipe).
+   - Tolerable: **small regressions allowed**, in proportion to the data trade-off. Disqualifying only if a non-target capability collapses or regresses far more than the data shift would explain.
 
-**Measurement**: Paloma macro PPL + dclm_200m_val PPL (continuous, primary signal) + above-random benchmarks classified by mechanism (Evaluation Taxonomy section below). Any recipe with strictly better per-token quality across mechanisms with no regression passes the gate.
+Why three parts, not one uniform gate:
+- "No regression on any eval" was too strict. If we swap 25% NL tokens for code tokens, NL knowledge benchmarks may see small drops — that's the price, not failure. The recipe should still be evaluated on whether it taught its target capability.
+- The old framing's "reasoning quality" criterion was satisfied by passage-grounded extraction gains (May 26 code-mix: sciq +6pt, boolq +7pt) that were not actually reasoning. **Reasoning gains require a probe that controls for the extraction confound** — see H1 probes.
+- Substrate-vs-non-target distinction matters: a model that can't write coherent English is unevaluable on reasoning, regardless of latent capability. Substrate has a floor; non-target capabilities have a budget.
+
+**For the May 26 code-mix recipe specifically** (target capability = reasoning, per the H1 hypothesis it's supposed to test):
+- Substrate: preserved (Paloma macro improved, no looping). ✅
+- Non-target NL knowledge / lexical: flat or improved across the board. ✅ (better than expected — no trade-off paid)
+- **Target (reasoning): undetermined.** Downstream improvement on sciq/boolq was extraction, not reasoning. H1 probe pending.
+
+So the May 26 result has cleared the gate's *substrate* and *non-target* requirements but the *target* requirement is still open. The toy probe defined under H1 below is the test of the target requirement.
 
 ### Overarching research hypotheses
 
