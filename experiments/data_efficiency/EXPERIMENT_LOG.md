@@ -38,6 +38,54 @@ H1 and H2 are independent and both required. Without H1 (good reasoning data), H
 - **Looping investigation (Steps 1–10 below)** is **methodology cleanup**, not directly testing H1 or H2. Established that our framework reproduces konwoo's recipes faithfully; wd=1.6/x16 doesn't loop while wd=3.2/x8 does. wd-vs-epoch ablation (wd=3.2/x16) currently running.
 - **Pivot after ablation**: most promising next H1 candidate is the Aryabumi code-mix at 1.4B — closest published result that hits all three criteria at scales we can match. Concrete plan to be drafted.
 
+### Evaluation taxonomy — what each eval *actually* tests (read the data, not the name)
+
+Names like "NL reasoning benchmark" hide important mechanistic differences. Below we classify every eval we use by the actual cognitive mechanism a model needs to score above chance, based on inspection of per-example samples. **Always sample the data before reasoning about why scores differ.**
+
+#### A. Continuous PPL (no task structure, just next-token loss)
+- **Paloma macro** (16 subsets, see `run_1_4b_25code_alg.py`) — domain-diverse held-out web/forum/code text. Primary continuous signal at our scale. Sensitive to general LM quality and to per-domain coverage.
+- **dclm_200m_val** — held-out NL within our training distribution. Sensitive to overfitting on the 209M-token DCLM training slice.
+- **opc_algorithmic** (when used as code training data) — final eval loss on the code training slice; signals code memorization, not generalization.
+
+#### B. Passage-grounded reading comprehension (answer is *in the prompt*; model just needs to attend and extract)
+The model does NOT need to know the answer in its weights — the passage contains or strongly implies it.
+- **sciq** — every question comes with a `support` paragraph that *literally states the answer* (e.g. "what is X called?" → support: "X is called Y"). 4-way MC. Tests context-attention and lexical matching, not science knowledge.
+- **boolq** — yes/no question + Wikipedia-style passage that contains the answer. Tests passage-question matching.
+- **openbookqa** (if used) — provides a relevant fact alongside the question.
+
+#### C. Parametric world knowledge (no passage; the model must recall facts from weights)
+- **arc_easy** — 4-way MC science questions, no support. Tests grade-school science recall (photosynthesis, meiosis, safety equipment, ...). Above-random at our scale.
+- **arc_challenge** — harder version, mostly at-random at 1.4B/3.3B.
+- **mmlu** — 4-way MC across 57 domains, no passage. At-random at our scale.
+- **triviaqa / naturalqs** — generation, no passage. At-random at our scale.
+
+#### D. Physical/social commonsense (no passage; intuition from weights)
+- **piqa** — 2 alternative everyday-task descriptions; pick the physically plausible one ("paper bedding" vs "jeans bedding" for a guinea pig). Above-random at our scale.
+- **social_iqa** — social-situation MC. At-random at our scale.
+- **hellaswag** — sentence-completion plausibility. Mostly at-random at our scale.
+
+#### E. Coreference / logical / linguistic
+- **winogrande** — pronoun-resolution pairs (Winograd schema). At-random at our scale.
+- **logiqa** — formal logical-reasoning MC. At-random at our scale.
+- **blimp** — minimal-pair grammaticality judgment. Linguistic, mostly above-random; not used as primary signal.
+
+#### F. Math (multi-step generation)
+- **gsm8k_cot** — grade-school math with 8-shot CoT, free generation. At our scale all 1.4B runs score 0/20. Used as a **looping smoke test**: does the model emit short sensible-shaped responses (`The answer is X.\n\n`) or n-gram loops?
+- **gsm8k** (logprob variant) — multiple-choice; at-random at our scale.
+- **minerva_math** — competition math, generation. At-random at our scale.
+
+#### G. Code generation
+- **HumanEval / MBPP** — function generation. At-random pass@1 at our scale.
+
+#### What's usable as outcome metric at our scale (1.4B, 3.3B tokens)
+- **Continuous (always usable)**: Paloma macro, dclm_200m_val
+- **Discrete above-random**: arc_easy (D), sciq (B), piqa (D), boolq (B). All others should be logged but treated as noise.
+- **Looping smoke test**: gsm8k_cot generation samples (qualitative, not exact_match).
+
+**Key mechanism note (from May 26 code-mix result):** the four above-random benchmarks span two distinct cognitive mechanisms — sciq+boolq are passage-grounded (B), arc_easy+piqa are knowledge-from-weights (C/D). Interventions that change attention/extraction (e.g. code data with input→output structure) can move (B) without moving (C/D). Always classify benchmark deltas by mechanism, not by name.
+
+---
+
 ### Historical hypotheses superseded by the H1/H2 framing above
 
 - **Causal bridge** (May 11) — old candidate for H1; Wikipedia-wikilink conditional generation. Shelved.
@@ -104,7 +152,13 @@ From the May 25 plan:
 
 - **Scale**: this is 60× fewer tokens than Aryabumi (200B). Effect size could shrink or grow at scale.
 - **Data**: we used open `algorithmic_corpus` (Python QA), not Aryabumi's proprietary "Python programming problems formally verified" set. The mechanism that gives both the boost may not be identical.
-- **Sciq + boolq, but not arc_easy/piqa**: the benchmarks that improved involve reading comprehension + science Q&A. Why these and not arc_easy/piqa? Hypothesis: code QA format (question + answer) transfers more directly to QA-format benchmarks than to multiple-choice physical/commonsense reasoning. Untested.
+- **Sciq + boolq, but not arc_easy/piqa — mechanism inspection (read the actual samples):** the split is not random; the two that improved are both **passage-grounded reading comprehension**, the two that didn't are both **knowledge-from-weights**. See the Evaluation taxonomy section above (B vs C/D).
+    - sciq sample: question `"Compounds that are capable of accepting electrons, such as o2 or f2, are called what?"` comes with `support: "Oxidants and Reductants Compounds that are capable of accepting electrons, such as O 2 or F2, are called oxidants ..."` — the answer is **literally in the passage**. Task = attend to support, lexical match.
+    - boolq sample: question `"is house tax and property tax are same"` with `passage: "Property tax or 'house tax' is a local tax on buildings..."` — passage contains the answer. Task = passage-question matching.
+    - arc_easy sample: `"Which statement best explains why photosynthesis is the foundation of most food webs?"` — no support, must recall biology from weights.
+    - piqa sample: `"How do I ready a guinea pig cage?"` with `sol1: paper bedding` vs `sol2: jeans bedding` — no support, must have physical intuition in weights.
+    - **Interpretation**: 25% code data appears to improve the model's ability to *attend to and extract from provided context*, not its parametric world knowledge or physical commonsense. The +6/+7pt gains on sciq/boolq are a **reading-comprehension / context-attention** effect, not a generic "NL reasoning" effect. This is consistent with code being dense in "given input → produce structured output" patterns (functions operating on arguments, problem statements followed by solutions).
+    - This nuance should temper the headline: we should NOT claim "code helps NL reasoning" in general. The honest claim is "code helps passage-grounded extraction tasks; effect on parametric-knowledge tasks is null".
 - **What's the active ingredient?**: code itself, or the Q&A structure, or just "more high-quality text"? Would need to compare against a 25% addition of non-code high-quality text (e.g. wikipedia subset) to isolate.
 - **Confound vs baseline**: data_seed and total token budget match; data ordering differs (DCLM shuffles in 75% rate + code interleaved). No obvious confound, but ordering effects at 3.34B-token scale haven't been measured here.
 
