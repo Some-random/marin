@@ -4,25 +4,36 @@
 
 ## ⭐ CURRENT GOALS & OVERARCHING HYPOTHESES (READ FIRST)
 
-### Three success criteria (every experiment must achieve ALL three)
-1. **Data efficiency** — same loss with less data or less training time
-2. **Reasoning quality** — better on reasoning tasks, less hallucination, more reliable reasoning
-3. **General NL performance** — no regression on standard benchmarks (ARC, MMLU, PIQA, HellaSwag, etc.)
+### Success criterion (revised May 27 — single axis)
 
-A recipe that achieves (1) but hurts (2) or (3) is not useful.
+**Token efficiency** — better quality per training token across every eval mechanism, with no regression on any.
+
+Why one criterion, not three:
+- The earlier framing split this into (1) "same loss with less data", (2) "better reasoning", (3) "no NL regression". (1) and (2)+(3) are duals of the same axis — "same perf, less data" is "more perf, same data" viewed differently. Three slots for one quantity.
+- "Better quality per token" is necessary but **not sufficient** to claim a recipe taught *reasoning capability*. The May 26 code-mix result is a clean example: it satisfied the old three-criteria (sciq +6pt, boolq +7pt, no regression), but sample inspection showed those gains came from passage-grounded extraction, not reasoning. The three-criteria framing produced a false positive for reasoning.
+- So token efficiency is the baseline gate — necessary for a recipe to be a candidate at all. Whether the recipe also taught reasoning capability is a **separate question** answered by the H1 / H2 probes below.
+
+**Measurement**: Paloma macro PPL + dclm_200m_val PPL (continuous, primary signal) + above-random benchmarks classified by mechanism (Evaluation Taxonomy section below). Any recipe with strictly better per-token quality across mechanisms with no regression passes the gate.
 
 ### Overarching research hypotheses
 
-**H1 — What kind of data teaches reasoning *capability* (not just domain knowledge)?**
+H1 and H2 are independent and both required. Without H1 (good reasoning data), H2 has nothing to retain. Without H2 (retention mechanism), H1 gains are erased. **Neither is testable from token-efficiency gains alone — both require dedicated capability probes** (see Probe Plans section).
 
-The question is what STRUCTURE in pretraining data teaches transferable reasoning skill, separately from teaching domain knowledge. Many data types help WITHIN a domain (OWM → SciQ, code → HumanEval) but don't transfer (OWM hurts ARC/PIQA, code hurts NL). The hypothesis space includes the tension between code-style reasoning and natural-language reasoning (Aryabumi vs Petty: code helps arithmetic/composition, hurts linguistic/factual), and whether there exists a kind of data that teaches general reasoning capability without the domain-specific tradeoff.
+**H1 — What kind of data teaches reasoning *capability* (not just domain knowledge or extraction skill)?**
 
-**Candidate experiments under H1** (not the hypothesis itself — these are tests *of* H1):
-- Aryabumi-style code mix at 1.4B (does 25% code with text achieve all three criteria at our scale?)
+The question is what STRUCTURE in pretraining data teaches transferable reasoning skill, separately from teaching domain knowledge or context-extraction skill. Many data types help WITHIN a domain (OWM → SciQ, code → HumanEval) but don't transfer (OWM hurts ARC/PIQA, code hurts NL). Code-mix at our scale appears to help context-grounded extraction (sciq, boolq) without teaching reasoning per se — distinguishing these requires probes that controlly vary "is the answer extractable from surface" vs. "is an algorithm required".
+
+**Candidate experiments under H1** (tests *of* H1, not the hypothesis itself):
+- Aryabumi-style code mix at 1.4B (DONE May 26 — passed token-efficiency gate, but mechanism analysis suggests extraction not reasoning; algorithmic-capability probes pending).
 - Synthetic structural data (formal languages, procedural data) — does abstract structure transfer to NL reasoning?
 - Domain-controlled data (math-only, code-only, mixed) — what's the transfer pattern?
 
-**What's been ruled out for H1**: pure OpenThoughts / OWM / code-only — all failed criterion (3) by hurting NL benchmarks at our scale (300M–1.4B).
+**Probes under H1** — distinguish "improved extraction" from "acquired algorithm". Designed to work at 1.4B / 3.3B-token scale where standard reasoning benchmarks are at-random.
+- **Output-probability conditioning probe** (McCoy "Embers of Autoregression" style) — same algorithmic task at two output-frequency tiers. If a recipe improves both equally, algorithmic; if only the high-frequency tier, surface.
+- **Counterfactual task variants** (Wu et al. "Reasoning or Reciting" style) — apply the algorithm under a non-default rule (e.g. base-9 arithmetic, mod-7 addition). Surface pattern-matching fails on the counterfactual; genuine algorithmic capability transfers.
+- **Reversal Curse** (Berglund) and **SCAN/COGS compositional generalization** as harder optional probes.
+
+**What's been ruled out for H1**: pure OpenThoughts / OWM / code-only — all failed token-efficiency by hurting NL benchmarks at our scale (300M–1.4B).
 
 **H2 — Once a model has reasoning capability, how do we retain & use it through general pretraining?**
 
@@ -31,12 +42,16 @@ Even if H1 is solved (we find data that builds reasoning capability), two failur
 - **H2a — Catastrophic forgetting**: web text overwrites the reasoning representations. *Candidate mitigation*: replay — mix a small fraction of reasoning data throughout web text training. **Untested at our scale.**
 - **H2b — No training pressure to use reasoning circuits**: even if reasoning circuits exist after phase 1, next-token prediction on standard web text doesn't activate them, so they sit dormant — replay alone doesn't fix this. *Candidate mitigations*: perplexity-filtered web text (train only on documents the reasoning-capable model finds surprising), joint training objectives that tie reasoning eval to web prediction. **Speculative and untested.**
 
-H1 and H2 are independent and both required. Without H1 (good reasoning data), H2 has nothing to retain. Without H2 (retention mechanism), H1 gains are erased.
+**Probes under H2** — measure capability decay over continued training.
+- Run an H1-passing recipe for phase 1, then continue training on standard web text for varying durations; re-run the H1 capability probes at intervals. Decay curve answers H2a.
+- Compare decay curves with and without replay (H2a mitigation), with and without perplexity-filtered web text (H2b mitigation).
 
-### Status of work as of May 25
+### Status of work as of May 27
 
-- **Looping investigation (Steps 1–10 below)** is **methodology cleanup**, not directly testing H1 or H2. Established that our framework reproduces konwoo's recipes faithfully; wd=1.6/x16 doesn't loop while wd=3.2/x8 does. wd-vs-epoch ablation (wd=3.2/x16) currently running.
-- **Pivot after ablation**: most promising next H1 candidate is the Aryabumi code-mix at 1.4B — closest published result that hits all three criteria at scales we can match. Concrete plan to be drafted.
+- **May 26 Aryabumi code-mix probe** passed the token-efficiency gate (Paloma macro −0.47 nats, sciq +6.2pt, boolq +7.7pt, no looping regression). **Mechanism inspection** revealed gains came from passage-grounded extraction, not reasoning — the recipe satisfies the gate but its H1 status (does it teach reasoning capability) is undecided.
+- **Next step**: H1 capability probes (Embers-style + Wu-style counterfactual) on the May 26 baseline + code-mix checkpoints — see Probe Plans section. This is the first attempt to test H1 directly rather than via downstream-benchmark proxies.
+- **Wide eval suite** in progress on both checkpoints (13 logprob task groups + 4 generation tasks, 8-GPU data-parallel via accelerate). Results will populate the Evaluation Taxonomy with actual per-task numbers.
+- **Looping investigation (Steps 1–10)** is **methodology cleanup**, complete. wd=1.6/x16/block=False (`peach-thunder-100` / `6xx0hu3l`) is the chosen non-looping baseline that all H1 candidates compare against.
 
 ### Evaluation taxonomy — what each eval *actually* tests (read the data, not the name)
 
