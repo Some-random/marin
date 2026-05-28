@@ -14,9 +14,11 @@
 
 The two are different goals. (A) is about training efficiency; (B) is about model behavior. A recipe can pass one without passing the other.
 
-### How we get to goal (B) — H1 and H2
+### How we get to either goal — H1 and H2
 
-H1 and H2 are the two open sub-questions on the path to (B). Both need to be solved.
+**H1 applies to both goals.** It's the same question (what data teaches a target capability?) with different "target": under (A) the target is NL capability per token; under (B) it's reasoning capability. The same data candidate (code, formal languages, synthetic textbooks) can be evaluated against either version.
+
+**H2 is mostly for (B).** Once a model has reasoning capability, it has to be retained through subsequent NL pretraining (or the gains disappear in the final artifact). Goal (A) cares about training-run efficiency to reach a fixed capability, so retention through later training isn't a separate question there.
 
 **H1 — What kind of pretraining data teaches reasoning capability (not just domain knowledge or extraction)?**
 - The question is what STRUCTURE in pretraining data teaches transferable reasoning, separately from domain knowledge or extraction skill. Many data types help WITHIN a domain (OWM → SciQ, code → HumanEval) but don't transfer.
@@ -34,7 +36,7 @@ H1 and H2 are the two open sub-questions on the path to (B). Both need to be sol
 ### Where things stand
 
 - May 26 code-mix recipe passes goal (A) loosely (Paloma macro −0.47 nats, sciq/boolq up, other NL tasks not down much). H1 status undetermined pending the counterfactual probe.
-- Goal (B) is gated on H1; H2 is gated on H1.
+- Both goals (A) and (B) depend on H1 being answered. Goal (B) additionally depends on H2.
 - In flight: phi-1.5-style data download + tokenize (May 28) as next H1 candidate; custom counterfactual eval dataset construction.
 
 ### Evaluation reference
