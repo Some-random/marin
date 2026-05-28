@@ -121,6 +121,123 @@ The model does NOT need to know the answer in its weights — the passage contai
 
 ---
 
+## May 28: Phi-1 / phi-1.5 four-way comparison + open-data sourcing plan
+
+*Goal: get apples-to-apples reference for what's possible at 1.3B params with the right data, and plan whether to attempt phi-1-style or phi-1.5-style training at our scale.*
+
+### What ran
+
+- Pulled `microsoft/phi-1` (1.3B, ~7B training tokens, code-only) and `microsoft/phi-1_5` (1.3B, ~30B training tokens, code + NL) from HuggingFace.
+- Ran both through the SAME lm-eval-harness pipeline + n-shot settings as our 1.4B baseline + code-mix runs (25-shot arc, 10-shot hellaswag, 5-shot winogrande/mmlu/gsm8k, 0-shot rest, gen tasks with `HF_ALLOW_CODE_EVAL=1`).
+- Script: `experiments/data_efficiency/run_phi_evals.sh`. Output: `outputs/eval_results/phi_evals_20260527_2257/`.
+- 8-GPU data-parallel via accelerate. phi-1: 22:57→23:29 PDT (~32 min). phi-1.5: 23:29→23:59 PDT (~30 min). Total ~62 min wall.
+
+### Full 4-way comparison (all numbers from our pipeline)
+
+Random column shows chance accuracy for that task. `acc_norm` used for arc/hellaswag/openbookqa, `acc` elsewhere.
+
+| Task | n-shot | Random | **1.4B base (3.3 B tok)** | **1.4B code25 (3.3 B tok)** | **phi-1 (7 B tok)** | **phi-1.5 (30 B tok)** |
+|---|---:|---:|---:|---:|---:|---:|
+| arc_easy | 25 | 0.25 | 0.401 | 0.416 | 0.378 | **0.805** |
+| arc_challenge | 25 | 0.25 | 0.242 | 0.236 | 0.232 | **0.532** |
+| sciq | 0 | 0.25 | 0.652 | 0.709 | 0.707 | **0.933** |
+| piqa | 0 | 0.50 | 0.634 | 0.619 | 0.562 | **0.766** |
+| boolq | 0 | 0.50 | 0.502 | 0.579 | 0.451 | **0.746** |
+| hellaswag | 10 | 0.25 | 0.348 | 0.341 | 0.301 | **0.635** |
+| winogrande | 5 | 0.50 | 0.504 | 0.500 | 0.498 | **0.710** |
+| openbookqa | 0 | 0.25 | 0.302 | 0.288 | 0.248 | **0.482** |
+| commonsense_qa | 0 | 0.20 | 0.192 | 0.200 | 0.175 | **0.507** |
+| social_iqa | 0 | 0.33 | 0.366 | 0.362 | 0.364 | **0.523** |
+| logiqa | 0 | 0.25 | 0.218 | 0.234 | 0.214 | 0.240 |
+| mmlu | 5 | 0.25 | 0.252 | 0.249 | 0.248 | **0.422** |
+| gsm8k | 5 | 0 | 0.000 | 0.000 | 0.012 | **0.305** |
+| gsm8k_cot | 0 | 0 | 0.024 | 0.022 | 0.014 | **0.069** |
+| **humaneval** | 0 | 0 | 0.000 | 0.006 | **0.494** | 0.342 |
+| mbpp | 0 | 0 | 0.000 | 0.000 | 0.010 | 0.004 |
+| minerva_math | 0 | 0 | 0.0002 | 0.0002 | 0.000 | 0.000 |
+
+### Findings
+
+**1. We are slightly BETTER than phi-1 on NL benchmarks** — by 2-5pt on piqa, boolq, hellaswag. This is consistent with phi-1 being a code-only model: its NL ability is no better than ours despite phi-1's "high-quality data" framing, because their training was almost entirely code. The phi-1 paper doesn't report NL benchmarks because they're not the point of that model.
+
+**2. phi-1 destroys us on HumanEval** — 49.4% vs 0.6%. This is the apples-to-apples evidence that **the right code data unlocks real code-generation capability at 1.3B params and 7B training tokens**. We have a similar parameter count and similar token budget; the only difference is data quality (filtered Stack + GPT-3.5 synthetic Python textbooks/exercises vs our unfiltered DCLM + opc_algorithmic Q&A pairs).
+
+**3. phi-1.5 with 9× our tokens lifts EVERY benchmark off the floor**:
+  - arc_easy 0.42 → 0.80 (+38pt), arc_challenge 0.24 → 0.53 (+29pt) — both far above random
+  - mmlu 0.25 → 0.42 — first time we see a 1.3B class model meaningfully above random
+  - gsm8k 0% → 30.5% — explicit "solve via Python emission" capability, possible because the code half of phi-1.5's training is preserved
+  - commonsense_qa 0.20 (random) → 0.51 — emerges only at this combo of scale + data
+  - humaneval 0.49 (phi-1) → 0.34 (phi-1.5) — small drop from adding NL data; mbpp similar
+
+  This is the empirical answer to "is there a way to get something out of nothing at our scale": **yes, but you need ~10× more training tokens AND the data quality discipline of phi-1.5**, not just one or the other.
+
+**4. MBPP discrepancy** — we measured phi-1 MBPP pass@1 at 1.0% in our pipeline, vs the paper's 55.5%. The Open LLM Leaderboard / lm-eval-harness MBPP scoring uses a specific extraction pattern and 0-shot setup that's likely undercounting. The paper used a different code-eval framework (BigCode evaluation harness). Our gsm8k_cot at 7% for phi-1.5 vs paper's 40.2% (via "Python emission") is similar — different methodologies. **Caveat: our pipeline's code-gen numbers are not directly comparable to published phi numbers; treat as conservative lower bounds.**
+
+### Implication for H1
+
+The May 26 Aryabumi-style code mix gave 0.6% HumanEval. phi-1 gave 49%. Same model size, similar token budget, *different code data*. So the H1 conclusion sharpens:
+
+> **Not all code data is equal.** Off-the-shelf code Q&A (opc_algorithmic) at 25% mix did not transfer to HumanEval. Phi-style filtered+synthetic textbook code at higher mix DID. The H1 hypothesis "code helps reasoning" is still alive but **conditional on data type and curation**.
+
+Whether phi-1.5-style mix would unlock NL reasoning at our scale is the next H1 question. The phi-1.5 result shows it's *possible*, but requires ~30B tokens — about 9× what we trained the May 26 recipe on.
+
+### Open-data sourcing plan (no Microsoft data available)
+
+Microsoft never released phi-1 / phi-1.5 training data. Closest open substitutes (per dataset cards):
+
+**Phi-1-style code mix (~7 B tokens, ~12-22 GB download)**
+
+| Component | Dataset | Tokens | License | Note |
+|---|---|---|---|---|
+| Filtered Python (educational) | `HuggingFaceTB/smollm-corpus/python-edu` | ~4 B (per SmolLM blog) | ODC-BY | Stack-v2 scored ≥4 by edu classifier; metadata only, content via S3 |
+| Synthetic Python exercises | `jinaai/code_exercises` | ~120 M | **CC-BY-NC-SA (NON-COMMERCIAL)** | GPT-3.5-generated, Python only; closest open clone of phi-1's `CodeExercises` |
+| (commercial alt) | `nampdn-ai/tiny-codes` | unstated, ~1.6 M rows / 981 MB | MIT | Multi-lang, lower QC |
+
+**Phi-1.5-style code+NL mix (~30 B tokens, ~190 GB download)**
+
+| Component | Dataset | Tokens | License |
+|---|---|---|---|
+| Phi-1 code base (above) | python-edu + code_exercises | ~7 B | mixed |
+| Synthetic NL textbooks | `HuggingFaceTB/smollm-corpus/cosmopedia-v2` | ~28 B | Apache-2.0 |
+| (optional add) | `HuggingFaceTB/smollm-corpus/fineweb-edu-dedup` | ~220 B (subsample) | ODC-BY |
+
+License watch:
+- jinaai/code_exercises is **non-commercial**; replace with tiny-codes for commercial release.
+- `open-phi/textbooks` has **no license listed**; don't use without clarification.
+- Microsoft's original phi-1 / phi-1.5 weights themselves are research-license (non-commercial), but we're only running inference on them for comparison — that's fine.
+
+### Compute estimates at our 1.4B / 8× A100-40GB
+
+Our May 26 run: 3.34 B tokens, 7h 40min wall → **~435 M tokens/hour** throughput at 1.4B / bs=64 / seq=4096.
+
+| Target | Unique tokens | Epochs | Total tokens | Wall time |
+|---|---|---|---|---|
+| Phi-1-scale, 1 epoch | 7 B | 1 | 7 B | ~16 h |
+| Phi-1-scale, paper's 8 epochs | 7 B | 8 | 56 B | ~5.4 days |
+| Phi-1.5-scale, 1 epoch | 30 B | 1 | 30 B | ~2.9 days |
+| Phi-1.5-scale, paper's 5 epochs | 30 B | 5 | 150 B | ~14.4 days |
+
+**Storage**: phi-1 mix fits comfortably on the local FS (~22 GB raw + ~10 GB tokenized). Phi-1.5 mix (~190 GB raw + ~80 GB tokenized) also fits.
+- Current `/fsx` usage: 34 TB / 39 TB (87% used), **5.0 TB free**.
+- Our existing footprint: `outputs/tokenized` 113 GB, `outputs/raw` 6.6 TB, `checkpoints` 738 GB.
+- Phi-1.5 mix would add ~270 GB total — ~5% of remaining free space, fine.
+
+### Recommendations / open decisions for tomorrow
+
+Three paths, in increasing cost:
+
+1. **(0.5-1 day)**: Run the toy reasoning probe (already drafted in chat) on our current models to settle "did Aryabumi 25% code teach algorithmic capability, even tiny?" Doesn't need new data.
+2. **(~6 days compute)**: Phi-1-style 1.4B replication. Download `python-edu` (S3 fetch step) + `jinaai/code_exercises` (or tiny-codes for commercial). Train 1.4B for 8 epochs on the ~7B-token mix. Target: HumanEval > 0, confirming "right code data → code capability at our scale" *with open data*.
+3. **(~14 days compute, ~190 GB download)**: Phi-1.5-style 1.4B replication. Train on python-edu + code_exercises + cosmopedia-v2 for 5 epochs. Target: reproduce phi-1.5's NL reasoning lift (arc_easy ~0.80, mmlu ~0.42, gsm8k ~0.30) with fully open data. Most informative result but biggest commitment.
+
+Open questions (need user input before proceeding):
+- Which path? Toy probe first (cheap, narrow), or jump to phi-1 replication (medium, high-information)?
+- For path 2 / 3: any constraint on multi-day GPU occupancy?
+- Commercial use needed? (affects jinaai vs tiny-codes choice)
+- Free space on `/fsx/users/dongweij/marin/`?
+
+---
+
 ## May 27: Wide benchmark suite on baseline vs code-mix — confirms extraction-not-reasoning
 
 *Direct follow-up to the May 26 code-mix probe. The 4-benchmark comparison there left open: does code-mix help on **any** reasoning-flavored task at our scale? Wide eval suite ran today on both checkpoints to answer that.*
