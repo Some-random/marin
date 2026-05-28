@@ -65,53 +65,9 @@ Even if H1 is solved (we find data that builds reasoning capability), two failur
 - **Wide eval suite** in progress on both checkpoints (13 logprob task groups + 4 generation tasks, 8-GPU data-parallel via accelerate). Results will populate the Evaluation Taxonomy with actual per-task numbers.
 - **Looping investigation (Steps 1–10)** is **methodology cleanup**, complete. wd=1.6/x16/block=False (`peach-thunder-100` / `6xx0hu3l`) is the chosen non-looping baseline that all H1 candidates compare against.
 
-### Evaluation taxonomy — what each eval *actually* tests (read the data, not the name)
+### Evaluation reference
 
-Names like "NL reasoning benchmark" hide important mechanistic differences. Below we classify every eval we use by the actual cognitive mechanism a model needs to score above chance, based on inspection of per-example samples. **Always sample the data before reasoning about why scores differ.**
-
-#### A. Continuous PPL (no task structure, just next-token loss)
-- **Paloma macro** (16 subsets, see `run_1_4b_25code_alg.py`) — domain-diverse held-out web/forum/code text. Primary continuous signal at our scale. Sensitive to general LM quality and to per-domain coverage.
-- **dclm_200m_val** — held-out NL within our training distribution. Sensitive to overfitting on the 209M-token DCLM training slice.
-- **opc_algorithmic** (when used as code training data) — final eval loss on the code training slice; signals code memorization, not generalization.
-
-#### B. Passage-grounded reading comprehension (answer is *in the prompt*; model just needs to attend and extract)
-The model does NOT need to know the answer in its weights — the passage contains or strongly implies it.
-- **sciq** — every question comes with a `support` paragraph that *literally states the answer* (e.g. "what is X called?" → support: "X is called Y"). 4-way MC. Tests context-attention and lexical matching, not science knowledge.
-- **boolq** — yes/no question + Wikipedia-style passage that contains the answer. Tests passage-question matching.
-- **openbookqa** (if used) — provides a relevant fact alongside the question.
-
-#### C. Parametric world knowledge (no passage; the model must recall facts from weights)
-- **arc_easy** — 4-way MC science questions, no support. Tests grade-school science recall (photosynthesis, meiosis, safety equipment, ...). Above-random at our scale.
-- **arc_challenge** — harder version, mostly at-random at 1.4B/3.3B.
-- **mmlu** — 4-way MC across 57 domains, no passage. At-random at our scale.
-- **triviaqa / naturalqs** — generation, no passage. At-random at our scale.
-
-#### D. Physical/social commonsense (no passage; intuition from weights)
-- **piqa** — 2 alternative everyday-task descriptions; pick the physically plausible one ("paper bedding" vs "jeans bedding" for a guinea pig). Above-random at our scale.
-- **social_iqa** — social-situation MC. At-random at our scale.
-- **hellaswag** — sentence-completion plausibility. Mostly at-random at our scale.
-
-#### E. Coreference / logical / linguistic
-- **winogrande** — pronoun-resolution pairs (Winograd schema). At-random at our scale.
-- **logiqa** — formal logical-reasoning MC. At-random at our scale.
-- **blimp** — minimal-pair grammaticality judgment. Linguistic, mostly above-random; not used as primary signal.
-
-#### F. Math (multi-step generation)
-- **gsm8k_cot** — grade-school math with 8-shot CoT, free generation. At our scale all 1.4B runs score 0/20. Used as a **looping smoke test**: does the model emit short sensible-shaped responses (`The answer is X.\n\n`) or n-gram loops?
-- **gsm8k** (logprob variant) — multiple-choice; at-random at our scale.
-- **minerva_math** — competition math, generation. At-random at our scale.
-
-#### G. Code generation
-- **HumanEval / MBPP** — function generation. At-random pass@1 at our scale.
-
-#### What's usable as outcome metric at our scale (1.4B, 3.3B tokens)
-- **Continuous (always usable)**: Paloma macro, dclm_200m_val
-- **Discrete above-random**: arc_easy (D), sciq (B), piqa (D), boolq (B). All others should be logged but treated as noise.
-- **Looping smoke test**: gsm8k_cot generation samples (qualitative, not exact_match).
-
-**Key mechanism note (from May 26 code-mix result):** the four above-random benchmarks span two distinct cognitive mechanisms — sciq+boolq are passage-grounded (B), arc_easy+piqa are knowledge-from-weights (C/D). Interventions that change attention/extraction (e.g. code data with input→output structure) can move (B) without moving (C/D). Always classify benchmark deltas by mechanism, not by name.
-
----
+For the canonical evaluation taxonomy (what each eval actually tests), the list of usable-at-our-scale benchmarks, and the current cross-model results table — see **[EVALUATION.md](./EVALUATION.md)**. Always classify benchmark deltas by mechanism (passage-grounded vs parametric vs commonsense vs ...), not by name; that doc is the reference.
 
 ### Historical hypotheses superseded by the H1/H2 framing above
 
