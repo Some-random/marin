@@ -20,6 +20,7 @@ dependencies = [
     # top level deps. try to keep these small.
     "watchdog",
     "dupekit >= 0.1.0",
+    "boto3>=1.41.5",
 ]
 
 [tool.uv]

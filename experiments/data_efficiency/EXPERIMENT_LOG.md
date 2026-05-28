@@ -156,6 +156,16 @@ Random column shows chance accuracy for that task. `acc_norm` used for arc/hella
 | mbpp | 0 | 0 | 0.000 | 0.000 | 0.010 | 0.004 |
 | minerva_math | 0 | 0 | 0.0002 | 0.0002 | 0.000 | 0.000 |
 
+### Side note: leaderboard n-shot reruns on our 1.4B models (May 27 evening)
+
+Before the phi runs we re-ran arc_easy/arc_challenge/hellaswag/winogrande at OpenLLM Leaderboard n-shot counts (25/25/10/5) on both 1.4B checkpoints. The numbers in the table above use these reruns where applicable.
+
+Notable: **arc_easy code-mix-vs-baseline Δ flipped sign with shot count**:
+- 0-shot: baseline 0.388 vs code-mix 0.386 → code-mix **−0.2 pt**
+- 25-shot: baseline 0.401 vs code-mix 0.416 → code-mix **+1.5 pt**
+
+Code-mix gained +3.0 pt from going 0→25 shot; baseline only +1.3 pt. Consistent with the "code data improves context attention/extraction" story — more in-context examples → bigger ICL gain for the code-mix model. Same direction as sciq/boolq passage-grounded gains, smaller magnitude. arc_challenge/hellaswag/winogrande deltas stayed within noise across n-shot changes.
+
 ### Findings
 
 **1. We are slightly BETTER than phi-1 on NL benchmarks** — by 2-5pt on piqa, boolq, hellaswag. This is consistent with phi-1 being a code-only model: its NL ability is no better than ours despite phi-1's "high-quality data" framing, because their training was almost entirely code. The phi-1 paper doesn't report NL benchmarks because they're not the point of that model.
