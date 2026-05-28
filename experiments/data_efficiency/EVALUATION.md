@@ -30,7 +30,7 @@ Two-way split for QA: **open-book** (the answer is in the prompt; model attends 
 > - **passage**: "Ethanol fuel -- All biomass goes through at least some of these steps: it needs to be grown, collected, dried, fermented, distilled, and burned. … one unit of fossil-fuel energy is required to create 1.3 energy units from the resulting ethanol. The energy balance for sugarcane ethanol produced in Brazil is more favorable, with one unit of fossil-fuel energy required to create 8 from the ethanol. …"
 > - **label**: False
 
-**openbookqa with-fact** (NOT what we currently run — flagged for future) — the standard `openbookqa` dataset includes a `fact1` field with the relevant scientific fact alongside the question. The lm-eval-harness `openbookqa` task we run drops the fact and presents only question + 4 choices, which makes it **closed-book** in our pipeline (see §B). If we want a clean open-book MC eval at our scale we should add the `fact1` field back in.
+**openbookqa_fact** — custom variant we added in `experiments/data_efficiency/openbookqa_fact.yaml` that uses the `additional` config of `allenai/openbookqa` and prepends the dataset's `fact1` field to the question stem. This is the open-book MC eval. Re-run pending; replaces the closed-book openbookqa default that lm-eval ships with.
 
 ### B. Closed-book QA / commonsense
 
@@ -54,12 +54,6 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > - **question**: "Find the degree for the given field extension Q(sqrt(2), sqrt(3), sqrt(18)) over Q."
 > - **choices**: 0 / 4 / 2 / 6
 > - **answer**: 1 → "4"
-
-**openbookqa** (closed-book variant we run) — 4-way MC; fact omitted in our pipeline.
-
-> - **question_stem**: "A person wants to start saving money so that they can afford a nice vacation at the end of the year. After looking over their budget and expenses, they decide the best way to save money is to"
-> - **choices**: A) make more phone calls / B) quit eating lunch out / C) buy less with monopoly money / D) have lunch with friends
-> - **answerKey**: B
 
 **piqa** — 2-way MC; physical-intuition continuations.
 
@@ -220,7 +214,7 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11) at the n-shot s
 | Closed-book | arc_easy | acc_norm | 25 | 0.25 | 0.401 | 0.416 | 0.378 | **0.805** |
 | Closed-book | arc_challenge | acc_norm | 25 | 0.25 | 0.242 | 0.236 | 0.232 | **0.532** |
 | Closed-book | mmlu | acc | 5 | 0.25 | 0.252 | 0.249 | 0.248 | **0.422** |
-| Closed-book | openbookqa | acc_norm | 0 | 0.25 | 0.302 | 0.288 | 0.248 | **0.482** |
+| Open-book | openbookqa_fact (with `fact1`) | acc_norm | 0 | 0.25 | TBD | TBD | TBD | TBD |
 | Closed-book | piqa | acc | 0 | 0.50 | 0.634 | 0.619 | 0.562 | **0.766** |
 | Closed-book | social_iqa | acc | 0 | 0.33 | 0.366 | 0.362 | 0.364 | **0.523** |
 | Closed-book | hellaswag | acc_norm | 10 | 0.25 | 0.348 | 0.341 | 0.301 | **0.635** |
@@ -228,10 +222,10 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11) at the n-shot s
 | Closed-book | commonsense_qa | acc | 0 | 0.20 | 0.192 | 0.200 | 0.175 | **0.507** |
 | Closed-book | logiqa | acc | 0 | 0.25 | 0.218 | 0.234 | 0.214 | 0.240 |
 | Math | gsm8k | exact_match | 5 | 0 | 0.000 | 0.000 | 0.012 | **0.305** |
-| Math | gsm8k_cot | exact_match | 0 | 0 | 0.024 | 0.022 | 0.014 | **0.069** |
-| Math | minerva_math | exact_match | 0 | 0 | 0.0002 | 0.0002 | 0.000 | 0.000 |
+| Math | gsm8k_cot | exact_match | 8 | 0 | TBD | TBD | TBD | TBD |
+| Math | minerva_math | exact_match | 4 | 0 | TBD | TBD | TBD | TBD |
 | Code | humaneval | pass@1 | 0 | 0 | 0.000 | 0.006 | **0.494** | 0.342 |
-| Code | mbpp | pass@1 | 0 | 0 | 0.000 | 0.000 | 0.010 | 0.004 |
+| Code | mbpp | pass@1 | 3 | 0 | TBD | TBD | TBD | TBD |
 | PPL | paloma_macro (16 subsets, mean) | eval_loss | — | — | 4.71 | **4.24** | — | — |
 | PPL | dclm_200m_val | eval_loss | — | — | 4.07 | **3.73** | — | — |
 | PPL | paloma 4chan | eval_loss | — | — | 3.640 | **3.254** | — | — |

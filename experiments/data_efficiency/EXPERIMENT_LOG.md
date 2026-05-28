@@ -2,68 +2,23 @@
 
 ---
 
-## ⭐ CURRENT GOALS & OVERARCHING HYPOTHESES (READ FIRST)
+## ⭐ CURRENT GOALS (READ FIRST)
 
-### Success criterion (revised May 27)
+### The two possible goals — pick one
 
-A recipe is judged against the capability it is supposed to teach, **not** uniformly across all evals. Trading tokens away from natural language to add (e.g.) code reduces NL exposure — small NL regressions are expected, not failures. The criterion has three parts:
+**(A) Reasoning data → data efficiency.** Use reasoning-style data to reach the same NL performance with less training compute.
+- Pass condition: same Paloma macro + above-random benchmarks as a text-only baseline trained on more tokens. Reasoning ability per se is not required.
 
-1. **Target capability** — the capability the recipe is designed to teach (e.g. *reasoning* for the code-mix recipe).
-   - Required: **strictly improves**, measured on probes that test the target capability under conditions where surface pattern-matching can't substitute (see H1 probes below).
-2. **Substrate capability** — capabilities the model needs to even attempt the task: basic NL fluency, ability to read and write coherent English, absence of generation pathologies (looping, gibberish).
-   - Required: **preserved within reason**. Measured by Paloma macro PPL, dclm_200m_val PPL, and generation smoke tests (gsm8k_cot loop check). Floor: if substrate collapses, the model can't be evaluated at all on the target.
-3. **Non-target capabilities** — everything else (e.g. knowledge benchmarks, lexical pattern-matching tasks, code metrics for an NL-targeted recipe).
-   - Tolerable: **small regressions allowed**, in proportion to the data trade-off. Disqualifying only if a non-target capability collapses or regresses far more than the data shift would explain.
+**(B) Reasoning data → models that actually reason.** Use reasoning-style data to make the model reliably reason and stop making reasoning mistakes.
+- Pass condition: reasoning improves, other tasks don't decrease much. Reasoning has to be tested with something that surface pattern-matching can't fake — counterfactual evals (Wu et al. style), not standard benchmark accuracy.
 
-Why three parts, not one uniform gate:
-- "No regression on any eval" was too strict. If we swap 25% NL tokens for code tokens, NL knowledge benchmarks may see small drops — that's the price, not failure. The recipe should still be evaluated on whether it taught its target capability.
-- The old framing's "reasoning quality" criterion was satisfied by passage-grounded extraction gains (May 26 code-mix: sciq +6pt, boolq +7pt) that were not actually reasoning. **Reasoning gains require a probe that controls for the extraction confound** — see H1 probes.
-- Substrate-vs-non-target distinction matters: a model that can't write coherent English is unevaluable on reasoning, regardless of latent capability. Substrate has a floor; non-target capabilities have a budget.
+The two are different goals. (A) is about training efficiency; (B) is about model behavior. A recipe can pass one without passing the other.
 
-**For the May 26 code-mix recipe specifically** (target capability = reasoning, per the H1 hypothesis it's supposed to test):
-- Substrate: preserved (Paloma macro improved, no looping). ✅
-- Non-target NL knowledge / lexical: flat or improved across the board. ✅ (better than expected — no trade-off paid)
-- **Target (reasoning): undetermined.** Downstream improvement on sciq/boolq was extraction, not reasoning. H1 probe pending.
+### Where things stand
 
-So the May 26 result has cleared the gate's *substrate* and *non-target* requirements but the *target* requirement is still open. The toy probe defined under H1 below is the test of the target requirement.
-
-### Overarching research hypotheses
-
-H1 and H2 are independent and both required. Without H1 (good reasoning data), H2 has nothing to retain. Without H2 (retention mechanism), H1 gains are erased. **Neither is testable from token-efficiency gains alone — both require dedicated capability probes** (see Probe Plans section).
-
-**H1 — What kind of data teaches reasoning *capability* (not just domain knowledge or extraction skill)?**
-
-The question is what STRUCTURE in pretraining data teaches transferable reasoning skill, separately from teaching domain knowledge or context-extraction skill. Many data types help WITHIN a domain (OWM → SciQ, code → HumanEval) but don't transfer (OWM hurts ARC/PIQA, code hurts NL). Code-mix at our scale appears to help context-grounded extraction (sciq, boolq) without teaching reasoning per se — distinguishing these requires probes that controlly vary "is the answer extractable from surface" vs. "is an algorithm required".
-
-**Candidate experiments under H1** (tests *of* H1, not the hypothesis itself):
-- Aryabumi-style code mix at 1.4B (DONE May 26 — passed token-efficiency gate, but mechanism analysis suggests extraction not reasoning; algorithmic-capability probes pending).
-- Synthetic structural data (formal languages, procedural data) — does abstract structure transfer to NL reasoning?
-- Domain-controlled data (math-only, code-only, mixed) — what's the transfer pattern?
-
-**Probes under H1** — distinguish "improved extraction" from "acquired algorithm". Designed to work at 1.4B / 3.3B-token scale where standard reasoning benchmarks are at-random.
-- **Output-probability conditioning probe** (McCoy "Embers of Autoregression" style) — same algorithmic task at two output-frequency tiers. If a recipe improves both equally, algorithmic; if only the high-frequency tier, surface.
-- **Counterfactual task variants** (Wu et al. "Reasoning or Reciting" style) — apply the algorithm under a non-default rule (e.g. base-9 arithmetic, mod-7 addition). Surface pattern-matching fails on the counterfactual; genuine algorithmic capability transfers.
-- **Reversal Curse** (Berglund) and **SCAN/COGS compositional generalization** as harder optional probes.
-
-**What's been ruled out for H1**: pure OpenThoughts / OWM / code-only — all failed token-efficiency by hurting NL benchmarks at our scale (300M–1.4B).
-
-**H2 — Once a model has reasoning capability, how do we retain & use it through general pretraining?**
-
-Even if H1 is solved (we find data that builds reasoning capability), two failure modes can erase that capability during subsequent general web text training:
-
-- **H2a — Catastrophic forgetting**: web text overwrites the reasoning representations. *Candidate mitigation*: replay — mix a small fraction of reasoning data throughout web text training. **Untested at our scale.**
-- **H2b — No training pressure to use reasoning circuits**: even if reasoning circuits exist after phase 1, next-token prediction on standard web text doesn't activate them, so they sit dormant — replay alone doesn't fix this. *Candidate mitigations*: perplexity-filtered web text (train only on documents the reasoning-capable model finds surprising), joint training objectives that tie reasoning eval to web prediction. **Speculative and untested.**
-
-**Probes under H2** — measure capability decay over continued training.
-- Run an H1-passing recipe for phase 1, then continue training on standard web text for varying durations; re-run the H1 capability probes at intervals. Decay curve answers H2a.
-- Compare decay curves with and without replay (H2a mitigation), with and without perplexity-filtered web text (H2b mitigation).
-
-### Status of work as of May 27
-
-- **May 26 Aryabumi code-mix probe** passed the token-efficiency gate (Paloma macro −0.47 nats, sciq +6.2pt, boolq +7.7pt, no looping regression). **Mechanism inspection** revealed gains came from passage-grounded extraction, not reasoning — the recipe satisfies the gate but its H1 status (does it teach reasoning capability) is undecided.
-- **Next step**: H1 capability probes (Embers-style + Wu-style counterfactual) on the May 26 baseline + code-mix checkpoints — see Probe Plans section. This is the first attempt to test H1 directly rather than via downstream-benchmark proxies.
-- **Wide eval suite** in progress on both checkpoints (13 logprob task groups + 4 generation tasks, 8-GPU data-parallel via accelerate). Results will populate the Evaluation Taxonomy with actual per-task numbers.
-- **Looping investigation (Steps 1–10)** is **methodology cleanup**, complete. wd=1.6/x16/block=False (`peach-thunder-100` / `6xx0hu3l`) is the chosen non-looping baseline that all H1 candidates compare against.
+- May 26 code-mix recipe (25% opc_algorithmic) passes (A) loosely: Paloma macro −0.47 nats, sciq/boolq up, other NL tasks not down much.
+- Whether it passes (B) is undetermined — the sciq/boolq gains are extraction, not reasoning. A counterfactual-style probe (Wu / Embers / our own custom counterfactual datasets) is the actual test.
+- Next directions: (i) find reasoning data that generalizes across domains without specialising the model; (ii) retain reasoning circuits through subsequent NL pretraining (catastrophic-forgetting / circuit-activation question).
 
 ### Evaluation reference
 
