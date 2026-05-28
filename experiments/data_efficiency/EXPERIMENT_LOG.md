@@ -121,6 +121,68 @@ The model does NOT need to know the answer in its weights — the passage contai
 
 ---
 
+## May 27: Wide benchmark suite on baseline vs code-mix — confirms extraction-not-reasoning
+
+*Direct follow-up to the May 26 code-mix probe. The 4-benchmark comparison there left open: does code-mix help on **any** reasoning-flavored task at our scale? Wide eval suite ran today on both checkpoints to answer that.*
+
+### Setup
+
+- Models: `peach-thunder-100` / `1_4b_wd1_6_x16_nocrossblock_hf` (baseline, 0% code) and `eager-grass-104` / `1_4b_25code_alg_hf` (code-mix, 25% opc_algorithmic).
+- Script: `experiments/data_efficiency/run_wide_evals.sh` + `run_wide_evals_resume.sh`. Output: `/fsx/users/dongweij/marin/outputs/eval_results/wide_eval_20260527_1343/`.
+- Parallelism: `accelerate launch --multi_gpu --num_processes 8` — each rank holds a full 1.4B model copy (fits 40 GB), processes 1/8 of requests. Logprob batch=32/dev, gen batch=8/dev.
+- Tasks (17 task groups, mmlu expands to 57 subtasks):
+  - Logprob: arc_easy, arc_challenge, sciq, piqa, boolq, hellaswag, winogrande, openbookqa, commonsense_qa, social_iqa, logiqa, mmlu, gsm8k
+  - Generation: humaneval, mbpp, gsm8k_cot, minerva_math
+- Required env: `HF_ALLOW_CODE_EVAL=1` (separate from `--confirm_run_unsafe_code` flag) for HumanEval/MBPP to run.
+
+### Full comparison (n covers full eval split per task)
+
+| Category | Task | Random | Baseline | Code-mix | Δ | Notes |
+|---|---|---:|---:|---:|---:|---|
+| **Passage-grounded extraction** | sciq | 0.25 | 0.652 ±0.015 | **0.709 ±0.014** | **+5.7 pt (~3σ)** | answer is in `support` paragraph |
+| | boolq | 0.50 | 0.502 ±0.009 | **0.579 ±0.009** | **+7.7 pt (~9σ)** | answer in `passage`; baseline at random |
+| **Parametric knowledge / commonsense** | arc_easy | 0.25 | 0.418 ±0.010 | 0.407 ±0.010 | −1.1 pt | non-target |
+| | piqa | 0.50 | 0.634 ±0.011 | 0.619 ±0.011 | −1.6 pt | non-target, ~1.5σ |
+| **At-random (no signal at our scale)** | arc_challenge | 0.25 | 0.218 ±0.012 | 0.213 ±0.012 | −0.5 pt | both below random |
+| | mmlu (57 sub) | 0.25 | 0.252 ±0.004 | 0.249 ±0.004 | −0.3 pt | both at random |
+| | hellaswag | 0.25 | 0.307 ±0.005 | 0.312 ±0.005 | +0.5 pt | both slightly above |
+| | winogrande | 0.50 | 0.490 ±0.014 | 0.504 ±0.014 | +1.3 pt | both at random |
+| | openbookqa | 0.25 | 0.180 ±0.017 | 0.184 ±0.017 | +0.4 pt | both BELOW random |
+| | commonsense_qa | 0.20 | 0.192 ±0.011 | 0.200 ±0.011 | +0.8 pt | both at random |
+| | social_iqa | 0.33 | 0.366 ±0.011 | 0.362 ±0.011 | −0.5 pt | both ~random |
+| | logiqa | 0.25 | 0.218 ±0.016 | 0.234 ±0.017 | +1.5 pt | both at random |
+| **Math (floor)** | gsm8k (MC) | 0 | 0.015 ±0.003 | 0.024 ±0.004 | +0.8 pt | both near zero |
+| | gsm8k_cot (gen) | 0 | 0.024 ±0.004 | 0.022 ±0.004 | −0.2 pt | both near zero, no looping |
+| | minerva_math | 0 | 0.0002 | 0.0002 | 0 | both effectively zero |
+| **Code (floor)** | humaneval | 0 | 0.000 ±0 | 0.006 ±0.006 | +0.6 pt | 1/164 problems passed |
+| | mbpp | 0 | 0.000 ±0 | 0.000 ±0 | 0 | both zero |
+
+### Applying the 3-part success criterion (target / substrate / non-target)
+
+| Part | Status | Evidence |
+|---|---|---|
+| **Substrate** (NL fluency, no generation pathology) | ✅ preserved | Paloma macro improved by 0.47 nats across every subset; no looping on gsm8k_cot |
+| **Non-target** (NL knowledge, lexical commonsense) | ✅ within budget | arc_easy −1.1pt, piqa −1.6pt; both within ~1.5σ. Small regressions consistent with trading 25% NL tokens for code |
+| **Target** (reasoning capability) | ❌ **no signal** | All math benchmarks (gsm8k, gsm8k_cot, minerva_math) at floor for both models. HumanEval +0.6pt = 1/164 problems = noise. All at-random NL benchmarks (arc_challenge, mmlu, hellaswag, logiqa) flat or random-walk |
+
+### Interpretation
+
+The wide eval confirms the May 26 nuance: **code-mix at our scale is a token-efficiency win for passage-grounded extraction, but produces no measurable reasoning capability on any standard reasoning benchmark.** The two large gains (sciq +5.7pt, boolq +7.7pt) come from tasks where the answer is in the prompt; everything that requires generating a multi-step solution or recalling parametric knowledge is at floor.
+
+So the May 26 "Aryabumi-effect reproduces" headline needs a sharper qualifier: it reproduces *the Paloma-PPL and downstream-MC parts* of the Aryabumi effect at our scale, but the "code helps NL reasoning" claim (the most interesting part of the Aryabumi paper) is **not testable here** — every reasoning-flavored benchmark is at-random for both models.
+
+### Open question (handed to the H1 probe design)
+
+Why does every reasoning benchmark floor for both models? Most likely: 1.4B at 3.34B training tokens is severely under-Chinchilla (Chinchilla optimal for 1.4B is ~28 B tokens — we're at ~12% of that). Reference points: Pythia-1.4B (300B tokens), TinyLlama-1.1B (3T tokens), OLMo-1B (4T tokens), Llama-3.2-1B (9T tokens) — every public 1.4B model that scores above-random on reasoning was trained on 100–3000× more tokens than we have here.
+
+We have two options:
+1. Build a probe that gives signal even at floor (the toy probe — Embers-style output-prob conditioning + Wu-style counterfactual addition). Doesn't require improving the model.
+2. Train longer / on better data so standard benchmarks lift off the floor.
+
+These aren't mutually exclusive but option 1 is much cheaper.
+
+---
+
 ## May 26: Aryabumi code-mix probe — result
 
 *Same research thread as the May 25 planning section. Continuation of the active H1 hypothesis.*
@@ -139,8 +201,16 @@ Started 2026-05-26 ~20:40 PDT (after one earlier crash at step ~3.17k restarted 
 | paloma c4_100_domains | 4.27 | **3.89** | −0.38 |
 | paloma c4_en | 4.55 | **4.15** | −0.40 |
 | paloma dolma-v1_5 | 4.35 | **3.93** | −0.42 |
-| paloma dolma_100_programing_languages | (TBD) | 3.37 | — |
-| paloma dolma_100_subreddits | (TBD) | 4.19 | — |
+| paloma dolma_100_programing_languages | 4.05 | **3.37** | **−0.68** *(largest NL-subset gain; code training transfers directly to code-adjacent text)* |
+| paloma dolma_100_subreddits | 4.59 | **4.19** | −0.40 |
+| paloma gab | 6.48 | **5.81** | **−0.67** |
+| paloma m2d2_s2orc_unsplit | 4.16 | **3.82** | −0.35 |
+| paloma m2d2_wikipedia_unsplit | 4.07 | **3.73** | −0.33 |
+| paloma manosphere_meta_sep | 4.57 | **4.18** | −0.39 |
+| paloma mc4 | 4.40 | **4.00** | −0.39 |
+| paloma ptb | 5.12 | **4.71** | −0.41 |
+| paloma redpajama | 4.46 | **3.99** | −0.48 |
+| paloma twitterAAE_HELM_fixed | 7.79 | **6.74** | **−1.05** *(largest single-subset gain; baseline was 7.79 → very far from ground truth, easier to move)* |
 | paloma falcon-refinedweb | 4.67 | **4.27** | −0.40 |
 | paloma wikitext_103 | 4.20 | **3.85** | −0.35 |
 | **paloma macro (16 subsets)** | **~4.71** | **~4.24** | **−0.47** |
