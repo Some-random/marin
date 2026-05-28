@@ -14,11 +14,28 @@
 
 The two are different goals. (A) is about training efficiency; (B) is about model behavior. A recipe can pass one without passing the other.
 
+### How we get to goal (B) — H1 and H2
+
+H1 and H2 are the two open sub-questions on the path to (B). Both need to be solved.
+
+**H1 — What kind of pretraining data teaches reasoning capability (not just domain knowledge or extraction)?**
+- The question is what STRUCTURE in pretraining data teaches transferable reasoning, separately from domain knowledge or extraction skill. Many data types help WITHIN a domain (OWM → SciQ, code → HumanEval) but don't transfer.
+- Tested at 1.4B scale: Aryabumi-style code mix (May 26) — passes goal (A) but H1 status undetermined (gains were extraction).
+- Ruled out at 300M–1.4B: pure OpenThoughts / OWM / code-only (hurt NL benchmarks meaningfully).
+- Open candidates: (i) phi-1.5-style synthetic textbook mix (download in progress May 28); (ii) formal-language / procedural-structure pretraining (Between Circuits and Chomsky); (iii) custom synthetic counterfactual data.
+- Test for H1: counterfactual evals (Wu et al. style) where surface pattern-matching can't substitute, since standard reasoning benchmarks floor at our scale.
+
+**H2 — Once a model has reasoning capability, how do we retain it through general NL pretraining?**
+- Two failure modes:
+  - **H2a — Catastrophic forgetting**: web text overwrites the reasoning representations. Candidate mitigation: replay (mix a small fraction of reasoning data throughout NL training).
+  - **H2b — No training pressure to use reasoning circuits**: even if circuits exist, NL next-token prediction doesn't activate them so they sit dormant. Candidate mitigations: perplexity-filtered web text (train only on documents the reasoning model finds surprising); joint objectives that tie reasoning eval to web prediction.
+- Untested at our scale. Sequencing: H1 first (need a reasoning-capable phase-1 model before H2 has anything to retain).
+
 ### Where things stand
 
-- May 26 code-mix recipe (25% opc_algorithmic) passes (A) loosely: Paloma macro −0.47 nats, sciq/boolq up, other NL tasks not down much.
-- Whether it passes (B) is undetermined — the sciq/boolq gains are extraction, not reasoning. A counterfactual-style probe (Wu / Embers / our own custom counterfactual datasets) is the actual test.
-- Next directions: (i) find reasoning data that generalizes across domains without specialising the model; (ii) retain reasoning circuits through subsequent NL pretraining (catastrophic-forgetting / circuit-activation question).
+- May 26 code-mix recipe passes goal (A) loosely (Paloma macro −0.47 nats, sciq/boolq up, other NL tasks not down much). H1 status undetermined pending the counterfactual probe.
+- Goal (B) is gated on H1; H2 is gated on H1.
+- In flight: phi-1.5-style data download + tokenize (May 28) as next H1 candidate; custom counterfactual eval dataset construction.
 
 ### Evaluation reference
 
