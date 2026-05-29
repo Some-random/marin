@@ -87,3 +87,8 @@
   4. On completion: fetch results from WandB and save summary to `logs/`
 - When chaining runs with `set -e` in a shell script, a crash in run 1 kills ALL subsequent runs — the monitor must detect this
 - Monitoring agents must NEVER spawn sub-monitors, sub-shells, or additional background tasks. Use ONE shell to check progress. Name monitors clearly so user can identify them.
+- **For ANY background process expected to run >30 min, immediately arm BOTH a Monitor and a ScheduleWakeup before doing anything else.** They're complementary:
+  - **Monitor** = event-driven, real-time. Wide grep filter on per-step DONE markers AND every crash-shaped string (`Traceback|FAILED|SIGBUS|RuntimeError|OOM|Killed|ChildFailedError|assert`). Catches "something happened" within seconds. Use `tail -F log | grep -E --line-buffered ...` and set `persistent=true`.
+  - **ScheduleWakeup** = time-based backstop, 20–30 min cadence. Catches "nothing happened" failures (process hung silently, killed without traceback, log went quiet). Independent of Monitor filter coverage.
+  - **Why both:** Monitor goes silent if your grep doesn't match an unexpected error mode; Wakeup goes silent until the next tick. Together: instant alert on known failures, bounded delay on unknown ones.
+  - **Anti-pattern (don't do this):** launch the job, switch attention to doc edits or another side task, forget to arm watchdogs. This caused a 5-hour-20-minute gap on a dead eval job on 2026-05-28. Arm watchdogs *first*, do unrelated work *after*.
