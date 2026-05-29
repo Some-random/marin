@@ -214,7 +214,7 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11) at the n-shot s
 | Closed-book | arc_easy | acc_norm | 25 | 0.25 | 0.401 | 0.416 | 0.378 | **0.805** |
 | Closed-book | arc_challenge | acc_norm | 25 | 0.25 | 0.242 | 0.236 | 0.232 | **0.532** |
 | Closed-book | mmlu | acc | 5 | 0.25 | 0.252 | 0.249 | 0.248 | **0.422** |
-| Open-book | openbookqa_fact (with `fact1`) | acc_norm | 0 | 0.25 | TBD | TBD | TBD | TBD |
+| Open-book | openbookqa_fact (with `fact1`) | acc_norm | 0 | 0.25 | 0.336 | 0.370 | 0.316 | **0.530** |
 | Closed-book | piqa | acc | 0 | 0.50 | 0.634 | 0.619 | 0.562 | **0.766** |
 | Closed-book | social_iqa | acc | 0 | 0.33 | 0.366 | 0.362 | 0.364 | **0.523** |
 | Closed-book | hellaswag | acc_norm | 10 | 0.25 | 0.348 | 0.341 | 0.301 | **0.635** |
@@ -222,10 +222,10 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11) at the n-shot s
 | Closed-book | commonsense_qa | acc | 0 | 0.20 | 0.192 | 0.200 | 0.175 | **0.507** |
 | Closed-book | logiqa | acc | 0 | 0.25 | 0.218 | 0.234 | 0.214 | 0.240 |
 | Math | gsm8k | exact_match | 5 | 0 | 0.000 | 0.000 | 0.012 | **0.305** |
-| Math | gsm8k_cot | exact_match | 8 | 0 | TBD | TBD | TBD | TBD |
-| Math | minerva_math | exact_match | 4 | 0 | TBD | TBD | TBD | TBD |
+| Math | gsm8k_cot | exact_match | 8 | 0 | 0.022 | 0.020 | 0.021 | **0.299** |
+| Math | minerva_math | exact_match | 4 | 0 | 0.0002 | 0.0014 | 0.012 | **0.029** |
 | Code | humaneval | pass@1 | 0 | 0 | 0.000 | 0.006 | **0.494** | 0.342 |
-| Code | mbpp | pass@1 | 3 | 0 | TBD | TBD | TBD | TBD |
+| Code | mbpp | pass@1 | 3 | 0 | 0.000 | 0.000 | **0.416** | 0.342 |
 | PPL | paloma_macro (16 subsets, mean) | eval_loss | — | — | 4.71 | **4.24** | — | — |
 | PPL | dclm_200m_val | eval_loss | — | — | 4.07 | **3.73** | — | — |
 | PPL | paloma 4chan | eval_loss | — | — | 3.640 | **3.254** | — | — |
