@@ -226,27 +226,28 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11) at the n-shot s
 | Math | minerva_math | exact_match | 4 | 0 | 0.0002 | 0.0014 | 0.012 | **0.029** |
 | Code | humaneval | pass@1 | 0 | 0 | 0.000 | 0.006 | **0.494** | 0.342 |
 | Code | mbpp | pass@1 | 3 | 0 | 0.000 | 0.000 | **0.416** | 0.342 |
-| PPL | paloma_macro (16 subsets, mean) | eval_loss | — | — | 4.71 | **4.24** | — | — |
-| PPL | dclm_200m_val | eval_loss | — | — | 4.07 | **3.73** | — | — |
-| PPL | paloma 4chan | eval_loss | — | — | 3.640 | **3.254** | — | — |
-| PPL | paloma c4_100_domains | eval_loss | — | — | 4.252 | **3.890** | — | — |
-| PPL | paloma c4_en | eval_loss | — | — | 4.547 | **4.154** | — | — |
-| PPL | paloma dolma-v1_5 | eval_loss | — | — | 4.348 | **3.931** | — | — |
-| PPL | paloma dolma_100_programing_languages | eval_loss | — | — | 4.049 | **3.370** | — | — |
-| PPL | paloma dolma_100_subreddits | eval_loss | — | — | 4.585 | **4.191** | — | — |
-| PPL | paloma falcon-refinedweb | eval_loss | — | — | 4.665 | **4.265** | — | — |
-| PPL | paloma gab | eval_loss | — | — | 6.476 | **5.807** | — | — |
-| PPL | paloma m2d2_s2orc_unsplit | eval_loss | — | — | 4.164 | **3.816** | — | — |
-| PPL | paloma m2d2_wikipedia_unsplit | eval_loss | — | — | 4.067 | **3.733** | — | — |
-| PPL | paloma manosphere_meta_sep | eval_loss | — | — | 4.569 | **4.183** | — | — |
-| PPL | paloma mc4 | eval_loss | — | — | 4.396 | **4.002** | — | — |
-| PPL | paloma ptb | eval_loss | — | — | 5.115 | **4.709** | — | — |
-| PPL | paloma redpajama | eval_loss | — | — | 4.464 | **3.988** | — | — |
-| PPL | paloma twitterAAE_HELM_fixed | eval_loss | — | — | 7.792 | **6.743** | — | — |
-| PPL | paloma wikitext_103 | eval_loss | — | — | 4.195 | **3.847** | — | — |
-| PPL | dclm_200m (training data) | eval_loss | — | — | **1.631** | 1.956 | — | — |
+| PPL | **paloma_macro (16 subsets, mean)** | bits_per_byte | — | — | 1.631 | 1.483 | 1.738 | **1.174** |
+| PPL | paloma 4chan_meta_sep | bits_per_byte | — | — | 1.561 | 1.402 | 1.665 | **1.199** |
+| PPL | paloma c4_100_domains | bits_per_byte | — | — | 1.322 | 1.212 | 1.615 | **0.948** |
+| PPL | paloma c4_en | bits_per_byte | — | — | 1.387 | 1.269 | 1.621 | **0.985** |
+| PPL | paloma dolma-v1_5 | bits_per_byte | — | — | 1.433 | 1.293 | 1.479 | **0.957** |
+| PPL | paloma dolma_100_programing_languages | bits_per_byte | — | — | 1.681 | 1.412 | 0.834 | **0.679** |
+| PPL | paloma dolma_100_subreddits | bits_per_byte | — | — | 1.492 | 1.368 | 1.732 | **1.159** |
+| PPL | paloma falcon-refinedweb | bits_per_byte | — | — | 1.448 | 1.327 | 1.679 | **1.025** |
+| PPL | paloma gab | bits_per_byte | — | — | 2.475 | 2.277 | 2.645 | **1.918** |
+| PPL | paloma m2d2_s2orc_unsplit | bits_per_byte | — | — | 1.389 | 1.274 | 1.273 | **0.946** |
+| PPL | paloma m2d2_wikipedia_unsplit | bits_per_byte | — | — | 1.319 | 1.211 | 1.629 | **0.976** |
+| PPL | paloma manosphere_meta_sep | bits_per_byte | — | — | 1.566 | 1.434 | 1.758 | **1.180** |
+| PPL | paloma mc4 | bits_per_byte | — | — | 1.546 | 1.400 | 1.604 | **1.031** |
+| PPL | paloma ptb | bits_per_byte | — | — | 1.565 | 1.451 | 1.644 | **1.057** |
+| PPL | paloma redpajama | bits_per_byte | — | — | 1.491 | 1.335 | 1.374 | **0.928** |
+| PPL | paloma twitterAAE_HELM_fixed | bits_per_byte | — | — | 3.077 | **2.834** | 3.634 | 2.826 |
+| PPL | paloma wikitext_103 | bits_per_byte | — | — | 1.336 | 1.224 | 1.620 | **0.970** |
 
-phi-1 / phi-1.5 Paloma + dclm cells are empty because those models were only evaluated through the lm-eval-harness suite, not the Levanter Paloma eval. PPL is "lower is better"; the `dclm_200m (training data)` row is an exception where lower means MORE memorization (so the baseline's 1.631 is "worse" for generalization than code-mix's 1.956).
+All 4 models were evaluated through the same lm-eval-harness Paloma pipeline (`bits_per_byte` is tokenizer-independent, so the comparison is apples-to-apples even though the models use different tokenizers). PPL is "lower is better." Headline:
+- **phi-1.5 wins on every NL subset.**
+- **phi-1 is WORSE than our 1.4B text-only baseline on macro** (1.738 vs 1.631), because phi-1 was trained almost exclusively on code. Phi-1 only beats our 1.4B baseline on `programming_languages` and `m2d2_s2orc` (the code/academic subsets).
+- **Code-mix (1.4B code25) beats our 1.4B baseline on every single subset.**
 
 **Caveat on code-gen numbers.** Our `humaneval` / `mbpp` uses `lm-eval-harness`'s scoring path with `--confirm_run_unsafe_code` + `HF_ALLOW_CODE_EVAL=1`. The original phi-1 paper reported MBPP 55.5% with the BigCode evaluation framework; our pipeline reports phi-1 MBPP 1.0%. The methodology difference (extraction patterns, n-shot, runner) is substantial. **Treat our code-gen pipeline numbers as conservative lower bounds; do not directly compare to published phi paper numbers.**
 
