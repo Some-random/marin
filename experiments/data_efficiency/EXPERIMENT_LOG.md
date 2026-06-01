@@ -39,26 +39,6 @@ The two are different goals. (A) is about training efficiency; (B) is about mode
 - Both goals (A) and (B) depend on H1 being answered. Goal (B) additionally depends on H2.
 - In flight: phi-1.5-style data download + tokenize (May 28) as next H1 candidate; custom counterfactual eval dataset construction.
 
-### Papers
-
-Running list of papers we've actually read, organized by topic. Each entry: 1–2 sentence summary + how it bears on our experiments (H1/H2 or recipe choice).
-
-#### Mech-interp
-
-**Lindner et al. 2023 — "Tracr: Compiled Transformers as a Laboratory for Interpretability"** ([arXiv:2301.05062](https://arxiv.org/abs/2301.05062), NeurIPS 2023 Spotlight). Built a compiler that converts human-written RASP-like programs directly into transformer weights that provably execute that program — so the resulting weights are known exactly and provide **ground truth** for evaluating interpretability tools. Demonstrated by studying superposition in compiled multi-step-algorithm transformers.
-- *Bearing on us*: doesn't help decide what data teaches reasoning, but lets us validate circuit-finding methods before applying them to our 1.4B. For H2 retention, a Tracr ground-truth baseline calibrates probe sensitivity — without that, "circuit decayed" and "our probe got noisier" are indistinguishable.
-- *Limit*: toy-scale compiled transformers; doesn't speak to learned circuits at 1.4B+.
-
-#### Synthetic data
-
-**Thrush et al. 2026 — "Synthetic Data for any Differentiable Target"** ([arXiv:2604.08423](https://arxiv.org/abs/2604.08423), April 2026). Introduce **Dataset Policy Gradient (DPG)**: an RL method that optimizes a synthetic-data generator using "exact data attribution via higher-order gradients" as the reward signal. Demonstrate the technique by training models — via SFT on the generated data alone — to embed QR codes in their LM-head weights, embed specific numerical patterns, reduce weight norm, rephrase inputs into new languages with no explicit instruction, and emit specific UUIDs.
-- *Bearing on us*: provides a method for *synthesizing* the data we'd want for an H1 candidate, rather than picking from existing corpora. If we can specify "differentiable target = the model emits correct base-9 arithmetic on held-out problems", DPG could in principle generate the training data that pushes a model toward that target. The QR-code-in-weights demo is the most striking demonstration that data alone has very fine-grained control over model internals.
-- *Open Q for us*: scalability — the paper's demos are small. Whether DPG produces useful pretraining-scale data is untested.
-
-**HuggingFaceFW — "The Synthetic Data Playbook: Generating Trillions of the Finest Tokens" / FinePhrase** ([HF Space](https://huggingface.co/spaces/HuggingFaceFW/finephrase), [dataset](https://huggingface.co/datasets/HuggingFaceFW/finephrase), 2026). Synthetic dataset generated with **SmolLM2-1.7B-Instruct** from **FineWeb-Edu** (sample-350BT split) using 4 prompt families that each rewrite a source document: **FAQ**, **Math word problem**, **structured Table + Q&A**, **step-by-step Tutorial**. Scale: 339M source documents → **1.35 B output samples / 486 B completion tokens**. License ODC-BY.
-- *Bearing on us*: directly downloadable synthetic-pretraining corpus at a scale meaningful to us (486 B tokens — Chinchilla-optimal for 1.4B is ~28 B, so it's 17× our budget; or pick a slice). The "rewrite same source 4 ways" structure is interesting because it gives the model multiple views of the same underlying content — could test whether multi-view synthetic data improves data efficiency vs single-rewrite or vs unmodified FineWeb-Edu.
-- *Open Q for us*: the dataset is HUGE, but is the quality high enough to outperform an equal token-count slice of plain FineWeb-Edu? Hasn't been demonstrated in our setup.
-
 ### Evaluation reference
 
 For the canonical evaluation taxonomy (what each eval actually tests), the list of usable-at-our-scale benchmarks, and the current cross-model results table — see **[EVALUATION.md](./EVALUATION.md)**. Always classify benchmark deltas by mechanism (passage-grounded vs parametric vs commonsense vs ...), not by name; that doc is the reference.

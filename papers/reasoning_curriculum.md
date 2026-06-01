@@ -359,6 +359,46 @@
 >
 > </details>
 
+---
+
+### [Synthetic Data for any Differentiable Target](https://arxiv.org/abs/2604.08423) (Thrush, Park, Brunborg, Bailey, Roed, Band, Potts & Hashimoto, 2026)
+
+**Motivation:** Synthetic-data pipelines for LLM training are typically hand-designed to push a vaguely-stated objective ("more reasoning", "better code"). The authors ask whether you can instead make the *data generator itself* the optimization target: write down any differentiable target on model behavior, then let the generator be trained to produce data that — when used for SFT — moves the model toward that target.
+
+**Experiment Setup:** Introduce **Dataset Policy Gradient (DPG)**, an RL method that treats the synthetic-data generator as a policy and uses "exact data attribution via higher-order gradients" as the reward — the gradient of (final model loss on the target ↘) with respect to (generator output ↗) backed all the way through the SFT process. Train the generator with PG against this reward. Demonstrate by SFT-ing models on the DPG-produced data to hit five different targets: (1) embedding QR codes in the LM-head weights, (2) embedding a specific number (67) in weights, (3) reducing total weight norm via data alone, (4) rephrasing inputs into a new language with no explicit instruction, (5) emitting specific UUIDs.
+
+**Conclusion:** Across all five targets, DPG-generated synthetic data — used only as SFT — successfully moves the model to the differentiable target. The QR-code-in-weights and weight-norm-reduction demos are the most striking: they show that data alone has very fine-grained control over model internals, including non-behavioral targets. The authors frame DPG as a unification framework — many existing techniques (rephrasing, distillation) are special cases. Limitation: demos are small-scale; the authors don't show DPG produces useful pretraining-corpus-scale data.
+
+> <details>
+> <summary><b>Dongwei comment — how it bears on us</b></summary>
+>
+> For H1 (what data teaches reasoning capability): DPG suggests we could specify the differentiable target as "model emits correct base-9 arithmetic on held-out problems" or "model passes Wu et al. counterfactual probes" and let the generator find the data shape that achieves that. We wouldn't be limited to picking from existing corpora.
+>
+> For H2 (retention): more speculative — could DPG-generated data also serve as the "replay" that defends reasoning circuits against subsequent NL training? You'd target "model loss on counterfactual probe stays low through 1B more NL tokens" as the differentiable objective.
+>
+> Practical block: DPG requires backproping through the SFT process. At 1.4B with 3B trained tokens, that's enormously expensive. The paper's demos are toy-scale (small SFT). Whether this scales to producing pretraining data is an open question.
+>
+> </details>
+
+---
+
+### [The Synthetic Data Playbook: Generating Trillions of the Finest Tokens (FinePhrase)](https://huggingface.co/spaces/HuggingFaceFW/finephrase) (HuggingFaceFW, 2026)
+
+**Motivation:** Existing pretraining corpora (FineWeb, etc.) are noisy and have inconsistent structure; phi-style "rewrite each document as a textbook" pipelines are expensive at trillion-token scale because they typically use a large teacher model. HuggingFaceFW asks whether a small, cheap rewriter can produce useful trillion-token-scale synthetic data.
+
+**Experiment Setup:** Use **SmolLM2-1.7B-Instruct** as the rewriter (small + cheap) to transform each document from `HuggingFaceFW/fineweb-edu` (sample-350BT split, 339.3M source documents) into 4 different rewritten outputs: (1) **FAQ** (rewrite as comprehensive Q&A pairs), (2) **Math word problem** (turn content into a math problem with step-by-step solution), (3) **Table** (organize as structured table + Q&A), (4) **Tutorial** (rewrite as a step-by-step instructional guide). Generation config: `temperature=1.0, top_p=1.0, top_k=50, max_tokens=2048`. Result: **1,354,044,711 output samples / 486.4 B completion tokens** (~336M samples per rewrite family, mean 273-437 tokens/sample depending on family). Released under ODC-BY.
+
+**Conclusion:** Working dataset rather than a paper — no controlled before/after benchmark numbers are published in the dataset card. The artifact itself (486B tokens of small-rewriter synthetic data over 4 prompt families) is the contribution; an open question to the community is whether it improves data efficiency vs the original FineWeb-Edu slice at matched token budget.
+
+> <details>
+> <summary><b>Dongwei comment — how it bears on us</b></summary>
+>
+> Directly usable for an H1 candidate at our scale. Chinchilla-optimal for 1.4B is ~28 B tokens — FinePhrase has 486 B, so we'd sample a slice. The "rewrite same source 4 ways" structure is interesting: it gives the model multiple views of identical underlying content, which is a different mechanism from phi-1.5's "one textbook per document" approach. Could test whether multi-view rewrites improve data efficiency vs single-rewrite vs unmodified FineWeb-Edu.
+>
+> Caveat: SmolLM2-1.7B is a smaller rewriter than phi's GPT-3.5 (used to make phi-1.5 data). Quality is unverified at our setup, and the dataset card doesn't include any "trained on FinePhrase vs trained on FineWeb-Edu" comparison.
+>
+> </details>
+
 </details>
 
 <details>
@@ -500,5 +540,29 @@
 **Experiment Setup:** Five synthetic pretrain tasks targeting distinct capabilities: Depo (reasoning depth via k-hop permutation traversal, K up to 16), Brevo (reasoning breadth via DAG traversal), Capo (knowledge capacity via N=50K-2M synthetic biographies), Mano (knowledge manipulation via modular arithmetic, length up to 16), and Lano (hierarchical structure via CFG parsing). Compare Llama(RoPE), Llama(NoPE), GLA, Mamba2, and GDN at GPT2-small scale, validated at 1.3B/100B tokens.
 
 **Conclusion:** Canon layers -- lightweight 1-d convolutions of kernel size 4 adding horizontal token-to-token information flow -- improve Transformer reasoning depth by 200-400%, breadth by 30%, revive NoPE to match RoPE, and lift GLA to rival Mamba2/GDN. Transformers with Canon maintain 2-4x greater reasoning depth than linear models and ~40% higher knowledge capacity. Findings confirmed at 1.3B real-world pretraining scale.
+
+</details>
+
+<details>
+<summary><h2>Mechanistic Interpretability</h2></summary>
+
+### [Tracr: Compiled Transformers as a Laboratory for Interpretability](https://arxiv.org/abs/2301.05062) (Lindner, Kramár, Farquhar, Rahtz, McGrath & Mikulik, NeurIPS 2023 Spotlight)
+
+**Motivation:** Mechanistic interpretability methods are typically evaluated on transformers whose learned computation is itself opaque — so when a method finds (or fails to find) a circuit, you can't tell whether the method is right or wrong. The authors want a transformer where the ground-truth computation is known by construction, so interpretability methods can be calibrated.
+
+**Experiment Setup:** Build **Tracr**, a compiler that takes a program written in a RASP-like DSL and emits a standard decoder-only transformer (weights + architecture) that provably executes that program. Implement and compile several test programs: token frequency computation, sorting, parenthesis validation. Use the resulting compiled transformers to study superposition in multi-step algorithms — since the "correct" representation is known, you can measure how much the compiled model packs distinct features into shared dimensions.
+
+**Conclusion:** Tracr produces transformers whose internal computation is fully specified, providing ground truth for evaluating any circuit-discovery or attribution method. The superposition study demonstrates the framework's utility: you can measure how interpretable a method is by checking whether it recovers the structure the compiler put there. Open-source code released. Limitation: compiled transformers are small (toy-scale) and execute hand-written programs, not learned ones — so the framework is methodological rather than directly applicable to interpreting frontier models.
+
+> <details>
+> <summary><b>Dongwei comment — how it bears on us</b></summary>
+>
+> Tracr doesn't tell us what data teaches reasoning, but it tells us how to trust any circuit-finding method we'd apply to our trained models. If we want to claim "the reasoning circuit X exists in our 1.4B code-mix model," the method we use to find X needs to have a known false-positive rate on a Tracr model that genuinely doesn't contain X. Without that calibration, we can't distinguish "circuit found" from "method hallucinated".
+>
+> For H2 (retention through subsequent NL training): the question is "does the reasoning circuit decay or stay?" The natural failure mode is conflating "circuit decayed" with "our probe got noisier." Tracr gives a fixed-circuit baseline against which to measure probe sensitivity over time.
+>
+> Limit for us: Tracr's compiled transformers are toy; we'd still need to verify any method on a setup closer to our 1.4B scale before drawing conclusions about our real models.
+>
+> </details>
 
 </details>
