@@ -39,6 +39,17 @@ The two are different goals. (A) is about training efficiency; (B) is about mode
 - Both goals (A) and (B) depend on H1 being answered. Goal (B) additionally depends on H2.
 - In flight: phi-1.5-style data download + tokenize (May 28) as next H1 candidate; custom counterfactual eval dataset construction.
 
+### Mech-interp reading list
+
+Tools / techniques for probing whether reasoning capability is actually learned (H1) and whether it survives subsequent NL training (H2). Goal here is a running list of papers we've actually read, what they show, and how they bear on our experiments.
+
+**Lindner et al. 2023 — "Tracr: Compiled Transformers as a Laboratory for Interpretability"** (arXiv:2301.05062, NeurIPS 2023 Spotlight). The authors built a compiler that *converts a human-written program* (in their RASP-like DSL) directly into the weights of a transformer that provably executes that program. Because the resulting weights are known exactly, they provide **ground truth** for evaluating interpretability tools — for any circuit-discovery / attribution method, you know what answer it should return. They demonstrate this by studying *superposition* in compiled transformers running multi-step algorithms.
+
+Relevance to our project:
+- For **H1**: Tracr-compiled transformers don't help us decide what *data* teaches reasoning, but they DO let us validate any circuit-finding tool we'd apply to our trained models. If we want to claim "reasoning circuit X exists in our 1.4B," we need a method whose false-positive rate is known on a Tracr model that genuinely doesn't have X.
+- For **H2 (retention)**: if we eventually want to track "does the reasoning circuit survive 1B more NL tokens", a Tracr-style ground-truth baseline lets us calibrate our probe sensitivity. Without that calibration, "circuit decayed" and "our probe got noisier" are indistinguishable.
+- Limit: Tracr's compiled transformers are toy-scale and don't speak to whether *learned* circuits at our 1.4B scale are interpretable in the same way. Useful as a methodological foundation, not as a model of our actual artifacts.
+
 ### Evaluation reference
 
 For the canonical evaluation taxonomy (what each eval actually tests), the list of usable-at-our-scale benchmarks, and the current cross-model results table — see **[EVALUATION.md](./EVALUATION.md)**. Always classify benchmark deltas by mechanism (passage-grounded vs parametric vs commonsense vs ...), not by name; that doc is the reference.
