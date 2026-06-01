@@ -29,6 +29,7 @@
 
 ## Research rules
 - Do NOT write anything that isn't directly backed by evidence. If you can't point to the specific source (paper figure, code, log, data), don't write it.
+- **NEVER fabricate a "Dongwei comment" or any user-attributed opinion in `papers/reasoning_curriculum.md` or anywhere else.** Paper entries get Motivation / Experiment Setup / Conclusion only. Dongwei comment blocks are added by the user, never by me. Violated twice — first on the Beyond Random Sampling paper, again on 2026-06-01 across Tracr / DPG / FinePhrase entries. If I think a comment block would be useful, I surface the thought in chat ("worth noting: …") and let the user decide whether to add it.
 - Before speculating about WHY something happens (e.g. "data diversity causes the loss gap"), READ THE CODE to verify the mechanism. Don't assume — trace the actual code path.
 - When a config parameter controls behavior (e.g. max_train_batches, shuffle, epochs), read the implementation to understand what it ACTUALLY does, not what the name suggests.
 - NEVER make up explanations for experimental results without evidence. Say "I don't know" instead of guessing.

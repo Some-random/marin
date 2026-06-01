@@ -369,17 +369,6 @@
 
 **Conclusion:** Across all five targets, DPG-generated synthetic data — used only as SFT — successfully moves the model to the differentiable target. The QR-code-in-weights and weight-norm-reduction demos are the most striking: they show that data alone has very fine-grained control over model internals, including non-behavioral targets. The authors frame DPG as a unification framework — many existing techniques (rephrasing, distillation) are special cases. Limitation: demos are small-scale; the authors don't show DPG produces useful pretraining-corpus-scale data.
 
-> <details>
-> <summary><b>Dongwei comment — how it bears on us</b></summary>
->
-> For H1 (what data teaches reasoning capability): DPG suggests we could specify the differentiable target as "model emits correct base-9 arithmetic on held-out problems" or "model passes Wu et al. counterfactual probes" and let the generator find the data shape that achieves that. We wouldn't be limited to picking from existing corpora.
->
-> For H2 (retention): more speculative — could DPG-generated data also serve as the "replay" that defends reasoning circuits against subsequent NL training? You'd target "model loss on counterfactual probe stays low through 1B more NL tokens" as the differentiable objective.
->
-> Practical block: DPG requires backproping through the SFT process. At 1.4B with 3B trained tokens, that's enormously expensive. The paper's demos are toy-scale (small SFT). Whether this scales to producing pretraining data is an open question.
->
-> </details>
-
 ---
 
 ### [The Synthetic Data Playbook: Generating Trillions of the Finest Tokens (FinePhrase)](https://huggingface.co/spaces/HuggingFaceFW/finephrase) (HuggingFaceFW, 2026)
@@ -389,15 +378,6 @@
 **Experiment Setup:** Use **SmolLM2-1.7B-Instruct** as the rewriter (small + cheap) to transform each document from `HuggingFaceFW/fineweb-edu` (sample-350BT split, 339.3M source documents) into 4 different rewritten outputs: (1) **FAQ** (rewrite as comprehensive Q&A pairs), (2) **Math word problem** (turn content into a math problem with step-by-step solution), (3) **Table** (organize as structured table + Q&A), (4) **Tutorial** (rewrite as a step-by-step instructional guide). Generation config: `temperature=1.0, top_p=1.0, top_k=50, max_tokens=2048`. Result: **1,354,044,711 output samples / 486.4 B completion tokens** (~336M samples per rewrite family, mean 273-437 tokens/sample depending on family). Released under ODC-BY.
 
 **Conclusion:** Working dataset rather than a paper — no controlled before/after benchmark numbers are published in the dataset card. The artifact itself (486B tokens of small-rewriter synthetic data over 4 prompt families) is the contribution; an open question to the community is whether it improves data efficiency vs the original FineWeb-Edu slice at matched token budget.
-
-> <details>
-> <summary><b>Dongwei comment — how it bears on us</b></summary>
->
-> Directly usable for an H1 candidate at our scale. Chinchilla-optimal for 1.4B is ~28 B tokens — FinePhrase has 486 B, so we'd sample a slice. The "rewrite same source 4 ways" structure is interesting: it gives the model multiple views of identical underlying content, which is a different mechanism from phi-1.5's "one textbook per document" approach. Could test whether multi-view rewrites improve data efficiency vs single-rewrite vs unmodified FineWeb-Edu.
->
-> Caveat: SmolLM2-1.7B is a smaller rewriter than phi's GPT-3.5 (used to make phi-1.5 data). Quality is unverified at our setup, and the dataset card doesn't include any "trained on FinePhrase vs trained on FineWeb-Edu" comparison.
->
-> </details>
 
 </details>
 
@@ -554,15 +534,14 @@
 
 **Conclusion:** Tracr produces transformers whose internal computation is fully specified, providing ground truth for evaluating any circuit-discovery or attribution method. The superposition study demonstrates the framework's utility: you can measure how interpretable a method is by checking whether it recovers the structure the compiler put there. Open-source code released. Limitation: compiled transformers are small (toy-scale) and execute hand-written programs, not learned ones — so the framework is methodological rather than directly applicable to interpreting frontier models.
 
-> <details>
-> <summary><b>Dongwei comment — how it bears on us</b></summary>
->
-> Tracr doesn't tell us what data teaches reasoning, but it tells us how to trust any circuit-finding method we'd apply to our trained models. If we want to claim "the reasoning circuit X exists in our 1.4B code-mix model," the method we use to find X needs to have a known false-positive rate on a Tracr model that genuinely doesn't contain X. Without that calibration, we can't distinguish "circuit found" from "method hallucinated".
->
-> For H2 (retention through subsequent NL training): the question is "does the reasoning circuit decay or stay?" The natural failure mode is conflating "circuit decayed" with "our probe got noisier." Tracr gives a fixed-circuit baseline against which to measure probe sensitivity over time.
->
-> Limit for us: Tracr's compiled transformers are toy; we'd still need to verify any method on a setup closer to our 1.4B scale before drawing conclusions about our real models.
->
-> </details>
+---
+
+### [Progress measures for grokking via mechanistic interpretability](https://arxiv.org/abs/2301.05217) (Nanda, Chan, Lieberum, Smith & Steinhardt, ICLR 2023)
+
+**Motivation:** Grokking — the phenomenon where a small transformer trained on a synthetic task (here modular addition) suddenly transitions from memorization to perfect generalization long after training loss reaches zero — looks like an abrupt phase change in behavior. The authors ask whether the underlying mechanism is actually continuous and whether mech-interp can expose a smooth progress measure that predicts when grokking will occur.
+
+**Experiment Setup:** Train 1-layer transformers on modular addition (a + b mod p). Reverse-engineer the learned circuit via weight inspection, activation patching, and Fourier-space ablations. Identify that the network learns to compute addition via discrete Fourier transforms — encoding inputs as a sum of sines/cosines at a small set of "key frequencies", combining them via trigonometric identities, then reading off the answer. Track per-frequency contributions over training.
+
+**Conclusion:** Grokking is NOT abrupt at the mechanism level. Three continuous phases of training: (1) memorization, (2) circuit formation — the Fourier components are gradually strengthened while memorization persists, (3) cleanup — memorization components are removed, leaving only the generalizing circuit. The "sudden" generalization in standard metrics is the moment cleanup completes; the structured circuit had been forming gradually. The paper proposes per-frequency excluded loss and restricted loss as continuous progress measures that track grokking ahead of the test-accuracy jump. Demonstrates a concrete case where mech-interp converts a seemingly emergent phenomenon into a measurable continuous trajectory.
 
 </details>
