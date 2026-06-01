@@ -70,6 +70,7 @@
 - NEVER leave blanks in experiment log tables — if a result is missing, re-run the eval to fill it in
 - Every run in a comparison table should have ALL columns filled
 - Mark off-ramp experiments clearly (experiments that diverge from the main hypothesis)
+- **SINGLE-DAY LOG ENTRIES ONLY.** Every `## ` header in `experiments/data_efficiency/EXPERIMENT_LOG.md` is exactly one calendar day. Never combine dates ("May 31 – June 1", "and", "/", ranges, etc.). If work spans days, split into one entry per day and cross-reference. Before committing any log edit, run `grep '^## ' experiments/data_efficiency/EXPERIMENT_LOG.md` and confirm no header spans multiple dates. User has corrected this rule multiple times (most recently 2026-06-01).
 
 ## Experiment monitoring
 - Monitoring runbook: `experiments/data_efficiency/monitor.md` — has copy-paste `/loop` commands for babysitting training runs
