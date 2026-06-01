@@ -51,6 +51,90 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## May 31 – June 1: Mid-training vs final checkpoints + wd=1.6/x8 looping ablation
+
+Two investigations folded into one entry because they share the same eval-suite reruns.
+
+### Investigation 1 — Does mid-training beat the final checkpoint?
+
+**Motivation.** The May 30 v2 trajectory was a wake-up: between step 9,600 and 12,799, v2's Paloma macro jumped from 4.36 → 5.18 (Levanter eval_loss), while training loss kept dropping. Classic over-fit. Question: is this just v2 (small unique-token slice), or do baseline / v1 / wd=3.2/x16 also overfit late, just less obviously?
+
+**Setup.** Ran the full lm-eval-harness downstream suite (arc/sciq/piqa/boolq/hellaswag/winogrande/openbookqa/openbookqa_fact/commonsense_qa/social_iqa/logiqa/mmlu/gsm8k/gsm8k_cot/minerva_math/mbpp/humaneval) at proper n-shot AND lm-eval Paloma 16-subset (bits_per_byte) on step-10,000 and final-step (step-12,799) checkpoints of:
+  - baseline `peach-thunder-100` (wd=1.6/x16, 100% DCLM)
+  - v1 `eager-grass-104` (wd=1.6/x16, 75/25 DCLM/opc, 943M opc)
+  - v2 `joqfahkl` (wd=1.6/x16, matched-epoch 150M/50M)
+  - wd=3.2/x16 `gm6by3tb` (May 25 Step 11 ablation, no code)
+  - wd=1.6/x8 `lo5yvdk7` (new — see Investigation 2 below) — only final available
+
+**Key result (Paloma trajectory):** Every model overfits Paloma in the last 25% of training (~step 9,600 → 12,799). Peak Paloma macro for each:
+| Model | Peak Paloma macro | Step | Final Paloma macro | Δ from peak |
+|---|---|---|---|---|
+| baseline (wd=1.6/x16) | 4.06 | 6,400 (50%) | 4.71 | +0.65 nats worse |
+| v1 (wd=1.6/x16 + code 943M) | 3.94 | 9,600 (75%) | 4.24 | +0.30 nats worse |
+| v2 (matched-epoch 150M/50M) | 4.13 | 6,400 (50%) | 5.18 | +1.05 nats worse |
+| wd=3.2/x16 | 3.92 | 9,600 (75%) | 4.20 | +0.28 nats worse |
+
+**But the surprise: downstream benchmarks DO NOT track Paloma overfit.** Even though Paloma gets worse late, downstream metrics are a mixed bag — some tasks improve at the final step, others get worse. Comparing v2 step-10,000 vs v2 final (the biggest Paloma overfit case, Δ = +1.05 nats):
+
+| Task | v2 step-10,000 | v2 final | direction |
+|---|---|---|---|
+| paloma_macro_bpb | 1.587 | 1.824 | s10000 much better PPL |
+| boolq | 0.525 | **0.567** | final BETTER (+4.2pt) |
+| sciq | 0.598 | 0.590 | ~tied |
+| piqa | 0.608 | 0.606 | ~tied |
+| arc_easy | 0.405 | 0.388 | s10000 better (−1.7pt) |
+| winogrande | 0.517 | 0.500 | s10000 better (−1.7pt) |
+| openbookqa_fact | 0.306 | 0.312 | final slightly better |
+| hellaswag | 0.317 | 0.321 | ~tied |
+
+**PPL up does not uniformly mean downstream down.** Even with v2's 1.05-nat Paloma overfit, downstream is ~half wins / half losses across tasks. boolq actually IMPROVES at the heavily-overfit final step.
+
+**Implication.** The May 26 "v1 wins over baseline" framing was based purely on Paloma — and Paloma got worse for both models in the last 25% of training. Comparing them at their respective peak steps (step 6,400 for baseline, step 9,600 for v1): they're essentially tied (4.06 vs 3.94, within typical noise). The +0.47 nat win of v1 at final-step was the baseline overfitting more aggressively than v1, not v1 teaching the model better representations.
+
+For practical recipe choice we should be comparing **best-checkpoint** numbers across recipes, not final-step numbers. And benchmark accuracy doesn't move 1:1 with Paloma, so we should pick whichever checkpoint we like best on the metric that matters for downstream use.
+
+### Investigation 2 — Quantitative looping rate across (WD, epochs, code-mix)
+
+**Motivation.** May 23–25 left us with unverified hypotheses: wd=3.2/x8 (Konwoo) loops 100%, wd=1.6/x16 (our baseline) was claimed "doesn't loop" from a small visual check. May 25 Step 11 added wd=3.2/x16 (30% loop). Two open holes: (a) is the baseline really non-looping? (b) what does wd=1.6/x8 do — flagged on May 23 as a missing ablation.
+
+**Setup.** Trained `1_4b_wd1_6_x8_nocrossblock` from scratch (run `earthy-donkey-107` / `lo5yvdk7`, 6,400 steps, 209M DCLM, x8 epochs, wd=1.6, cosine LR to 0, otherwise identical to baseline). On its HF-converted final checkpoint AND all other recipes' final HF checkpoints, ran `gsm8k_cot` 8-shot CoT, limit=20, `--log_samples`. Then quantitatively counted the looping rate (generation length > 400 chars = looping; matches visual inspection of "The answer is X. The answer is X. ..." patterns).
+
+**Result.**
+
+| Recipe | Final-step gsm8k_cot loop rate (>400ch / 40 samples) | Final Paloma macro (bpb) |
+|---|---|---|
+| Konwoo wd=3.2/x8 | ~100% (from May 23–25, n=40) | ~1.74 (worse than our baseline) |
+| **Our wd=1.6/x8 (new)** | **55% (22/40)** | 1.41 |
+| Our wd=3.2/x16 (May 25 Step 11) | 30% (12/40) | 1.46 |
+| Our wd=1.6/x16 baseline | **25% (10/40)** — **NOT "no loops"** | 1.63 |
+| **v1 (wd=1.6/x16 + 25% code)** | **0% (0/40)** ✓ | 1.48 |
+
+**Two clean monotonic effects:**
+1. **More epochs at fixed WD → fewer loops.** wd=1.6: 55% (x8) → 25% (x16). wd=3.2: 100% (x8) → 30% (x16). Both directions confirm.
+2. **Lower WD at fixed epochs → fewer loops.** At x16: 30% (wd=3.2) → 25% (wd=1.6). At x8: 100% (wd=3.2) → 55% (wd=1.6).
+
+**The only recipe that fully eliminates looping is v1 (code-mix).** Its 943M-token opc slice is mostly never re-seen (~0.89 epochs over the slice) — that diversity prevents the model from collapsing into the same memorized n-gram patterns that drive looping in pure-DCLM recipes.
+
+**Correction to prior claim.** The May 23–25 entry stated "wd=1.6/x16 doesn't loop." That was a visual inspection on a small number of samples. The quantitative count is 25% loop rate (10/40). The wd=1.6/x16 recipe DOES loop, just less than wd=3.2/x8 (100%) or wd=1.6/x8 (55%).
+
+### Methodological note: PPL ≠ benchmark ≠ looping
+
+Three signals captured for each recipe; none of them are 1:1 substitutes for the others.
+
+- **Paloma macro bpb** (continuous): every recipe over-fits late; mid-training is better.
+- **Downstream benchmark accuracy** (discrete): doesn't track Paloma; tasks split half-and-half on whether final or mid-training is better.
+- **gsm8k_cot generation behavior** (qualitative): orthogonal to both — code-mix uniquely eliminates loops despite not having the lowest Paloma; wd=1.6/x8 has the best Paloma of the no-code recipes (1.41) but 55% loop rate.
+
+For comparing recipes we need to track all three.
+
+### Eval coverage check
+
+Built completeness matrix: 11 models × 19 metrics (17 downstream + paloma_macro_bpb + ... actually 18 downstream + paloma_macro_bpb = 19). **All 209 cells filled** with real measurements after the cleanup re-runs handled the remote-node failures (HF rate-limit, code_eval cache race, falcon-refinedweb OOM at batch=16). No remaining empties.
+
+The canonical results table lives in `EVALUATION.md` — this entry is the chronological log of how it was filled.
+
+---
+
 ## May 28: Phi-1 / phi-1.5 four-way comparison + open-data sourcing plan
 
 *Goal: get apples-to-apples reference for what's possible at 1.3B params with the right data, and plan whether to attempt phi-1-style or phi-1.5-style training at our scale.*
