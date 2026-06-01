@@ -93,6 +93,38 @@ For comparing recipes we need to track all three.
 
 Built completeness matrix: 11 models × 19 metrics. **All 209 cells filled** with real measurements after the cleanup re-runs handled the remote-node failures (HF rate-limit, code_eval cache race, falcon-refinedweb OOM at batch=16). The canonical results table lives in `EVALUATION.md` — this entry is the chronological log of how it got filled.
 
+### Investigation — In-domain held-out overfit + retraction of May 26 "v1 wins" framing
+
+**Motivation.** May 31's overfit analysis used Paloma (held-out OOD subsets) as the overfit signal. That's the wrong metric for "did the model overfit on the training data" — Paloma measures transfer to OOD, not in-domain memorization vs generalization. The correct signal is **`eval/dclm_200m_val/loss`** (held-out slice of DCLM, the actual training distribution). Pulled from WandB for all 5 runs.
+
+**Result. In-domain held-out (`eval/dclm_200m_val/loss`, nats):**
+
+| Run | step 3,200 | step 6,400 | step 9,600 | step 12,799 (final) | Δ peak→final |
+|---|---:|---:|---:|---:|---:|
+| baseline (wd=1.6/x16) | 3.763 | **3.578** | 3.610 | 4.070 | +0.49 |
+| v1 (25% code, 1.15B unique) | 3.818 | 3.616 | **3.494** | 3.733 | +0.24 |
+| **v2 (matched 200M unique)** | 3.884 | **3.722** | 3.855 | **4.596** | **+0.87 ← worst** |
+| wd=3.2/x16 | 3.908 | 3.687 | **3.457** | 3.671 | +0.21 |
+| wd=1.6/x8 | 3.675 | **3.542** (step 6,399) | — | — | n/a (1 cycle only) |
+
+**Findings.**
+
+1. **The "overfit late" claim survives.** Every multi-epoch recipe rises on in-domain val after step ~6,400–9,600. Baseline +0.49 nats, v1 +0.24, v2 +0.87, wd=3.2/x16 +0.21. This isn't transfer-gap widening — the in-domain training distribution itself becomes worse-modeled in the last 25%. Paloma was correlated (constant transfer gap ~0.4 nats), so the May 31 paloma-based conclusion happens to be correct, but for principle the in-domain signal is what we should be tracking.
+
+2. **v2 is the WORST in-domain overfit, not just a bad-downstream model.** Final dclm_val 4.596 (baseline 4.070). The matched-token swap of 50M DCLM for 50M opc gave the model fewer unique NL tokens (150M vs 209M) at the same epoch count — more per-token repetition pressure, and the code added nothing to NL generalization.
+
+3. **Retraction: the May 26 "v1 beats baseline" finding is invalid.** At PEAK-vs-PEAK in-domain val:
+   - baseline peak: 3.578
+   - v1 peak: 3.494 (−0.084 vs baseline — but v1 has 5× more unique tokens, so this is a unique-tokens confound, not a code effect)
+   - **v2 peak (the matched-token, fair comparison): 3.722 → LOSES to baseline by +0.144 nats**
+   - wd=3.2/x16 peak: 3.457 (−0.121 — higher WD as regularizer wins on in-domain, no code needed)
+
+   v1 vs baseline is not a controlled experiment because v1 has more unique training tokens. v2 (Aryabumi-style matched-token swap) is the controlled one, and v2 LOSES.
+
+**Corrected conclusion about code-mix at 1.4B / 3.3B tokens.** Under fair (matched-compute, matched-unique-tokens) comparison, Aryabumi-style 25% code mix does NOT improve in-domain NL. It actively hurts: peak in-domain val gets worse, and the final-step overfit is more severe than baseline.
+
+The one v1 effect that survives the v2 controls is **the 0% gsm8k_cot loop rate** — but this needs to be retested by counting loops on the v2 final checkpoint to know whether it's a code-mix effect or just a unique-tokens effect. Pending.
+
 ---
 
 ## May 31: Mid-training vs final checkpoints — every recipe overfits late, downstream doesn't follow
