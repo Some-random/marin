@@ -6,6 +6,8 @@
 |---|---|---|---|---|
 | **1.4B baseline** | `1_4b_wd1_6_x16_nocrossblock_hf` (`peach-thunder-100` / `6xx0hu3l`) | 1.4 B | 3.3 B (DCLM-200M, x16 epochs) | wd=1.6, LR=1e-3 cosine, block_cross_doc=False |
 | **1.4B code-mix 25%** | `1_4b_25code_alg_hf` (`eager-grass-104` / `p2n84bo3`) | 1.4 B | 3.3 B (75% DCLM + 25% opc_algorithmic) | Same recipe as baseline + code component |
+| **1.4B 1-ep DCLM @ step-14672** | `1ep_dclm_step14672_hf` (run `1ep-dclm-A5`, in-flight) | 1.4 B | ~15.4 B trained so far (target 30.77 B, x1 epoch over 7 DCLM shards) | wd=0.1, LR=3e-4 cosine, 4-node DP. Mid-training snapshot. |
+| **1.4B 1-ep code-mix @ step-14672** | `1ep_code25_step14672_hf` (run `1ep-code25-B4`, in-flight) | 1.4 B | ~15.4 B trained so far (target 30.77 B, x1 epoch each) | Same as above + 25% code mix (aryabumi_synth 17.5% + aryabumi_web 4.4% + opc 3.1%) |
 | phi-1 | `microsoft/phi-1` | 1.3 B | ~7 B (filtered Stack + ~1B GPT-3.5 synth Python) | Code-only |
 | phi-1.5 | `microsoft/phi-1_5` | 1.3 B | ~30 B (phi-1 mix + ~20B synthetic NL textbooks) | 5 epochs × 30B unique |
 
@@ -250,6 +252,49 @@ All 4 models were evaluated through the same lm-eval-harness Paloma pipeline (`b
 - **Code-mix (1.4B code25) beats our 1.4B baseline on every single subset.**
 
 **Caveat on code-gen numbers.** Our `humaneval` / `mbpp` uses `lm-eval-harness`'s scoring path with `--confirm_run_unsafe_code` + `HF_ALLOW_CODE_EVAL=1`. The original phi-1 paper reported MBPP 55.5% with the BigCode evaluation framework; our pipeline reports phi-1 MBPP 1.0%. The methodology difference (extraction patterns, n-shot, runner) is substantial. **Treat our code-gen pipeline numbers as conservative lower bounds; do not directly compare to published phi paper numbers.**
+
+## 4. 1-epoch experiment partial results (step-14672, ~50% trained)
+
+In-flight runs `1ep-dclm-A5` (variant A, 100% DCLM) and `1ep-code25-B4` (variant B,
+75% DCLM + 25% code mix), both targeting 30.77 B trained tokens at 1 epoch over
+each data source. Numbers below are from the step-14672 checkpoint snapshot
+(50% of training done); final-checkpoint numbers will be added when training
+completes. mmlu pending due to a torch-distributed gather issue specific to
+the 57-subtask aggregation; see `1ep_experiment_plan.md`.
+
+| Mechanism | Task | Metric | n-shot | A5 1ep DCLM (s14672) | B4 1ep code-mix (s14672) | Δ (B−A) |
+|---|---|---|---:|---:|---:|---:|
+| Closed-book | arc_easy | acc_norm | 25 | 0.590 | 0.564 | −2.6 pp |
+| Closed-book | arc_challenge | acc_norm | 25 | 0.297 | 0.282 | −1.5 pp |
+| Closed-book | hellaswag | acc_norm | 10 | 0.458 | 0.427 | **−3.1 pp** |
+| Closed-book | commonsense_qa | acc | 0 | 0.212 | 0.200 | −1.2 pp |
+| Closed-book | social_iqa | acc | 0 | 0.408 | 0.394 | −1.4 pp |
+| Closed-book | logiqa | acc | 0 | 0.235 | 0.212 | −2.3 pp |
+| Closed-book | winogrande | acc | 5 | pending | 0.508 | pending |
+| Closed-book | mmlu | acc | 5 | pending | pending | pending |
+| Open-book | sciq | acc | 0 | 0.816 | 0.799 | −1.7 pp |
+| Open-book | boolq | acc | 0 | 0.577 | 0.569 | −0.8 pp |
+| Open-book | piqa | acc | 0 | 0.691 | 0.688 | tied |
+| Open-book | openbookqa_fact | acc_norm | 0 | 0.418 | 0.410 | −0.8 pp |
+| Math | gsm8k | exact_match | 5 | pending | 0.014 | pending |
+| Math | gsm8k_cot | exact_match | 8 | 0.014 | 0.014 | tied (floor) |
+| Math | minerva_math | exact_match | 4 | 0.001 | 0.006 | tied (floor) |
+| Code | humaneval | pass@1 | 0 | 0.006 | **0.043** | **+3.7 pp** |
+| Code | mbpp | pass_at_1 | 3 | 0.000 | **0.068** | **+6.8 pp** |
+| PPL | `dclm_200m_val` (in-domain held-out) | nats | — | 2.996 | 3.058 | A5 wins by 0.06 nats |
+
+**Headline at 50%:** Of 13 tasks with both sides reporting, **variant A (DCLM-only)
+wins 9 NL benchmarks (1-3 pp), variant B (code-mix) wins 2 code benchmarks
+decisively (3-7 pp), 2 tied at floor.** Code-mix is trading NL ability for code-gen
+ability — exactly what the data mix predicts.
+
+**This replicates the May 31 / June 1 v2 finding** (matched-token code mix
+doesn't help in-domain NL at 1.4B / our compute) and adds the new signal
+that the cost shows up *across NL benchmarks consistently* at mid-training.
+
+Final-step checkpoint comparison (incl. paloma 16-subset bpb, full mmlu, etc.)
+will be filled in when training completes (~2026-06-02 22:00 PDT). See
+`1ep_experiment_plan.md` for the methodology + remaining open items.
 
 ---
 
