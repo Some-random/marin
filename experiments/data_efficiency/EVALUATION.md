@@ -207,47 +207,67 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 
 ## 3. Canonical results — all models
 
-All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11) at the n-shot settings shown. `acc_norm` used where reported; `acc` otherwise. Paloma / `dclm_200m_val` loss is mean next-token cross-entropy (lower is better). Bolded cells = best for that row. Mechanism column refers to the §2 taxonomy.
+All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Models are rows; tasks are columns. Column header format: `task[nshot]`. Accuracy metrics use `acc_norm` where reported in §2; `acc` otherwise. PPL is `bits_per_byte` (paloma) or nats (`dclm_200m_val`), lower=better. Bolded = best in column. `—` = not run.
 
-**A5 1ep / B4 1ep columns are the in-flight 1-epoch experiment at the step-14672 checkpoint (~50% trained). Final-step numbers will replace these when training completes (~2026-06-02 22:00 PDT).**
+**A5 1ep / B4 1ep are the in-flight 1-epoch experiment at the step-14672 checkpoint (~50% trained). Final-step numbers will replace these when training completes (~2026-06-02 22:00 PDT).**
 
-| Mech | Task | Metric | n-shot | base (x16) | code25 (x16) | A5 1ep s14672 | B4 1ep s14672 | phi-1 | phi-1.5 |
-|---|---|---|---:|---:|---:|---:|---:|---:|---:|
-| Open | sciq | acc | 0 | 0.652 | 0.709 | **0.816** | 0.799 | 0.707 | **0.933** |
-| Open | boolq | acc | 0 | 0.502 | 0.579 | 0.577 | 0.569 | 0.451 | **0.746** |
-| Open | piqa | acc | 0 | 0.634 | 0.619 | 0.691 | 0.688 | 0.562 | **0.766** |
-| Open | openbookqa_fact (with `fact1`) | acc_norm | 0 | 0.336 | 0.370 | 0.418 | 0.410 | 0.316 | **0.530** |
-| Closed | arc_easy | acc_norm | 25 | 0.401 | 0.416 | 0.590 | 0.564 | 0.378 | **0.805** |
-| Closed | arc_challenge | acc_norm | 25 | 0.242 | 0.236 | 0.297 | 0.282 | 0.232 | **0.532** |
-| Closed | hellaswag | acc_norm | 10 | 0.348 | 0.341 | 0.458 | 0.427 | 0.301 | **0.635** |
-| Closed | winogrande | acc | 5 | 0.504 | 0.500 | 0.530 | 0.508 | 0.498 | **0.710** |
-| Closed | mmlu | acc | 5 | 0.252 | 0.249 | pending | pending | 0.248 | **0.422** |
-| Closed | commonsense_qa | acc | 0 | 0.192 | 0.200 | 0.212 | 0.200 | 0.175 | **0.507** |
-| Closed | social_iqa | acc | 0 | 0.366 | 0.362 | 0.408 | 0.394 | 0.364 | **0.523** |
-| Closed | logiqa | acc | 0 | 0.218 | 0.234 | 0.235 | 0.212 | 0.214 | **0.240** |
-| Math | gsm8k | exact_match | 5 | 0.000 | 0.000 | 0.000 | 0.014 | 0.012 | **0.305** |
-| Math | gsm8k_cot | exact_match | 8 | 0.022 | 0.020 | 0.014 | 0.014 | 0.021 | **0.299** |
-| Math | minerva_math | exact_match | 4 | 0.0002 | 0.0014 | 0.001 | 0.006 | 0.012 | **0.029** |
-| Code | humaneval | pass@1 | 0 | 0.000 | 0.006 | 0.006 | 0.043 | **0.494** | 0.342 |
-| Code | mbpp | pass@1 (or pass_at_1) | 3 | 0.000 | 0.000 | 0.000 | 0.068 | **0.416** | 0.342 |
-| PPL | `dclm_200m_val` (in-domain) | nats | — | — | — | **2.996** | 3.058 | — | — |
-| PPL | **paloma_macro (16 subsets)** | bits_per_byte | — | 1.631 | 1.483 | pending | pending | 1.738 | **1.174** |
-| PPL | paloma 4chan_meta_sep | bits_per_byte | — | 1.561 | 1.402 | pending | pending | 1.665 | **1.199** |
-| PPL | paloma c4_100_domains | bits_per_byte | — | 1.322 | 1.212 | pending | pending | 1.615 | **0.948** |
-| PPL | paloma c4_en | bits_per_byte | — | 1.387 | 1.269 | pending | pending | 1.621 | **0.985** |
-| PPL | paloma dolma-v1_5 | bits_per_byte | — | 1.433 | 1.293 | pending | pending | 1.479 | **0.957** |
-| PPL | paloma dolma_100_programing_languages | bits_per_byte | — | 1.681 | 1.412 | pending | pending | 0.834 | **0.679** |
-| PPL | paloma dolma_100_subreddits | bits_per_byte | — | 1.492 | 1.368 | pending | pending | 1.732 | **1.159** |
-| PPL | paloma falcon-refinedweb | bits_per_byte | — | 1.448 | 1.327 | pending | pending | 1.679 | **1.025** |
-| PPL | paloma gab | bits_per_byte | — | 2.475 | 2.277 | pending | pending | 2.645 | **1.918** |
-| PPL | paloma m2d2_s2orc_unsplit | bits_per_byte | — | 1.389 | 1.274 | pending | pending | 1.273 | **0.946** |
-| PPL | paloma m2d2_wikipedia_unsplit | bits_per_byte | — | 1.319 | 1.211 | pending | pending | 1.629 | **0.976** |
-| PPL | paloma manosphere_meta_sep | bits_per_byte | — | 1.566 | 1.434 | pending | pending | 1.758 | **1.180** |
-| PPL | paloma mc4 | bits_per_byte | — | 1.546 | 1.400 | pending | pending | 1.604 | **1.031** |
-| PPL | paloma ptb | bits_per_byte | — | 1.565 | 1.451 | pending | pending | 1.644 | **1.057** |
-| PPL | paloma redpajama | bits_per_byte | — | 1.491 | 1.335 | pending | pending | 1.374 | **0.928** |
-| PPL | paloma twitterAAE_HELM_fixed | bits_per_byte | — | 3.077 | **2.834** | pending | pending | 3.634 | 2.826 |
-| PPL | paloma wikitext_103 | bits_per_byte | — | 1.336 | 1.224 | pending | pending | 1.620 | **0.970** |
+To render wide tables without horizontal scrolling, view in raw or in a markdown viewer that lifts the page-max-width (mkdocs `extra_css` with `.md-grid {max-width: none}`, or VS Code preview which auto-sizes).
+
+### Open-book NL
+
+| Model | sciq[0] | boolq[0] | piqa[0] | openbookqa_fact[0] |
+|---|---:|---:|---:|---:|
+| 1.4B base (x16) | 0.652 | 0.502 | 0.634 | 0.336 |
+| 1.4B code25 (x16) | 0.709 | 0.579 | 0.619 | 0.370 |
+| A5 1ep s14672 | **0.816** | 0.577 | 0.691 | 0.418 |
+| B4 1ep s14672 | 0.799 | 0.569 | 0.688 | 0.410 |
+| phi-1 | 0.707 | 0.451 | 0.562 | 0.316 |
+| phi-1.5 | **0.933** | **0.746** | **0.766** | **0.530** |
+
+### Closed-book NL / commonsense
+
+| Model | arc_easy[25] | arc_challenge[25] | hellaswag[10] | winogrande[5] | mmlu[5] | commonsense_qa[0] | social_iqa[0] | logiqa[0] |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1.4B base (x16) | 0.401 | 0.242 | 0.348 | 0.504 | 0.252 | 0.192 | 0.366 | 0.218 |
+| 1.4B code25 (x16) | 0.416 | 0.236 | 0.341 | 0.500 | 0.249 | 0.200 | 0.362 | 0.234 |
+| A5 1ep s14672 | 0.590 | 0.297 | 0.458 | 0.530 | pending | 0.212 | 0.408 | 0.235 |
+| B4 1ep s14672 | 0.564 | 0.282 | 0.427 | 0.508 | pending | 0.200 | 0.394 | 0.212 |
+| phi-1 | 0.378 | 0.232 | 0.301 | 0.498 | 0.248 | 0.175 | 0.364 | 0.214 |
+| phi-1.5 | **0.805** | **0.532** | **0.635** | **0.710** | **0.422** | **0.507** | **0.523** | **0.240** |
+
+### Math + Code
+
+| Model | gsm8k[5] | gsm8k_cot[8] | minerva[4] | humaneval[0] | mbpp[3] |
+|---|---:|---:|---:|---:|---:|
+| 1.4B base (x16) | 0.000 | 0.022 | 0.0002 | 0.000 | 0.000 |
+| 1.4B code25 (x16) | 0.000 | 0.020 | 0.0014 | 0.006 | 0.000 |
+| A5 1ep s14672 | 0.000 | 0.014 | 0.001 | 0.006 | 0.000 |
+| B4 1ep s14672 | 0.014 | 0.014 | 0.006 | 0.043 | 0.068 |
+| phi-1 | 0.012 | 0.021 | 0.012 | **0.494** | **0.416** |
+| phi-1.5 | **0.305** | **0.299** | **0.029** | 0.342 | 0.342 |
+
+### Perplexity (lower = better)
+
+| Model | dclm_200m_val (nats, in-domain) | paloma_macro (bpb, OOD 16-subset mean) |
+|---|---:|---:|
+| 1.4B base (x16) | — | 1.631 |
+| 1.4B code25 (x16) | — | 1.483 |
+| A5 1ep s14672 | **2.996** | pending |
+| B4 1ep s14672 | 3.058 | pending |
+| phi-1 | — | 1.738 |
+| phi-1.5 | — | **1.174** |
+
+<details>
+<summary><b>Paloma per-subset bpb (16 subsets) — expand</b></summary>
+
+| Model | 4chan | c4_100d | c4_en | dolma-v1.5 | dolma_prog | dolma_subred | falcon | gab | m2d2_s2orc | m2d2_wiki | manosphere | mc4 | ptb | redpajama | twitterAAE | wikitext_103 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1.4B base (x16) | 1.561 | 1.322 | 1.387 | 1.433 | 1.681 | 1.492 | 1.448 | 2.475 | 1.389 | 1.319 | 1.566 | 1.546 | 1.565 | 1.491 | 3.077 | 1.336 |
+| 1.4B code25 (x16) | 1.402 | 1.212 | 1.269 | 1.293 | 1.412 | 1.368 | 1.327 | 2.277 | 1.274 | 1.211 | 1.434 | 1.400 | 1.451 | 1.335 | **2.834** | 1.224 |
+| phi-1 | 1.665 | 1.615 | 1.621 | 1.479 | 0.834 | 1.732 | 1.679 | 2.645 | 1.273 | 1.629 | 1.758 | 1.604 | 1.644 | 1.374 | 3.634 | 1.620 |
+| phi-1.5 | **1.199** | **0.948** | **0.985** | **0.957** | **0.679** | **1.159** | **1.025** | **1.918** | **0.946** | **0.976** | **1.180** | **1.031** | **1.057** | **0.928** | 2.826 | **0.970** |
+
+</details>
 
 ### Headlines
 
