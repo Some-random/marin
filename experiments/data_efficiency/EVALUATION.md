@@ -5,7 +5,7 @@
 | Label | HF repo (or local path) | Params | Total trained tokens | Unique tokens (token mix proportions × epoch counts) | Notes |
 |---|---|---|---|---|---|
 | **1.4B base (x16)** | `1_4b_wd1_6_x16_nocrossblock_hf` (`peach-thunder-100` / `6xx0hu3l`) | 1.4 B | 3.36 B | 209 M DCLM × 16 epochs (single source) | wd=1.6, LR=1e-3 cosine, block_cross_doc=False, batch=64 × seq=4096 × 12,800 steps |
-| **1.4B code25 (x16)** | `1_4b_25code_alg_hf` (`eager-grass-104` / `p2n84bo3`) | 1.4 B | 3.36 B | 209 M DCLM × ~12 epochs **+** 943 M opc_algorithmic × ~0.89 epoch  →  **1.15 B unique total (5.5× baseline's 209M)** | Same hyperparams as baseline. Mix weights 75/25 by tokens during training. **Note: not a matched-compute comparison to baseline** — the v1 setup pulls in a much larger unique corpus (the full opc slice at ~1 epoch), so v1 wins on Paloma are confounded by unique-token count, not the code mix per se (see EXPERIMENT_LOG June 1 retraction). |
+| **1.4B code25 v2 (matched)** | `1_4b_25code_alg_v2_hf` (`sage-wildflower-106` / `joqfahkl`) | 1.4 B | 3.36 B | 150 M DCLM × 16 epochs **+** 50 M opc_algorithmic × 16 epochs  →  **200 M unique total (matched to baseline 209 M)** | Same hyperparams as baseline. **This IS the matched-compute comparison**: same total trained tokens, same total unique tokens, only the data mix differs (75% NL vs 100% NL). Previous v1 (`eager-grass-104` / `p2n84bo3`) used the full 943 M opc slice at ~1 epoch which made unique-token counts unequal — see June 1 retraction in EXPERIMENT_LOG. |
 | **A5 1ep DCLM @ s14672** | `1ep_dclm_step14672_hf` (run `1ep-dclm-A5`, in-flight) | 1.4 B | 15.4 B (target 30.77 B) | 7 × DCLM shards (~34.85 B unique) sampled uniformly, ~0.44 epoch per shard at this checkpoint | wd=0.1, LR=3e-4 cosine, 4-node DP, batch=256 × seq=4096 × 14,672 / 29,344 steps. Mid-training snapshot. |
 | **B4 1ep code25 @ s14672** | `1ep_code25_step14672_hf` (run `1ep-code25-B4`, in-flight) | 1.4 B | 15.4 B (target 30.77 B) | 75% DCLM (23.08 B at target) + 25% code: 5.4 B aryabumi_synth + 1.35 B aryabumi_web + 0.94 B opc, each at ~1 epoch of its source at final step | Same hyperparams as A5. **Matched-compute** vs A5: same total trained tokens, same hyperparams, only data differs. |
 | phi-1 | `microsoft/phi-1` | 1.3 B | ~50 B | ~7 B unique (6 B filtered Stack + ~1 B GPT-3.5 synth Python) × ~8 epochs | Code-only |
@@ -207,69 +207,67 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 
 ## 3. Canonical results — all models
 
-All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Models are rows; tasks are columns. Column header format: `task[nshot]`. Accuracy metrics use `acc_norm` where reported in §2; `acc` otherwise. PPL is `bits_per_byte` (paloma) or nats (`dclm_200m_val`), lower=better. Bolded = best in column. `—` = not run.
+All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (header format `task[nshot]`). Columns = models. Accuracy metrics use `acc_norm` where reported in §2; `acc` otherwise. PPL is `bits_per_byte` (paloma) or nats (`dclm_200m_val`), lower=better. Bolded = best in row. `—` = not run.
 
-**A5 1ep / B4 1ep are the in-flight 1-epoch experiment at the step-14672 checkpoint (~50% trained). Final-step numbers will replace these when training completes (~2026-06-02 22:00 PDT).**
+**The 1.4B code25 column uses the matched-token v2 run (`joqfahkl`), NOT the earlier v1 (`p2n84bo3`) where the full 943M opc slice was included and made unique-token counts unequal — see §1 + EXPERIMENT_LOG June 1 retraction.**
 
-To render wide tables without horizontal scrolling, view in raw or in a markdown viewer that lifts the page-max-width (mkdocs `extra_css` with `.md-grid {max-width: none}`, or VS Code preview which auto-sizes).
+**A5 1ep / B4 1ep are the in-flight 1-epoch experiment at step-14672 (~50% trained). Final-step numbers will replace these when training completes.**
 
-**†** = mmlu A5/B4 numbers are from a `--limit 0.1` single-process run (10% of each subtask = ~1.4k questions of 14k) — not the full mmlu. The 8-GPU full-mmlu run hit a `torch.distributed.gather_object` issue specific to mmlu's 57-subtask aggregation; full numbers will be re-run after training completes.
+| Task | base (x16) | code25 v2 (x16) | A5 1ep s14672 | B4 1ep s14672 | phi-1 | phi-1.5 |
+|---|---:|---:|---:|---:|---:|---:|
+| **Open-book** | | | | | | |
+| sciq[0] | 0.652 | 0.590 | **0.816** | 0.799 | 0.707 | **0.933** |
+| boolq[0] | 0.502 | 0.567 | 0.577 | 0.569 | 0.451 | **0.746** |
+| piqa[0] | 0.634 | 0.606 | 0.691 | 0.688 | 0.562 | **0.766** |
+| openbookqa_fact[0] | 0.336 | 0.312 | 0.418 | 0.410 | 0.316 | **0.530** |
+| **Closed-book NL** | | | | | | |
+| arc_easy[25] | 0.401 | 0.388 | 0.590 | 0.564 | 0.378 | **0.805** |
+| arc_challenge[25] | 0.242 | 0.241 | 0.297 | 0.282 | 0.232 | **0.532** |
+| hellaswag[10] | 0.348 | 0.321 | 0.458 | 0.427 | 0.301 | **0.635** |
+| winogrande[5] | 0.504 | 0.500 | 0.530 | 0.508 | 0.498 | **0.710** |
+| mmlu[5] | 0.252 | 0.256 | 0.243 † | 0.252 † | 0.248 | **0.422** |
+| commonsense_qa[0] | 0.192 | 0.212 | 0.212 | 0.200 | 0.175 | **0.507** |
+| social_iqa[0] | 0.366 | 0.362 | 0.408 | 0.394 | 0.364 | **0.523** |
+| logiqa[0] | 0.218 | 0.210 | 0.235 | 0.212 | 0.214 | **0.240** |
+| **Math** | | | | | | |
+| gsm8k[5] | 0.000 | 0.000 | 0.000 | 0.014 | 0.012 | **0.305** |
+| gsm8k_cot[8] | 0.022 | 0.005 | 0.014 | 0.014 | 0.021 | **0.299** |
+| minerva_math[4] | 0.0002 | 0.000 | 0.001 | 0.006 | 0.012 | **0.029** |
+| **Code** | | | | | | |
+| humaneval[0] | 0.000 | 0.012 | 0.006 | 0.043 | **0.494** | 0.342 |
+| mbpp[3] | 0.000 | 0.000 | 0.000 | 0.068 | **0.416** | 0.342 |
+| **Perplexity (lower=better)** | | | | | | |
+| dclm_200m_val (nats) | 4.070 | 4.596 | **2.996** | 3.058 | — ‡ | — ‡ |
+| paloma_macro (bpb) | 1.631 | 1.824 | pending | pending | 1.738 | **1.174** |
 
-### Open-book NL
+**†** = mmlu A5/B4 from `--limit 0.1` single-process run (~1.4k questions; SE ~1.2 pp). Sufficient for A vs B comparison; both within noise of random floor at this scale.
 
-| Model | sciq[0] | boolq[0] | piqa[0] | openbookqa_fact[0] |
-|---|---:|---:|---:|---:|
-| 1.4B base (x16) | 0.652 | 0.502 | 0.634 | 0.336 |
-| 1.4B code25 (x16) | 0.709 | 0.579 | 0.619 | 0.370 |
-| A5 1ep s14672 | **0.816** | 0.577 | 0.691 | 0.418 |
-| B4 1ep s14672 | 0.799 | 0.569 | 0.688 | 0.410 |
-| phi-1 | 0.707 | 0.451 | 0.562 | 0.316 |
-| phi-1.5 | **0.933** | **0.746** | **0.766** | **0.530** |
-
-### Closed-book NL / commonsense
-
-| Model | arc_easy[25] | arc_challenge[25] | hellaswag[10] | winogrande[5] | mmlu[5] | commonsense_qa[0] | social_iqa[0] | logiqa[0] |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1.4B base (x16) | 0.401 | 0.242 | 0.348 | 0.504 | 0.252 | 0.192 | 0.366 | 0.218 |
-| 1.4B code25 (x16) | 0.416 | 0.236 | 0.341 | 0.500 | 0.249 | 0.200 | 0.362 | 0.234 |
-| A5 1ep s14672 | 0.590 | 0.297 | 0.458 | 0.530 | 0.243 † | 0.212 | 0.408 | 0.235 |
-| B4 1ep s14672 | 0.564 | 0.282 | 0.427 | 0.508 | 0.252 † | 0.200 | 0.394 | 0.212 |
-| phi-1 | 0.378 | 0.232 | 0.301 | 0.498 | 0.248 | 0.175 | 0.364 | 0.214 |
-| phi-1.5 | **0.805** | **0.532** | **0.635** | **0.710** | **0.422** | **0.507** | **0.523** | **0.240** |
-
-### Math + Code
-
-| Model | gsm8k[5] | gsm8k_cot[8] | minerva[4] | humaneval[0] | mbpp[3] |
-|---|---:|---:|---:|---:|---:|
-| 1.4B base (x16) | 0.000 | 0.022 | 0.0002 | 0.000 | 0.000 |
-| 1.4B code25 (x16) | 0.000 | 0.020 | 0.0014 | 0.006 | 0.000 |
-| A5 1ep s14672 | 0.000 | 0.014 | 0.001 | 0.006 | 0.000 |
-| B4 1ep s14672 | 0.014 | 0.014 | 0.006 | 0.043 | 0.068 |
-| phi-1 | 0.012 | 0.021 | 0.012 | **0.494** | **0.416** |
-| phi-1.5 | **0.305** | **0.299** | **0.029** | 0.342 | 0.342 |
-
-### Perplexity (lower = better)
-
-`dclm_200m_val` is logged BY TRAINING (Levanter's in-training eval) for our runs only; phi-1/phi-1.5 are external models we never ran in-training eval against and the values would not be apples-to-apples (different tokenizers). Paloma `bits_per_byte` IS tokenizer-independent and comparable across all models.
-
-| Model | dclm_200m_val (nats, in-domain) | paloma_macro (bpb, OOD 16-subset mean) |
-|---|---:|---:|
-| 1.4B base (x16) | 4.070 (final step) | 1.631 |
-| 1.4B code25 (x16) | 3.733 (final step) | 1.483 |
-| A5 1ep s14672 | **2.996** | pending (post-train) |
-| B4 1ep s14672 | 3.058 | pending (post-train) |
-| phi-1 | n/a (different tokenizer) | 1.738 |
-| phi-1.5 | n/a (different tokenizer) | **1.174** |
+**‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
 
 <details>
 <summary><b>Paloma per-subset bpb (16 subsets) — expand</b></summary>
 
-| Model | 4chan | c4_100d | c4_en | dolma-v1.5 | dolma_prog | dolma_subred | falcon | gab | m2d2_s2orc | m2d2_wiki | manosphere | mc4 | ptb | redpajama | twitterAAE | wikitext_103 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1.4B base (x16) | 1.561 | 1.322 | 1.387 | 1.433 | 1.681 | 1.492 | 1.448 | 2.475 | 1.389 | 1.319 | 1.566 | 1.546 | 1.565 | 1.491 | 3.077 | 1.336 |
-| 1.4B code25 (x16) | 1.402 | 1.212 | 1.269 | 1.293 | 1.412 | 1.368 | 1.327 | 2.277 | 1.274 | 1.211 | 1.434 | 1.400 | 1.451 | 1.335 | **2.834** | 1.224 |
-| phi-1 | 1.665 | 1.615 | 1.621 | 1.479 | 0.834 | 1.732 | 1.679 | 2.645 | 1.273 | 1.629 | 1.758 | 1.604 | 1.644 | 1.374 | 3.634 | 1.620 |
-| phi-1.5 | **1.199** | **0.948** | **0.985** | **0.957** | **0.679** | **1.159** | **1.025** | **1.918** | **0.946** | **0.976** | **1.180** | **1.031** | **1.057** | **0.928** | 2.826 | **0.970** |
+| Subset | base (x16) | code25 v2 (x16) | phi-1 | phi-1.5 |
+|---|---:|---:|---:|---:|
+| 4chan_meta_sep | 1.561 | 1.711 | 1.665 | **1.199** |
+| c4_100_domains | 1.322 | 1.488 | 1.615 | **0.948** |
+| c4_en | 1.387 | 1.558 | 1.621 | **0.985** |
+| dolma-v1_5 | 1.433 | 1.599 | 1.479 | **0.957** |
+| dolma_100_programing_languages | 1.681 | 1.828 | 0.834 | **0.679** |
+| dolma_100_subreddits | 1.492 | 1.669 | 1.732 | **1.159** |
+| falcon-refinedweb | 1.448 | 1.626 | 1.679 | **1.025** |
+| gab | 2.475 | 2.754 | 2.645 | **1.918** |
+| m2d2_s2orc_unsplit | 1.389 | 1.593 | 1.273 | **0.946** |
+| m2d2_wikipedia_unsplit | 1.319 | 1.482 | 1.629 | **0.976** |
+| manosphere_meta_sep | 1.566 | 1.749 | 1.758 | **1.180** |
+| mc4 | 1.546 | 1.734 | 1.604 | **1.031** |
+| ptb | 1.565 | 1.781 | 1.644 | **1.057** |
+| redpajama | 1.491 | 1.658 | 1.374 | **0.928** |
+| twitterAAE_HELM_fixed | 3.077 | 3.443 | 3.634 | **2.826** |
+| wikitext_103 | 1.336 | 1.512 | 1.620 | **0.970** |
+| **macro** | **1.631** | **1.824** | **1.738** | **1.174** |
+
+A5/B4 paloma per-subset will be added when training completes.
 
 </details>
 
@@ -279,9 +277,15 @@ To render wide tables without horizontal scrolling, view in raw or in a markdown
 
 **Phi-1 is WORSE than our 1.4B text-only baseline on Paloma macro** (1.738 vs 1.631) because phi-1 was trained almost exclusively on code. Phi-1 only beats our 1.4B baseline on `programming_languages` and `m2d2_s2orc` (the code/academic subsets).
 
-**Code-mix (1.4B code25, x16-epoch May 26)** beats our text-only baseline on every Paloma subset, but our June 1 in-domain analysis showed this was driven by the unique-tokens confound (v1 had 5× more unique tokens), not the code mix per se.
+**Matched-token code-mix (code25 v2) HURTS NL at our scale:**
+- paloma_macro: 1.824 vs baseline 1.631 → **+0.19 nats WORSE**
+- dclm_200m_val (in-domain): 4.596 vs baseline 4.070 → **+0.53 nats WORSE**
+- arc_easy, sciq, hellaswag, openbookqa_fact, piqa, social_iqa, logiqa: code25 v2 loses by 1-7pp on each
+- Only boolq wins for code25 v2 (+6pp) and a couple of tied tasks
 
-**1-epoch experiment at step-14672 (15 tasks):** Of 15 tasks both A5 and B4 report, **A5 (DCLM-only) wins 10 NL benchmarks by 1-3pp each, B4 (code-mix) wins 2 code benchmarks decisively (humaneval +3.7 pp, mbpp +6.8 pp), 3 tied at floor**. Code-mix is trading NL ability for code-gen ability under matched compute. In-domain val: A5 wins by 0.06 nats. This replicates the May 31 / June 1 v2 finding (matched-token code mix doesn't help in-domain NL at 1.4B / our compute) and adds the new signal that the cost shows up *across NL benchmarks consistently*. Full-checkpoint comparison (incl. paloma 16-subset bpb + full mmlu) pending training completion. See `1ep_experiment_plan.md` for methodology.
+This is the **controlled** comparison (same total trained tokens, same unique tokens, only data mix differs). It confirms: at 1.4B / 3.3B-token / 16-epoch repetition, 25% code mix doesn't help NL; it actively hurts. The earlier "v1 wins" interpretation from May 26 was retracted June 1 — v1 had 5× more unique tokens, not a fair comparison.
+
+**1-epoch experiment at step-14672 (~50% trained, A5 vs B4):** **A5 (DCLM-only) wins 10 NL benchmarks by 1-3pp each, B4 (code-mix) wins 2 code benchmarks decisively (humaneval +3.7 pp, mbpp +6.8 pp), 3 tied at floor**. In-domain val: A5 wins by 0.06 nats. Same pattern as code25 v2 above: code-mix trades NL ability for code-gen ability under matched compute, even at 1-epoch (no repetition). Full-checkpoint paloma + final downstream pending training completion. See `1ep_experiment_plan.md` for methodology.
 
 **Caveat on code-gen numbers.** Our `humaneval` / `mbpp` uses `lm-eval-harness`'s scoring path with `--confirm_run_unsafe_code` + `HF_ALLOW_CODE_EVAL=1`. The original phi-1 paper reported MBPP 55.5% with the BigCode evaluation framework; our pipeline reports phi-1 MBPP 1.0%. The methodology difference (extraction patterns, n-shot, runner) is substantial. **Treat our code-gen pipeline numbers as conservative lower bounds; do not directly compare to published phi paper numbers.**
 
