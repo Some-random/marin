@@ -32,7 +32,7 @@ Two-way split for QA: **open-book** (the answer is in the prompt; model attends 
 > - **passage**: "Ethanol fuel -- All biomass goes through at least some of these steps: it needs to be grown, collected, dried, fermented, distilled, and burned. … one unit of fossil-fuel energy is required to create 1.3 energy units from the resulting ethanol. The energy balance for sugarcane ethanol produced in Brazil is more favorable, with one unit of fossil-fuel energy required to create 8 from the ethanol. …"
 > - **label**: False
 
-**openbookqa_fact** — custom variant we added in `experiments/data_efficiency/openbookqa_fact.yaml` that uses the `additional` config of `allenai/openbookqa` and prepends the dataset's `fact1` field to the question stem. This is the open-book MC eval. Re-run pending; replaces the closed-book openbookqa default that lm-eval ships with.
+**openbookqa_fact** — custom variant we added in `experiments/data_efficiency/openbookqa_fact.yaml` that uses the `additional` config of `allenai/openbookqa` and prepends the dataset's `fact1` field to the question stem. This is the open-book MC eval, and replaces the closed-book `openbookqa` default that lm-eval ships with.
 
 ### B. Closed-book QA / commonsense
 
@@ -287,7 +287,11 @@ This is the **controlled** comparison (same total trained tokens, same unique to
 
 **1-epoch experiment at step-14672 (~50% trained, A5 vs B4):** **A5 (DCLM-only) wins 10 NL benchmarks by 1-3pp each, B4 (code-mix) wins 2 code benchmarks decisively (humaneval +3.7 pp, mbpp +6.8 pp), 3 tied at floor**. In-domain val: A5 wins by 0.06 nats. Same pattern as code25 v2 above: code-mix trades NL ability for code-gen ability under matched compute, even at 1-epoch (no repetition). Full-checkpoint paloma + final downstream pending training completion. See `1ep_experiment_plan.md` for methodology.
 
-**Caveat on code-gen numbers.** Our `humaneval` / `mbpp` uses `lm-eval-harness`'s scoring path with `--confirm_run_unsafe_code` + `HF_ALLOW_CODE_EVAL=1`. The original phi-1 paper reported MBPP 55.5% with the BigCode evaluation framework; our pipeline reports phi-1 MBPP 1.0%. The methodology difference (extraction patterns, n-shot, runner) is substantial. **Treat our code-gen pipeline numbers as conservative lower bounds; do not directly compare to published phi paper numbers.**
+**Caveat on code-gen numbers.** Our `humaneval` / `mbpp` use `lm-eval-harness`'s scoring path with `--confirm_run_unsafe_code` + `HF_ALLOW_CODE_EVAL=1`. Sanity-check vs phi-1 paper:
+- HumanEval: ours 49.4% vs paper 50.6% — within 1.2 pp, **essentially matching**
+- MBPP: ours 41.6% vs paper 55.5% — **−13.9 pp gap**, meaningful
+
+The HumanEval gap is small; the MBPP gap is real. The methodology difference (3-shot prompt format, code extraction patterns, timeout, sandboxing) is significant for MBPP specifically. The relative comparison between **our** models on the same lm-eval-harness pipeline is still internally consistent. If you want absolute numbers comparable to published code-gen results, install `bigcode-evaluation-harness` and run that — it's the standard for code tasks.
 
 ---
 
