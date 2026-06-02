@@ -205,96 +205,61 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 
 ---
 
-## 3. Canonical results
+## 3. Canonical results — all models
 
-All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11) at the n-shot settings shown. `acc_norm` used where reported; `acc` otherwise. Paloma / dclm_200m loss is mean next-token cross-entropy (lower is better). Random column shows chance accuracy for the discrete tasks; "—" means random doesn't apply.
+All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11) at the n-shot settings shown. `acc_norm` used where reported; `acc` otherwise. Paloma / `dclm_200m_val` loss is mean next-token cross-entropy (lower is better). Bolded cells = best for that row. Mechanism column refers to the §2 taxonomy.
 
-| Mechanism | Task | Metric | n-shot | Random | 1.4B base | 1.4B code25 | phi-1 | phi-1.5 |
-|---|---|---|---:|---:|---:|---:|---:|---:|
-| Open-book | sciq | acc | 0 | 0.25 | 0.652 | 0.709 | 0.707 | **0.933** |
-| Open-book | boolq | acc | 0 | 0.50 | 0.502 | 0.579 | 0.451 | **0.746** |
-| Closed-book | arc_easy | acc_norm | 25 | 0.25 | 0.401 | 0.416 | 0.378 | **0.805** |
-| Closed-book | arc_challenge | acc_norm | 25 | 0.25 | 0.242 | 0.236 | 0.232 | **0.532** |
-| Closed-book | mmlu | acc | 5 | 0.25 | 0.252 | 0.249 | 0.248 | **0.422** |
-| Open-book | openbookqa_fact (with `fact1`) | acc_norm | 0 | 0.25 | 0.336 | 0.370 | 0.316 | **0.530** |
-| Closed-book | piqa | acc | 0 | 0.50 | 0.634 | 0.619 | 0.562 | **0.766** |
-| Closed-book | social_iqa | acc | 0 | 0.33 | 0.366 | 0.362 | 0.364 | **0.523** |
-| Closed-book | hellaswag | acc_norm | 10 | 0.25 | 0.348 | 0.341 | 0.301 | **0.635** |
-| Closed-book | winogrande | acc | 5 | 0.50 | 0.504 | 0.500 | 0.498 | **0.710** |
-| Closed-book | commonsense_qa | acc | 0 | 0.20 | 0.192 | 0.200 | 0.175 | **0.507** |
-| Closed-book | logiqa | acc | 0 | 0.25 | 0.218 | 0.234 | 0.214 | 0.240 |
-| Math | gsm8k | exact_match | 5 | 0 | 0.000 | 0.000 | 0.012 | **0.305** |
-| Math | gsm8k_cot | exact_match | 8 | 0 | 0.022 | 0.020 | 0.021 | **0.299** |
-| Math | minerva_math | exact_match | 4 | 0 | 0.0002 | 0.0014 | 0.012 | **0.029** |
-| Code | humaneval | pass@1 | 0 | 0 | 0.000 | 0.006 | **0.494** | 0.342 |
-| Code | mbpp | pass@1 | 3 | 0 | 0.000 | 0.000 | **0.416** | 0.342 |
-| PPL | **paloma_macro (16 subsets, mean)** | bits_per_byte | — | — | 1.631 | 1.483 | 1.738 | **1.174** |
-| PPL | paloma 4chan_meta_sep | bits_per_byte | — | — | 1.561 | 1.402 | 1.665 | **1.199** |
-| PPL | paloma c4_100_domains | bits_per_byte | — | — | 1.322 | 1.212 | 1.615 | **0.948** |
-| PPL | paloma c4_en | bits_per_byte | — | — | 1.387 | 1.269 | 1.621 | **0.985** |
-| PPL | paloma dolma-v1_5 | bits_per_byte | — | — | 1.433 | 1.293 | 1.479 | **0.957** |
-| PPL | paloma dolma_100_programing_languages | bits_per_byte | — | — | 1.681 | 1.412 | 0.834 | **0.679** |
-| PPL | paloma dolma_100_subreddits | bits_per_byte | — | — | 1.492 | 1.368 | 1.732 | **1.159** |
-| PPL | paloma falcon-refinedweb | bits_per_byte | — | — | 1.448 | 1.327 | 1.679 | **1.025** |
-| PPL | paloma gab | bits_per_byte | — | — | 2.475 | 2.277 | 2.645 | **1.918** |
-| PPL | paloma m2d2_s2orc_unsplit | bits_per_byte | — | — | 1.389 | 1.274 | 1.273 | **0.946** |
-| PPL | paloma m2d2_wikipedia_unsplit | bits_per_byte | — | — | 1.319 | 1.211 | 1.629 | **0.976** |
-| PPL | paloma manosphere_meta_sep | bits_per_byte | — | — | 1.566 | 1.434 | 1.758 | **1.180** |
-| PPL | paloma mc4 | bits_per_byte | — | — | 1.546 | 1.400 | 1.604 | **1.031** |
-| PPL | paloma ptb | bits_per_byte | — | — | 1.565 | 1.451 | 1.644 | **1.057** |
-| PPL | paloma redpajama | bits_per_byte | — | — | 1.491 | 1.335 | 1.374 | **0.928** |
-| PPL | paloma twitterAAE_HELM_fixed | bits_per_byte | — | — | 3.077 | **2.834** | 3.634 | 2.826 |
-| PPL | paloma wikitext_103 | bits_per_byte | — | — | 1.336 | 1.224 | 1.620 | **0.970** |
+**A5 1ep / B4 1ep columns are the in-flight 1-epoch experiment at the step-14672 checkpoint (~50% trained). Final-step numbers will replace these when training completes (~2026-06-02 22:00 PDT).**
 
-All 4 models were evaluated through the same lm-eval-harness Paloma pipeline (`bits_per_byte` is tokenizer-independent, so the comparison is apples-to-apples even though the models use different tokenizers). PPL is "lower is better." Headline:
-- **phi-1.5 wins on every NL subset.**
-- **phi-1 is WORSE than our 1.4B text-only baseline on macro** (1.738 vs 1.631), because phi-1 was trained almost exclusively on code. Phi-1 only beats our 1.4B baseline on `programming_languages` and `m2d2_s2orc` (the code/academic subsets).
-- **Code-mix (1.4B code25) beats our 1.4B baseline on every single subset.**
+| Mech | Task | Metric | n-shot | base (x16) | code25 (x16) | A5 1ep s14672 | B4 1ep s14672 | phi-1 | phi-1.5 |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| Open | sciq | acc | 0 | 0.652 | 0.709 | **0.816** | 0.799 | 0.707 | **0.933** |
+| Open | boolq | acc | 0 | 0.502 | 0.579 | 0.577 | 0.569 | 0.451 | **0.746** |
+| Open | piqa | acc | 0 | 0.634 | 0.619 | 0.691 | 0.688 | 0.562 | **0.766** |
+| Open | openbookqa_fact (with `fact1`) | acc_norm | 0 | 0.336 | 0.370 | 0.418 | 0.410 | 0.316 | **0.530** |
+| Closed | arc_easy | acc_norm | 25 | 0.401 | 0.416 | 0.590 | 0.564 | 0.378 | **0.805** |
+| Closed | arc_challenge | acc_norm | 25 | 0.242 | 0.236 | 0.297 | 0.282 | 0.232 | **0.532** |
+| Closed | hellaswag | acc_norm | 10 | 0.348 | 0.341 | 0.458 | 0.427 | 0.301 | **0.635** |
+| Closed | winogrande | acc | 5 | 0.504 | 0.500 | 0.530 | 0.508 | 0.498 | **0.710** |
+| Closed | mmlu | acc | 5 | 0.252 | 0.249 | pending | pending | 0.248 | **0.422** |
+| Closed | commonsense_qa | acc | 0 | 0.192 | 0.200 | 0.212 | 0.200 | 0.175 | **0.507** |
+| Closed | social_iqa | acc | 0 | 0.366 | 0.362 | 0.408 | 0.394 | 0.364 | **0.523** |
+| Closed | logiqa | acc | 0 | 0.218 | 0.234 | 0.235 | 0.212 | 0.214 | **0.240** |
+| Math | gsm8k | exact_match | 5 | 0.000 | 0.000 | 0.000 | 0.014 | 0.012 | **0.305** |
+| Math | gsm8k_cot | exact_match | 8 | 0.022 | 0.020 | 0.014 | 0.014 | 0.021 | **0.299** |
+| Math | minerva_math | exact_match | 4 | 0.0002 | 0.0014 | 0.001 | 0.006 | 0.012 | **0.029** |
+| Code | humaneval | pass@1 | 0 | 0.000 | 0.006 | 0.006 | 0.043 | **0.494** | 0.342 |
+| Code | mbpp | pass@1 (or pass_at_1) | 3 | 0.000 | 0.000 | 0.000 | 0.068 | **0.416** | 0.342 |
+| PPL | `dclm_200m_val` (in-domain) | nats | — | — | — | **2.996** | 3.058 | — | — |
+| PPL | **paloma_macro (16 subsets)** | bits_per_byte | — | 1.631 | 1.483 | pending | pending | 1.738 | **1.174** |
+| PPL | paloma 4chan_meta_sep | bits_per_byte | — | 1.561 | 1.402 | pending | pending | 1.665 | **1.199** |
+| PPL | paloma c4_100_domains | bits_per_byte | — | 1.322 | 1.212 | pending | pending | 1.615 | **0.948** |
+| PPL | paloma c4_en | bits_per_byte | — | 1.387 | 1.269 | pending | pending | 1.621 | **0.985** |
+| PPL | paloma dolma-v1_5 | bits_per_byte | — | 1.433 | 1.293 | pending | pending | 1.479 | **0.957** |
+| PPL | paloma dolma_100_programing_languages | bits_per_byte | — | 1.681 | 1.412 | pending | pending | 0.834 | **0.679** |
+| PPL | paloma dolma_100_subreddits | bits_per_byte | — | 1.492 | 1.368 | pending | pending | 1.732 | **1.159** |
+| PPL | paloma falcon-refinedweb | bits_per_byte | — | 1.448 | 1.327 | pending | pending | 1.679 | **1.025** |
+| PPL | paloma gab | bits_per_byte | — | 2.475 | 2.277 | pending | pending | 2.645 | **1.918** |
+| PPL | paloma m2d2_s2orc_unsplit | bits_per_byte | — | 1.389 | 1.274 | pending | pending | 1.273 | **0.946** |
+| PPL | paloma m2d2_wikipedia_unsplit | bits_per_byte | — | 1.319 | 1.211 | pending | pending | 1.629 | **0.976** |
+| PPL | paloma manosphere_meta_sep | bits_per_byte | — | 1.566 | 1.434 | pending | pending | 1.758 | **1.180** |
+| PPL | paloma mc4 | bits_per_byte | — | 1.546 | 1.400 | pending | pending | 1.604 | **1.031** |
+| PPL | paloma ptb | bits_per_byte | — | 1.565 | 1.451 | pending | pending | 1.644 | **1.057** |
+| PPL | paloma redpajama | bits_per_byte | — | 1.491 | 1.335 | pending | pending | 1.374 | **0.928** |
+| PPL | paloma twitterAAE_HELM_fixed | bits_per_byte | — | 3.077 | **2.834** | pending | pending | 3.634 | 2.826 |
+| PPL | paloma wikitext_103 | bits_per_byte | — | 1.336 | 1.224 | pending | pending | 1.620 | **0.970** |
+
+### Headlines
+
+**Phi-1.5** wins on every NL subset (synthetic-textbook-heavy training pays off at 1.3B).
+
+**Phi-1 is WORSE than our 1.4B text-only baseline on Paloma macro** (1.738 vs 1.631) because phi-1 was trained almost exclusively on code. Phi-1 only beats our 1.4B baseline on `programming_languages` and `m2d2_s2orc` (the code/academic subsets).
+
+**Code-mix (1.4B code25, x16-epoch May 26)** beats our text-only baseline on every Paloma subset, but our June 1 in-domain analysis showed this was driven by the unique-tokens confound (v1 had 5× more unique tokens), not the code mix per se.
+
+**1-epoch experiment at step-14672 (15 tasks):** Of 15 tasks both A5 and B4 report, **A5 (DCLM-only) wins 10 NL benchmarks by 1-3pp each, B4 (code-mix) wins 2 code benchmarks decisively (humaneval +3.7 pp, mbpp +6.8 pp), 3 tied at floor**. Code-mix is trading NL ability for code-gen ability under matched compute. In-domain val: A5 wins by 0.06 nats. This replicates the May 31 / June 1 v2 finding (matched-token code mix doesn't help in-domain NL at 1.4B / our compute) and adds the new signal that the cost shows up *across NL benchmarks consistently*. Full-checkpoint comparison (incl. paloma 16-subset bpb + full mmlu) pending training completion. See `1ep_experiment_plan.md` for methodology.
 
 **Caveat on code-gen numbers.** Our `humaneval` / `mbpp` uses `lm-eval-harness`'s scoring path with `--confirm_run_unsafe_code` + `HF_ALLOW_CODE_EVAL=1`. The original phi-1 paper reported MBPP 55.5% with the BigCode evaluation framework; our pipeline reports phi-1 MBPP 1.0%. The methodology difference (extraction patterns, n-shot, runner) is substantial. **Treat our code-gen pipeline numbers as conservative lower bounds; do not directly compare to published phi paper numbers.**
-
-## 4. 1-epoch experiment partial results (step-14672, ~50% trained)
-
-In-flight runs `1ep-dclm-A5` (variant A, 100% DCLM) and `1ep-code25-B4` (variant B,
-75% DCLM + 25% code mix), both targeting 30.77 B trained tokens at 1 epoch over
-each data source. Numbers below are from the step-14672 checkpoint snapshot
-(50% of training done); final-checkpoint numbers will be added when training
-completes. mmlu pending due to a torch-distributed gather issue specific to
-the 57-subtask aggregation; see `1ep_experiment_plan.md`.
-
-| Mechanism | Task | Metric | n-shot | A5 1ep DCLM (s14672) | B4 1ep code-mix (s14672) | Δ (B−A) |
-|---|---|---|---:|---:|---:|---:|
-| Closed-book | arc_easy | acc_norm | 25 | 0.590 | 0.564 | −2.6 pp |
-| Closed-book | arc_challenge | acc_norm | 25 | 0.297 | 0.282 | −1.5 pp |
-| Closed-book | hellaswag | acc_norm | 10 | 0.458 | 0.427 | **−3.1 pp** |
-| Closed-book | commonsense_qa | acc | 0 | 0.212 | 0.200 | −1.2 pp |
-| Closed-book | social_iqa | acc | 0 | 0.408 | 0.394 | −1.4 pp |
-| Closed-book | logiqa | acc | 0 | 0.235 | 0.212 | −2.3 pp |
-| Closed-book | winogrande | acc | 5 | pending | 0.508 | pending |
-| Closed-book | mmlu | acc | 5 | pending | pending | pending |
-| Open-book | sciq | acc | 0 | 0.816 | 0.799 | −1.7 pp |
-| Open-book | boolq | acc | 0 | 0.577 | 0.569 | −0.8 pp |
-| Open-book | piqa | acc | 0 | 0.691 | 0.688 | tied |
-| Open-book | openbookqa_fact | acc_norm | 0 | 0.418 | 0.410 | −0.8 pp |
-| Math | gsm8k | exact_match | 5 | pending | 0.014 | pending |
-| Math | gsm8k_cot | exact_match | 8 | 0.014 | 0.014 | tied (floor) |
-| Math | minerva_math | exact_match | 4 | 0.001 | 0.006 | tied (floor) |
-| Code | humaneval | pass@1 | 0 | 0.006 | **0.043** | **+3.7 pp** |
-| Code | mbpp | pass_at_1 | 3 | 0.000 | **0.068** | **+6.8 pp** |
-| PPL | `dclm_200m_val` (in-domain held-out) | nats | — | 2.996 | 3.058 | A5 wins by 0.06 nats |
-
-**Headline at 50%:** Of 13 tasks with both sides reporting, **variant A (DCLM-only)
-wins 9 NL benchmarks (1-3 pp), variant B (code-mix) wins 2 code benchmarks
-decisively (3-7 pp), 2 tied at floor.** Code-mix is trading NL ability for code-gen
-ability — exactly what the data mix predicts.
-
-**This replicates the May 31 / June 1 v2 finding** (matched-token code mix
-doesn't help in-domain NL at 1.4B / our compute) and adds the new signal
-that the cost shows up *across NL benchmarks consistently* at mid-training.
-
-Final-step checkpoint comparison (incl. paloma 16-subset bpb, full mmlu, etc.)
-will be filled in when training completes (~2026-06-02 22:00 PDT). See
-`1ep_experiment_plan.md` for the methodology + remaining open items.
 
 ---
 
