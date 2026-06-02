@@ -2,14 +2,14 @@
 
 ## 1. Models tracked
 
-| Label | HF repo (or local path) | Params | Train tokens | Notes |
-|---|---|---|---|---|
-| **1.4B baseline** | `1_4b_wd1_6_x16_nocrossblock_hf` (`peach-thunder-100` / `6xx0hu3l`) | 1.4 B | 3.3 B (DCLM-200M, x16 epochs) | wd=1.6, LR=1e-3 cosine, block_cross_doc=False |
-| **1.4B code-mix 25%** | `1_4b_25code_alg_hf` (`eager-grass-104` / `p2n84bo3`) | 1.4 B | 3.3 B (75% DCLM + 25% opc_algorithmic) | Same recipe as baseline + code component |
-| **1.4B 1-ep DCLM @ step-14672** | `1ep_dclm_step14672_hf` (run `1ep-dclm-A5`, in-flight) | 1.4 B | ~15.4 B trained so far (target 30.77 B, x1 epoch over 7 DCLM shards) | wd=0.1, LR=3e-4 cosine, 4-node DP. Mid-training snapshot. |
-| **1.4B 1-ep code-mix @ step-14672** | `1ep_code25_step14672_hf` (run `1ep-code25-B4`, in-flight) | 1.4 B | ~15.4 B trained so far (target 30.77 B, x1 epoch each) | Same as above + 25% code mix (aryabumi_synth 17.5% + aryabumi_web 4.4% + opc 3.1%) |
-| phi-1 | `microsoft/phi-1` | 1.3 B | ~7 B (filtered Stack + ~1B GPT-3.5 synth Python) | Code-only |
-| phi-1.5 | `microsoft/phi-1_5` | 1.3 B | ~30 B (phi-1 mix + ~20B synthetic NL textbooks) | 5 epochs × 30B unique |
+| Label | HF repo (or local path) | Params | Total trained tokens | Unique tokens (token mix proportions × epoch counts) | Notes |
+|---|---|---|---|---|---|
+| **1.4B base (x16)** | `1_4b_wd1_6_x16_nocrossblock_hf` (`peach-thunder-100` / `6xx0hu3l`) | 1.4 B | 3.36 B | 209 M DCLM × 16 epochs (single source) | wd=1.6, LR=1e-3 cosine, block_cross_doc=False, batch=64 × seq=4096 × 12,800 steps |
+| **1.4B code25 (x16)** | `1_4b_25code_alg_hf` (`eager-grass-104` / `p2n84bo3`) | 1.4 B | 3.36 B | 209 M DCLM × ~12 epochs **+** 943 M opc_algorithmic × ~0.89 epoch  →  **1.15 B unique total (5.5× baseline's 209M)** | Same hyperparams as baseline. Mix weights 75/25 by tokens during training. **Note: not a matched-compute comparison to baseline** — the v1 setup pulls in a much larger unique corpus (the full opc slice at ~1 epoch), so v1 wins on Paloma are confounded by unique-token count, not the code mix per se (see EXPERIMENT_LOG June 1 retraction). |
+| **A5 1ep DCLM @ s14672** | `1ep_dclm_step14672_hf` (run `1ep-dclm-A5`, in-flight) | 1.4 B | 15.4 B (target 30.77 B) | 7 × DCLM shards (~34.85 B unique) sampled uniformly, ~0.44 epoch per shard at this checkpoint | wd=0.1, LR=3e-4 cosine, 4-node DP, batch=256 × seq=4096 × 14,672 / 29,344 steps. Mid-training snapshot. |
+| **B4 1ep code25 @ s14672** | `1ep_code25_step14672_hf` (run `1ep-code25-B4`, in-flight) | 1.4 B | 15.4 B (target 30.77 B) | 75% DCLM (23.08 B at target) + 25% code: 5.4 B aryabumi_synth + 1.35 B aryabumi_web + 0.94 B opc, each at ~1 epoch of its source at final step | Same hyperparams as A5. **Matched-compute** vs A5: same total trained tokens, same hyperparams, only data differs. |
+| phi-1 | `microsoft/phi-1` | 1.3 B | ~50 B | ~7 B unique (6 B filtered Stack + ~1 B GPT-3.5 synth Python) × ~8 epochs | Code-only |
+| phi-1.5 | `microsoft/phi-1_5` | 1.3 B | ~150 B | ~30 B unique (phi-1 mix + ~20 B synthetic NL textbooks) × ~5 epochs | Larger synth-textbook training |
 
 ---
 
@@ -213,6 +213,8 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Models are row
 
 To render wide tables without horizontal scrolling, view in raw or in a markdown viewer that lifts the page-max-width (mkdocs `extra_css` with `.md-grid {max-width: none}`, or VS Code preview which auto-sizes).
 
+**†** = mmlu A5/B4 numbers are from a `--limit 0.1` single-process run (10% of each subtask = ~1.4k questions of 14k) — not the full mmlu. The 8-GPU full-mmlu run hit a `torch.distributed.gather_object` issue specific to mmlu's 57-subtask aggregation; full numbers will be re-run after training completes.
+
 ### Open-book NL
 
 | Model | sciq[0] | boolq[0] | piqa[0] | openbookqa_fact[0] |
@@ -230,8 +232,8 @@ To render wide tables without horizontal scrolling, view in raw or in a markdown
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | 1.4B base (x16) | 0.401 | 0.242 | 0.348 | 0.504 | 0.252 | 0.192 | 0.366 | 0.218 |
 | 1.4B code25 (x16) | 0.416 | 0.236 | 0.341 | 0.500 | 0.249 | 0.200 | 0.362 | 0.234 |
-| A5 1ep s14672 | 0.590 | 0.297 | 0.458 | 0.530 | pending | 0.212 | 0.408 | 0.235 |
-| B4 1ep s14672 | 0.564 | 0.282 | 0.427 | 0.508 | pending | 0.200 | 0.394 | 0.212 |
+| A5 1ep s14672 | 0.590 | 0.297 | 0.458 | 0.530 | 0.243 † | 0.212 | 0.408 | 0.235 |
+| B4 1ep s14672 | 0.564 | 0.282 | 0.427 | 0.508 | 0.252 † | 0.200 | 0.394 | 0.212 |
 | phi-1 | 0.378 | 0.232 | 0.301 | 0.498 | 0.248 | 0.175 | 0.364 | 0.214 |
 | phi-1.5 | **0.805** | **0.532** | **0.635** | **0.710** | **0.422** | **0.507** | **0.523** | **0.240** |
 
@@ -248,14 +250,16 @@ To render wide tables without horizontal scrolling, view in raw or in a markdown
 
 ### Perplexity (lower = better)
 
+`dclm_200m_val` is logged BY TRAINING (Levanter's in-training eval) for our runs only; phi-1/phi-1.5 are external models we never ran in-training eval against and the values would not be apples-to-apples (different tokenizers). Paloma `bits_per_byte` IS tokenizer-independent and comparable across all models.
+
 | Model | dclm_200m_val (nats, in-domain) | paloma_macro (bpb, OOD 16-subset mean) |
 |---|---:|---:|
-| 1.4B base (x16) | — | 1.631 |
-| 1.4B code25 (x16) | — | 1.483 |
-| A5 1ep s14672 | **2.996** | pending |
-| B4 1ep s14672 | 3.058 | pending |
-| phi-1 | — | 1.738 |
-| phi-1.5 | — | **1.174** |
+| 1.4B base (x16) | 4.070 (final step) | 1.631 |
+| 1.4B code25 (x16) | 3.733 (final step) | 1.483 |
+| A5 1ep s14672 | **2.996** | pending (post-train) |
+| B4 1ep s14672 | 3.058 | pending (post-train) |
+| phi-1 | n/a (different tokenizer) | 1.738 |
+| phi-1.5 | n/a (different tokenizer) | **1.174** |
 
 <details>
 <summary><b>Paloma per-subset bpb (16 subsets) — expand</b></summary>
