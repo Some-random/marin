@@ -246,7 +246,7 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 | mbpp[3] | 0.000 | 0.000 | 0.000 | 0.068 | **0.416** | 0.342 |
 | **Perplexity (lower=better)** | | | | | | |
 | dclm_200m_val (nats) | 4.070 | 4.596 | **2.996** | 3.058 | — ‡ | — ‡ |
-| paloma_macro (bpb) | 1.631 | 1.824 | pending | pending | 1.738 | **1.174** |
+| paloma_macro (bpb) | 1.631 | 1.824 | 1.122 ¶ | **1.097 ¶** | 1.738 | 1.174 |
 
 **†** = mmlu A5/B4 from `--limit 0.1` single-process run (~1.4k questions; SE ~1.2 pp). Sufficient for A vs B comparison; both within noise of random floor at this scale.
 
@@ -258,8 +258,12 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 
 **§§** = bbh / mmlu_pro hit the same multi-task gather issue for several models (succeeded for some by luck). Single-process re-runs were impractically slow (~1h/task, 12 tasks remaining). Will be retried multi-GPU on subtask-by-subtask basis when the final checkpoint sweep runs.
 
+**¶** = A5/B4 paloma_macro from Levanter in-training eval (see Table B in the per-subset details below), NOT from lm-eval-harness like the other columns (see Table A). Methodologies disagree by ~+0.05 nats on average and ~+0.55 nats on twitterAAE, so direct numerical comparison to other columns has that calibration noise. The cross-table interpretation in the per-subset section gives a rough Table-A-equivalent of 1.05–1.08 — both still lower than phi-1.5's 1.174.
+
 <details>
 <summary><b>Paloma per-subset bpb (16 subsets) — expand</b></summary>
+
+**Table A — lm-eval-harness paloma_* values** (base/code25v2/phi-1/phi-1.5 only; A5/B4 lm-eval paloma blocked on gated `EleutherAI/paloma` dataset).
 
 | Subset | base (x16) | code25 v2 (x16) | phi-1 | phi-1.5 |
 |---|---:|---:|---:|---:|
@@ -281,7 +285,31 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 | wikitext_103 | 1.336 | 1.512 | 1.620 | **0.970** |
 | **macro** | **1.631** | **1.824** | **1.738** | **1.174** |
 
-A5/B4 paloma per-subset will be added when training completes.
+**Table B — Levanter in-training-eval paloma_* values** (base/code25v2/A5/B4 only; phi-1/phi-1.5 are external HF checkpoints and were never put through Levanter's in-training eval pipeline).
+
+| Subset | base (x16) | code25 v2 (x16) | A5 1ep final | B4 1ep final |
+|---|---:|---:|---:|---:|
+| 4chan | 1.5622 | 1.7079 | 1.0612 | **1.0715** |
+| c4_100_domains | 1.3229 | 1.4912 | **0.8939** | 0.9095 |
+| c4_en | 1.3966 | 1.5635 | **0.9479** | 0.9603 |
+| dolma-v1_5 | 1.4595 | 1.6240 | 0.9458 | **0.9311** |
+| dolma_100_programing_languages | 1.7378 | 1.8932 | 0.8816 | **0.7087** |
+| dolma_100_subreddits | 1.4977 | 1.6712 | **1.0773** | 1.0841 |
+| falcon-refinedweb | 1.4855 | 1.6549 | **1.0059** | 1.0193 |
+| gab | 2.6040 | 2.8929 | 1.7705 | **1.7103** |
+| m2d2_s2orc_unsplit | 1.3835 | 1.5874 | **0.9175** | 0.9225 |
+| m2d2_wikipedia_unsplit | 1.3153 | 1.4756 | **0.8747** | 0.8931 |
+| manosphere_meta_sep | 1.5570 | 1.7404 | **1.1023** | 1.1122 |
+| mc4 | 1.5140 | 1.6976 | **0.9607** | 0.9673 |
+| ptb | 1.6080 | 1.8303 | **1.0140** | 1.0490 |
+| redpajama | 1.5471 | 1.7158 | 0.9461 | **0.9052** |
+| twitterAAE_HELM_fixed | 3.6221 | 4.0445 | 2.6658 | **2.4174** |
+| wikitext_103 | 1.3338 | 1.5076 | **0.8785** | 0.8852 |
+| **macro** | **1.6842** | **1.8465** | **1.1215** | **1.0967** |
+
+**Caveat on Table A vs B comparability.** The two pipelines compute bpb differently (document boundaries, eos handling, twitterAAE in particular differs ~0.5 nats). For base at step-12799, Table A says 1.631 while Table B says 1.684 — same model, same checkpoint, different methodology, ~+0.05 nat offset. Per-subset offsets vary (twitterAAE is the worst: +0.55 nats). So **don't compare a Table A value to a Table B value at face**; only compare WITHIN a table.
+
+**Cross-table reading (rough only):** A5/B4 final macro values (Table B) of 1.12 / 1.10 are ~0.55 nats LOWER than base Table B (1.68), and ~0.55 lower than code25v2 (1.85). Translating the ~0.55-nat gap into Table A-equivalent terms (base Table A = 1.63), A5/B4 final macros would be ~1.05–1.08 — i.e., still significantly LOWER than phi-1.5's lm-eval value of 1.174. This translation is rough and only works for macro, not per-subset.
 
 </details>
 
