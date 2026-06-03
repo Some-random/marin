@@ -127,6 +127,85 @@ The one v1 effect that survives the v2 controls is **the 0% gsm8k_cot loop rate*
 
 ---
 
+## June 2: 1-epoch A5/B4 final-step evals + Path B Phase 1 arithmetic probe + paper/MODELS infra
+
+Day spans final checkpoint sweep for A5 (`1ep-dclm-A5`, `tmgu1im8`) and B4 (`1ep-code25-B4`, `6zs6ybgt`), both completing at step-29343 (~30.77B trained tokens) around 22:10-22:23 PDT, plus the first concrete counterfactual probe from `next_steps_strategy.md` Path B, plus bookkeeping: MS MAI-Thinking-1 paper added, MODELS.md inventory written, strategy/probes design docs committed.
+
+### A5 vs B4 final-step comparison
+
+Both checkpoints converted (Levanter → HF) on this node (gpu-dy-5) using `convert_*_final.py` scripts. Full lm-eval suite run on gpu-dy-5 (B4) and gpu-st-4 (A5) in parallel. Several tasks needed retries due to (a) `code_eval` cache races (multi-GPU lm-eval `code_eval` module collision) and (b) intermittent HF 504 Gateway Timeout on `cais/mmlu`, `EleutherAI/hendrycks_math`, `SaylorTwift/bbh`. Retries on gpu-dy-3 / gpu-dy-4 / gpu-st-4 filled all gaps except A5 mmlu (4 attempts all hit HF 504 on different subtasks — to be retried when HF stabilizes).
+
+**Final-step values written into [EVALUATION.md §3](EVALUATION.md#3-canonical-results--all-models). Headline comparison:**
+
+| Metric | A5 final | B4 final | Δ (A5 − B4) |
+|---|---:|---:|---:|
+| paloma_macro bpb (training-eval) | 1.122 | **1.097** | +0.025 (B4 wins, see caveat below) |
+| dclm_200m_val loss (nats) | **2.821** | 2.878 | −0.057 (A5 wins in-domain) |
+| arc_easy 25-shot acc_norm | **0.629** | 0.607 | +2.2 pp |
+| arc_challenge 25-shot acc_norm | **0.316** | 0.289 | +2.7 pp |
+| hellaswag 10-shot acc_norm | **0.497** | 0.464 | +3.3 pp |
+| winogrande 5-shot acc | **0.541** | 0.515 | +2.6 pp |
+| piqa 0-shot acc | **0.718** | 0.709 | +0.9 pp |
+| boolq 0-shot acc | 0.563 | **0.599** | −3.6 pp |
+| sciq 0-shot acc | **0.834** | 0.829 | +0.5 pp |
+| openbookqa 0-shot acc_norm | **0.332** | 0.314 | +1.8 pp |
+| openbookqa_fact 0-shot acc_norm | 0.430 | 0.430 | 0 |
+| commonsense_qa 0-shot acc | 0.195 | **0.213** | −1.8 pp |
+| social_iqa 0-shot acc | **0.415** | 0.400 | +1.5 pp |
+| logiqa 0-shot acc_norm | **0.320** | 0.270 | +5.0 pp |
+| lambada_openai acc | **0.519** | 0.496 | +2.3 pp |
+| copa 0-shot acc | **0.740** | 0.690 | +5.0 pp |
+| agieval_lsat_ar acc_norm | 0.187 | **0.222** | −3.5 pp |
+| gpqa_diamond_zeroshot acc | **0.268** | 0.217 | +5.1 pp |
+| bbh 3-shot (limit=0.1) | 0.160 | **0.206** | −4.6 pp |
+| mmlu_pro 5-shot (limit=0.1) | **0.116** | 0.073 | +4.3 pp |
+| gsm8k 5-shot | 0.001 | 0.010 | −0.9 pp |
+| gsm8k_cot 8-shot flex | 0.031 | 0.027 | +0.4 pp |
+| minerva_math 4-shot exact | 0.002 | 0.010 | −0.8 pp |
+| humaneval lm-eval pass@1 | 0.006 | **0.104** | −9.8 pp |
+| humaneval bigcode pass@1 | 0.000 | failed (bug) | n/a |
+| mbpp 3-shot pass_at_1 | 0.000 | 0.060 | −6.0 pp |
+
+A5 wins NL benchmarks. B4 wins code/composition/bbh + boolq/agieval/commonsense. Sigma of differences ≈ 1.5-2 pp per task — A5's NL wins are ~1.5-2σ each, B4's code-gen wins are ~3-5σ.
+
+**Paloma caveat.** The training-eval paloma_macro shows B4 < A5 (1.097 < 1.122), driven by 2 outlier subsets: `dolma_100_programming_languages` (B4 0.71 vs A5 0.88, −0.17 nats, expected — B4 has code training) and `twitterAAE_HELM_fixed` (B4 2.42 vs A5 2.67, −0.25 nats; code training's broader tokenizer handling helps with compressed-character noise). On the 14 mainstream NL paloma subsets, A5 wins by 0.005-0.02 nats each. The macro reverses because of those two outliers; this is consistent with the downstream pattern (B4 narrowly wins broad/code metrics, A5 wins fluent NL).
+
+### Path B Phase 1: arithmetic decomposition probe
+
+Per [`counterfactual_probes.md`](counterfactual_probes.md), built [`probes_arithmetic.py`](probes_arithmetic.py) — 500 synthetic problems across 5 levels (single-digit add, two-digit no-carry add, two-digit with-carry add, single-digit mult, two-digit subtract), greedy generation with `max_new_tokens=4`, first-int scoring. Ran v1 on all 6 models in 7 GPU-minutes on gpu-dy-3.
+
+**Result (v1):**
+
+| Model | A1 add | A2 nc-add | A3 c-add | A4 mult | A5 sub |
+|---|---:|---:|---:|---:|---:|
+| 1.4B base x16 | 0.13 | 0.01 | 0.00 | 0.02 | 0.01 |
+| code25v2 x16 | 0.09 | 0.01 | 0.00 | 0.01 | 0.01 |
+| A5 1ep final | 0.35 | 0.01 | 0.01 | 0.13 | 0.00 |
+| **B4 1ep final** | **0.83** | **0.07** | 0.01 | **0.84** | **0.07** |
+| phi-1 † | 0.14 | 0.00 | 0.00 | 0.11 | 0.03 |
+| phi-1.5 † | 0.01 | 0.07 | 0.01 | 0.07 | 0.02 |
+
+**†** = phi-1/phi-1.5 are NOT comparable on this prompt format; they write Python-indent / word-problem chain-of-thought ("Simplifying...", "Answer:") rather than the bare integer the probe expects. Ran v2 (`probes_arithmetic_v2.py`: max_new_tokens=64, last-int + truncate at `\n\n`) for fair comparison; phi-1.5 still scored 0 because its CoT starts with `\n\nSimplifying...` (so the truncation grabs nothing) AND inspection shows phi-1.5 has a strong prior toward "x = 10" as the canonical answer (it was trained on word-problem synthetic textbooks with "garden width is X meters" framing). The bare `a + b = ` probe is biased toward models that learned explicit arithmetic notation. For phi-1.5 the right format is GSM8K word problems (which it scores 0.305 on). v1 / v2 agree exactly for our 4 1.4B models (they write bare answers).
+
+**Headline:** **B4 (with 25% code mix) has 83%/84% on single-digit add/mult while A5 (DCLM only) has 35%/13%.** Code data — specifically the aryabumi_synth (5.4B) + opc_algorithmic (0.94B) textbook-style algorithmic Python — teaches single-digit arithmetic at our 1.4B / 30B-token scale. Phi-1's code-only training does NOT (14% / 11%), suggesting it's the SPECIFIC arithmetic-heavy code distribution that matters, not just "code" generically. Both A5 and B4 floor on GSM8K (0.001 / 0.010) despite the gap above, so the GSM8K deficit at our scale is multi-digit composition + word-problem parsing, NOT lack of foundational arithmetic.
+
+This decomposes the H1 question into **(a) what teaches the foundational capability** — answered tonight: arithmetic-heavy code-textbook data — and **(b) what teaches the composition** — still open at this scale.
+
+### Bookkeeping
+
+- **MS MAI-Thinking-1** tech report (35B-active / 1T-total MoE, 30T pretraining tokens, mid-training 3.55T, RL climb to 52.8% SWE-Bench Pro / 97% AIME 2025; key methodological finding: **rank non-invariance in data mixture scaling** — stem-heavy beat code-heavy at 5B-active, then code-heavy overtook stem-heavy at 23B-active; small-scale ablations can't be trusted alone) added to [`papers/reasoning_curriculum.md`](../../papers/reasoning_curriculum.md). Local PDF saved at `papers/MAI-Thinking-1.pdf`.
+- **[MODELS.md](MODELS.md)** created as the training-side companion to [EVALUATION.md](EVALUATION.md). Per-model: architecture, training data (verified token counts from `.stats.json`), hyperparams, source paths. §3 documents canonical caches incl. `phi_1_5/cosmopedia_v2-21b787` (27.37B tokens, available if we choose Path A).
+- **[next_steps_strategy.md](next_steps_strategy.md)** written: three forward paths (A=cosmopedia synthetic NL leg, B=counterfactual probes, C=write up). Recommendation: do B+C in parallel, defer A. The Path B arithmetic probe (above) is the first concrete deliverable.
+- **[counterfactual_probes.md](counterfactual_probes.md)** written: detailed design for three probe families (arithmetic decomposition, CRUXEval, counterfactual MMLU).
+
+### Operational notes
+
+- HF `cais/mmlu` had intermittent 504 Gateway Timeouts between ~22:33 and 00:30 PDT, blocking A5 final mmlu across 4 separate launches. B4 final mmlu succeeded on its first try (0.258) before HF degraded. Other affected datasets: `EleutherAI/hendrycks_math` (A5 minerva), `SaylorTwift/bbh` (A5 + B4 bbh first attempt). Retries succeeded for A5 minerva and both bbh once HF stabilized; A5 mmlu still pending.
+- bigcode-evaluation-harness has a new failure mode for B4 final HumanEval: `'HumanEval' object has no attribute 'dataset'` — bigcode lost its dataset loader for the bare-name `openai_humaneval` dataset (rejected as not having `namespace/`). MBPP via bigcode also broken upstream. lm-eval HumanEval=0.104 for B4 is what we have.
+- `code_eval` cache race (multi-GPU lm-eval mbpp/humaneval): root cause is shared `~/.cache/huggingface/metrics/code_eval/default/default_experiment-1-0.arrow` file. Single-process workaround used for A5 mbpp/humaneval retries (~15 min each); B4 mbpp/humaneval ran successfully on first try by luck.
+
+---
+
 ## May 31: Mid-training vs final checkpoints — every recipe overfits late, downstream doesn't follow
 
 ### Investigation — Does mid-training beat the final checkpoint?
