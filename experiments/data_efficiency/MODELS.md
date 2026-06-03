@@ -208,6 +208,8 @@ For datasets that appear above, what's actually in the cache directory.
 - **Chronological run log:** [EXPERIMENT_LOG.md](EXPERIMENT_LOG.md)
 - **Monitoring runbook:** [monitor.md](monitor.md)
 - **Strategy / next steps:** [next_steps_strategy.md](next_steps_strategy.md)
+- **Counterfactual probes design:** [counterfactual_probes.md](counterfactual_probes.md)
+- **Arithmetic probe script (Path B Phase 1):** [probes_arithmetic.py](probes_arithmetic.py)
 - **Paper notes:** [../../papers/reasoning_curriculum.md](../../papers/reasoning_curriculum.md)
 
 ## 5. Updating this doc
