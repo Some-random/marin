@@ -61,6 +61,16 @@
 
 **Conclusion:** OLMo 3 Base 32B is the best fully-open base model, outperforming Marin 32B and Apertus 70B with double-digit improvements on math and code. OLMo 3.1 Think 32B is the strongest fully-open thinking model, competitive with Qwen 3 32B (trained on 6x fewer tokens). OLMo 3 Instruct 7B/32B surpass Qwen 2.5, Gemma 3, IBM Granite 3.3, and Llama 3 at comparable scales. Flagship scores: 96.2% MATH, 80.6% AIME 2024, 83.3% LiveCodeBench v3, 86.4% MMLU, 57.5% GPQA.
 
+---
+
+### [MAI-Thinking-1: Building a Hill-Climbing Machine](https://microsoft.ai/wp-content/uploads/2026/06/main_20260602_2.pdf) (The Microsoft AI Team, 2026)
+
+**Motivation:** Frame model development as a system-level optimization problem — a "hill-climbing machine" that integrates data pipelines, training infra, RL environments, eval suites, and safety into one empirical loop. Build from scratch on licensed human-generated data, with no distillation from third-party models, no LM-generated synthetic data in pretraining, and explicit removal of AI-generated content from sources. First product of the process is MAI-Thinking-1, a frontier STEM/agentic-coding reasoning model.
+
+**Experiment Setup:** 35B-active / 1T-total sparse MoE (78 layers, hidden 6656, FFN 13312, 8 of 512 experts per token via LatentMoE compressed-latent routing, periodic local/global attention with 5:1 ratio + sliding window 512, RoPE on local layers, NoPE on global, GQA with 8 KV heads / 80 Q heads / 128 per-head dim, dropless MoE, o200k_base 200,019-vocab tokenizer). Pretrained on 8K GB200 GPUs on Azure. Pretrain corpus: 30T tokens over 29.2T unique tokens (avg 1.03 epochs). Final mix (Tab. 5): Code 54.6% (16.4T train / 7.4T unique, 2.22× epochs), STEM 15.8%, Web text 14.9% (0.55× epochs — undersampled), Math 5.4% (1.6T / 0.3T, 5.28× epochs — heavily upsampled), PDFs 4.7%, Books 3.1%, Multilingual 1.6%. Hard cap of 8 epochs on any source. Mid-training (3.55T tokens, two stages): re-weight pretraining corpus toward STEM/math 35%, code 55%, background 10%; add long-context extension to 256K. RL climb on three specialist domains (STEM reasoning, agentic coding/tool use, helpfulness+safety) consolidated into one model via self-distillation. Architecture decisions validated on a scaling ladder L12 (3.9B total) → L78 (1T total) using "efficiency gain" (EG) ratio against fitted Chinchilla scaling laws.
+
+**Conclusion:** 52.8% SWE-Bench Pro, 97.0% AIME 2025, 94.5% AIME 2026, 87.7% LiveCodeBench v6 — competitive with Claude Sonnet 4.6 on a broad benchmark sweep. Methodologically important finding (Fig. 6): **rank non-invariance in data-mixture scaling** — a stem-heavy mix beat code-heavy on held-out STEM NLL at 5B-active, but code-heavy overtook stem-heavy at 23B-active, contradicting the small-scale-ablation assumption underlying RegMix-style methods. Two STEM sources with high quality but heavy fuzzy duplication helped small models and hurt large ones, suggesting diversity becomes the binding constraint as scale grows. Practical takeaway: small-scale data ablations cannot be trusted as the sole signal; scaling-ladder validation across multiple model sizes is required.
+
 </details>
 
 
