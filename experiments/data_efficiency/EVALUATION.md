@@ -234,7 +234,8 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 | gsm8k_cot[8] | 0.022 | 0.005 | 0.014 | 0.014 | 0.021 | **0.299** |
 | minerva_math[4] | 0.0002 | 0.000 | 0.001 | 0.006 | 0.012 | **0.029** |
 | **Code** | | | | | | |
-| humaneval[0] | 0.000 | 0.012 | 0.006 | 0.043 | **0.494** | 0.342 |
+| humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.006 | 0.043 | 0.494 | 0.342 |
+| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.000 | 0.000 | **0.543** | 0.342 |
 | mbpp[3] | 0.000 | 0.000 | 0.000 | 0.068 | **0.416** | 0.342 |
 | **Perplexity (lower=better)** | | | | | | |
 | dclm_200m_val (nats) | 4.070 | 4.596 | **2.996** | 3.058 | — ‡ | — ‡ |
@@ -243,6 +244,8 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 **†** = mmlu A5/B4 from `--limit 0.1` single-process run (~1.4k questions; SE ~1.2 pp). Sufficient for A vs B comparison; both within noise of random floor at this scale.
 
 **‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
+
+**‡‡** = bigcode-evaluation-harness (the canonical code-gen runner used by the phi paper). Confirms phi-1 ≈ 54% (paper 50.6%); our 4 small models score 0 (lm-eval-harness gave partial credit that bigcode correctly rejects — see updated caveat below). MBPP via bigcode is broken upstream (`'MBPP' object has no attribute 'dataset'`), so MBPP numbers stay on lm-eval.
 
 <details>
 <summary><b>Paloma per-subset bpb (16 subsets) — expand</b></summary>
@@ -287,11 +290,15 @@ This is the **controlled** comparison (same total trained tokens, same unique to
 
 **1-epoch experiment at step-14672 (~50% trained, A5 vs B4):** **A5 (DCLM-only) wins 10 NL benchmarks by 1-3pp each, B4 (code-mix) wins 2 code benchmarks decisively (humaneval +3.7 pp, mbpp +6.8 pp), 3 tied at floor**. In-domain val: A5 wins by 0.06 nats. Same pattern as code25 v2 above: code-mix trades NL ability for code-gen ability under matched compute, even at 1-epoch (no repetition). Full-checkpoint paloma + final downstream pending training completion. See `1ep_experiment_plan.md` for methodology.
 
-**Caveat on code-gen numbers.** Our `humaneval` / `mbpp` use `lm-eval-harness`'s scoring path with `--confirm_run_unsafe_code` + `HF_ALLOW_CODE_EVAL=1`. Sanity-check vs phi-1 paper:
-- HumanEval: ours 49.4% vs paper 50.6% — within 1.2 pp, **essentially matching**
-- MBPP: ours 41.6% vs paper 55.5% — **−13.9 pp gap**, meaningful
+**Caveat on code-gen numbers.** We now run HumanEval via both `lm-eval-harness` and `bigcode-evaluation-harness`. Comparison:
 
-The HumanEval gap is small; the MBPP gap is real. The methodology difference (3-shot prompt format, code extraction patterns, timeout, sandboxing) is significant for MBPP specifically. The relative comparison between **our** models on the same lm-eval-harness pipeline is still internally consistent. If you want absolute numbers comparable to published code-gen results, install `bigcode-evaluation-harness` and run that — it's the standard for code tasks.
+| Model | HE (lm-eval) | HE (bigcode) | HE (paper) |
+|---|---:|---:|---:|
+| phi-1 | 0.494 | **0.543** | 0.506 |
+| phi-1.5 | 0.342 | 0.342 | 0.414 |
+| our 4 × 1.4B | 0.000–0.043 | **0.000** | n/a |
+
+bigcode matches phi-1 paper closely (54.3% vs 50.6%); lm-eval undercounts slightly. For our small 1.4B models, lm-eval's loose extraction gives them spurious 0-4% credit on partial generations that bigcode (which actually runs the test suite) correctly rejects as failures. **Bottom line: at 1.4B / our compute, our models really score zero on HumanEval — they can't generate executable Python.** MBPP via bigcode is broken (upstream bug); MBPP numbers stay on lm-eval-harness with its known ~14 pp gap to published numbers — internally consistent but not absolute-comparable.
 
 ---
 
