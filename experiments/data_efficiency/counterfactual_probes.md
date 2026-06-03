@@ -169,10 +169,9 @@ The motivation: our 4 small-scale models score at floor on math (GSM8K 0.0-0.014
 For each capability our models score near zero on:
 
 1. **Q1 — Does the model have the underlying capability circuit at all?** E.g., for GSM8K = 0: does the model know `1 + 1 = 2`?
-2. **Q2 — Does the model fail at composition / multi-step?** E.g., can it do `7 × 3`, but not `7 × 13`?
-3. **Q3 — Are existing scores driven by surface-pattern memorization rather than the named capability?** E.g., does the same MMLU question score differently if we rename "France" to "Atlantis"?
+2. **Q2 — Are existing scores driven by surface-pattern memorization rather than the named capability?** E.g., does the same MMLU question score differently if we rename "France" to "Atlantis"?
 
-Q1 and Q2 mostly target our 4 small models (where the bottleneck is "scale + data"). Q3 targets phi-1.5 specifically (where the bottleneck might be "synthetic data overfits to the surface distribution of its source").
+Q1 targets our 4 small models. Q2 targets phi-1.5 specifically (where the bottleneck might be "synthetic data overfits to the surface distribution of its source").
 
 ---
 
@@ -180,17 +179,17 @@ Q1 and Q2 mostly target our 4 small models (where the bottleneck is "scale + dat
 
 **This is the probe that ran 2026-06-02, before the redesign above. It is a *skill-decomposition* probe, not a counterfactual probe.** Kept here for reference and because its result (B4 has single-digit arithmetic, A5 doesn't) is real, just measured under a single fixed surface format which biases against phi-1.5. Replaced by CF-1 going forward.
 
-**Targets Q1 + Q2 on the math axis.**
+**Targets Q1 on the math axis.**
 
 **Construction:** synthetically generate prompts at five difficulty levels. No external dataset; all generated in code with a fixed `numpy.random` seed so the probe is fully reproducible.
 
-| Level | Format | Range | Count | Purpose |
-|---|---|---|---|---|
-| A1 | `a + b = ` | a, b ∈ [0, 9] | 100 | Most basic arithmetic |
-| A2 | `a + b = ` | a, b ∈ [10, 99], no carry | 100 | Two-digit, no decomposition needed |
-| A3 | `a + b = ` | a, b ∈ [10, 99], with carry | 100 | Two-digit with decomposition |
-| A4 | `a × b = ` | a ∈ [2, 9], b ∈ [2, 9] | 100 | Single-digit multiplication |
-| A5 | `a - b = ` | a, b ∈ [0, 99], a ≥ b | 100 | Subtraction |
+| Level | Format | Range | Count |
+|---|---|---|---|
+| A1 | `a + b = ` | a, b ∈ [0, 9] | 100 |
+| A2 | `a + b = ` | a, b ∈ [10, 99], no carry between columns | 100 |
+| A3 | `a + b = ` | a, b ∈ [10, 99], carry between columns | 100 |
+| A4 | `a × b = ` | a ∈ [2, 9], b ∈ [2, 9] | 100 |
+| A5 | `a - b = ` | a, b ∈ [0, 99], a ≥ b | 100 |
 
 **Scoring:**
 - Greedy generate up to `max_new_tokens=4`. Strip whitespace.
