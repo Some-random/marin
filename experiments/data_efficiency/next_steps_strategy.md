@@ -49,6 +49,9 @@ Written 2026-06-03 as a strategic-thinking doc for review when you wake up. Capt
 
 ### Path B — Counterfactual probes on existing checkpoints
 
+> **Update 2026-06-02 23:00 PDT:** Phase 1 (arithmetic decomposition probe) ran tonight on all 6 models. Result is informative — see [EVALUATION.md §4](EVALUATION.md#4-counterfactual-probes--arithmetic-decomposition-phase-1). Headline: **B4 (25% code mix) has 83%/84% single-digit add/mult, A5 (DCLM only) has 35%/13%**. Code teaches arithmetic at our scale even though benchmark scores stay at floor. phi-1 and phi-1.5 need Phase 2 prompt reformatting to compare fairly. Moving forward with Phase 1 → Phase 2 (CRUXEval + counterfactual MMLU) is now strongly motivated by this result.
+
+
 **What:** Build a set of cheap evaluations that decompose "model can do X" from "model knows the surface pattern of X", on the 6 checkpoints we already have. No new training. Three probe families:
 1. **Arithmetic decomposition** — single-digit / two-digit / multi-digit arithmetic, generated synthetically. Discriminates "lacks arithmetic" from "has arithmetic, can't parse word problem".
 2. **CRUXEval-style code execution** — given a Python function, predict its output. Discriminates "writes Python syntax" from "understands Python semantics". Particularly informative for phi-1 vs B4.

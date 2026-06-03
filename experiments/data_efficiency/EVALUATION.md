@@ -313,6 +313,47 @@ bigcode matches phi-1 paper closely (54.3% vs 50.6%); lm-eval undercounts slight
 
 ---
 
+## 4. Counterfactual probes — arithmetic decomposition (Phase 1)
+
+Probe design lives in [`counterfactual_probes.md`](counterfactual_probes.md); implementation in [`probes_arithmetic.py`](probes_arithmetic.py). 500 problems across 5 levels (100 per level), 0-shot greedy generation with `max_new_tokens=4`, scored by parsing the first integer in the generation.
+
+| Level | Format | Random-guess baseline | Description |
+|---|---|---:|---|
+| A1 | `a + b = ` | ~5% | single-digit addition (a, b ∈ [0, 9]) |
+| A2 | `a + b = ` | ~1% | two-digit addition, no carry (a + b ≤ 99) |
+| A3 | `a + b = ` | ~1% | two-digit addition with carry |
+| A4 | `a * b = ` | ~3% | single-digit multiplication (a, b ∈ [2, 9]) |
+| A5 | `a - b = ` | ~1% | two-digit subtraction |
+
+### Results
+
+| Model | A1 | A2 | A3 | A4 | A5 |
+|---|---:|---:|---:|---:|---:|
+| **1.4B base (x16)** | 0.13 | 0.01 | 0.00 | 0.02 | 0.01 |
+| **1.4B code25 v2 (x16)** | 0.09 | 0.01 | 0.00 | 0.01 | 0.01 |
+| **A5 1ep final (DCLM-only)** | 0.35 | 0.01 | 0.01 | 0.13 | 0.00 |
+| **B4 1ep final (DCLM 75% + code 25%)** | **0.83** | **0.07** | 0.01 | **0.84** | **0.07** |
+| phi-1 † | 0.14 | 0.00 | 0.00 | 0.11 | 0.03 |
+| phi-1.5 † | 0.01 | 0.07 | 0.01 | 0.07 | 0.02 |
+
+**†** = NOT directly comparable on this probe. phi-1 and phi-1.5 receive the prompt as Python-indent / textbook-introduction context and start writing a chain-of-thought response ("Simplifying...", "Answer:") rather than the bare integer. `max_new_tokens=4` cuts before any answer is produced. Phase 2 needs reformatted prompts (or a longer generation budget + answer-regex extraction) to compare phi-models fairly. For now, **only the 4 1.4B columns are comparable.**
+
+### Headlines
+
+**B4 (1-epoch, 25% code mix) has MASSIVELY more arithmetic than A5 (1-epoch, DCLM-only).** Single-digit addition jumps from A5's 35% to B4's 83%; single-digit multiplication from 13% to 84%. Two-digit no-carry addition jumps from 1% to 7% — small but 7× the random baseline. **Code data teaches arithmetic at our scale.**
+
+**Both A5 and B4 floor on GSM8K (0.000 / 0.014) despite the gap above.** The probe decomposes the GSM8K floor: A5 lacks single-digit arithmetic, B4 has single-digit but lacks two-digit composition AND word-problem parsing. They share the GSM8K-relevant deficit (multi-digit + word problems) even though they differ on basic capability.
+
+**The 1-epoch DCLM model (A5) does pick up SOME single-digit addition.** 35% vs the heavily-overfit baseline's 13% (and code25 v2's 9%, which is at floor). 30B tokens of pure web text gives the model weak single-digit addition; 7.5B tokens of mixed-in code (aryabumi synth + opc algorithmic) gives it strong single-digit add+mult.
+
+**Phi-1's code training does NOT teach arithmetic the way B4's does.** Phi-1's 14% A1 / 11% A4 is closer to our 1.4B baseline than to B4. Phi-1 was trained on filtered Stack code + GPT-3.5 Python textbooks — the Python is mostly syntactically arithmetic-free (operators yes, "= integer" rarely). aryabumi_synth + opc_algorithmic are textbook/algorithmic-Python style where explicit arithmetic IS prevalent. **The specific code distribution matters, not just "code".** (Caveat: phi-1's prompt-format mismatch may inflate this gap; need Phase 2 reformat to confirm.)
+
+### What this clarifies about H1
+
+The matched-token study said "code mix HURTS NL by 0.2 nats paloma" → the question was *why* the mix didn't help any downstream metric. The probe answers: **code DOES teach a foundational capability** (single-digit arithmetic, jumps 35% → 83%), but this capability **isn't enough to surface on GSM8K** at 1.4B / 30B tokens — multi-digit composition and word-problem parsing remain at floor regardless of data. So the H1 question splits into "what teaches the foundational capability" (code-textbook-style data teaches arithmetic) and "what teaches the composition" (still unanswered at our scale).
+
+---
+
 ## Updating this doc
 
 When a new model is trained or a new eval is added, update §1 (models) and §3 (results) with the new row/column. Add a brief follow-up entry in `EXPERIMENT_LOG.md` pointing here. Chronological narrative stays in `EXPERIMENT_LOG.md`; canonical reference stays here.
