@@ -364,7 +364,15 @@ Probe design lives in [`counterfactual_probes.md`](counterfactual_probes.md); im
 | phi-1 † | 0.14 | 0.00 | 0.00 | 0.11 | 0.03 |
 | phi-1.5 † | 0.01 | 0.07 | 0.01 | 0.07 | 0.02 |
 
-**†** = NOT directly comparable on this probe. phi-1 and phi-1.5 receive the prompt as Python-indent / textbook-introduction context and start writing a chain-of-thought response ("Simplifying...", "Answer:") rather than the bare integer. `max_new_tokens=4` cuts before any answer is produced. Phase 2 needs reformatted prompts (or a longer generation budget + answer-regex extraction) to compare phi-models fairly. For now, **only the 4 1.4B columns are comparable.**
+**†** = NOT directly comparable on this probe format. phi-1 and phi-1.5 receive the bare `a + b = ` prompt as Python-indent (phi-1) or word-problem (phi-1.5) context and start writing a chain-of-thought response ("Simplifying the equation...", "Answer:") rather than the bare integer. `max_new_tokens=4` cuts before any answer is produced. Re-ran with v2 (`probes_arithmetic_v2.py`: max_new_tokens=64, last-int, truncate at first `\n\n`) and phi-1.5 still scored 0 across the board because:
+1. Phi-1.5's generations begin with `\n\nSimplifying...`, so the first-`\n\n` truncation grabs everything BEFORE the model writes anything — empty string, no integer.
+2. Even with a more lenient parse, inspection of phi-1.5 outputs shows it generates word-problem-shaped responses (`"the width of the garden is 10 meters..."`) where the answer appears but is preceded by domain words ("garden"). Phi-1.5 was trained on synthetic word problems, not bare `1 + 2 = ` notation, so the format mismatch dominates the result.
+
+Concretely: for `0 + 5 = ` phi-1.5 writes `\n\nSimplifying the equation, we get:\n\nx = 10\n\nTherefore...` — predicts 10 regardless of the input numbers. The model has a strong prior toward "x = 10" because that's the canonical "garden width" answer in its training distribution.
+
+**This is itself a finding about phi-1.5:** the synthetic-NL-textbook training teaches a very specific surface format (word problems with garden/area framing) and the model's arithmetic capability is only accessible through that format. The bare `a + b = ` probe is biased toward models that learned explicit arithmetic notation — which our 4 1.4B columns are directly testing.
+
+**Only the 4 1.4B columns are directly comparable. Phi-1/phi-1.5 results reflect format mismatch, not arithmetic capability.** For phi-1.5 specifically, GSM8K-style word-problem evaluation is the right format (that's what `gsm8k=0.305` measures).
 
 ### Headlines
 
