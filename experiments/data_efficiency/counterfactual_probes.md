@@ -6,11 +6,98 @@ Companion to [`next_steps_strategy.md`](next_steps_strategy.md). Detailed design
 
 ---
 
-## Counterfactual probes (CF-1..CF-3) — the actual designs
+## Counterfactual probes — replicating Wu et al + GSM-Symbolic, NOT inventing variants
 
-**Design pattern (Wu et al + GSM-Symbolic):** keep task structure identical, swap only surface tokens (entities, numbers, formats). Measure delta accuracy(original) − accuracy(perturbed). A model with genuine capability shows small delta. A model leaning on surface memorization shows large delta.
+> **2026-06-03 revision (PM):** The CF-1..CF-3 originally listed below were *hand-picked variants on hunch* (4 self-chosen formats, MMLU rewrites for subjects I picked). That violates the rule of following published methodology exactly when the user has named a paper. Replaced here with strict replications of:
+> - **Wu, Geiger, Goodman, Manning (2024), "Reasoning or Reciting?"** — counterfactual world-model perturbations (e.g., arithmetic in base-9 instead of base-10).
+> - **Mirzadeh et al (2024, Apple), "GSM-Symbolic"** — symbolic GSM8K templates with name/number perturbations.
 
-### CF-1 — Format-invariant arithmetic (for our 4 1.4B models)
+### Honest scope: who can we actually run these on?
+
+| Model | GSM8K | Smallest GSM-Symbolic-tested = Phi-3.5-mini (3.8B). Smallest Wu et al-tested = closed-source instruction-tuned. | Replicable on this model? |
+|---|---:|---|---|
+| 1.4B base / code25v2 / A5 / B4 | 0.000–0.014 | Below validated range; floor on default → counterfactual drop is 0 → 0, no signal | **Out of scope.** Run anyway only with explicit "below paper's validated range" caveat. |
+| phi-1 | 0.012 | Floor on default; bigcode HumanEval 0.543 | Replicable on Wu's code task; not on math. |
+| phi-1.5 | 0.305 | Below paper's 3.8B floor but enough signal | Replicable on GSM-Symbolic with size-out-of-scope caveat. |
+
+**Implication for our matched-token H1 (what data teaches reasoning at our scale):** the published counterfactual methodologies do not work directly on our 4 1.4B base models — they floor on the default tasks the papers test. We have two honest options:
+- (a) Stop calling our 4-model comparison "counterfactual" and use the v1 skill-decomposition probe (renamed accordingly) for them.
+- (b) Run published probes on phi-1 + phi-1.5 only and report those as standalone results, separate from the matched-token A5-vs-B4 story.
+
+This doc favours (a)+(b) in combination: skill-decomposition for our 4 (already done as Family A below), and CF-A / CF-B / CF-C below for phi models against the published methodologies.
+
+### CF-A — Replicate GSM-Symbolic on phi-1.5 (and phi-1 as comparison)
+
+**Dataset:** [`apple/GSM-Symbolic`](https://huggingface.co/datasets/apple/GSM-Symbolic) — Apple's released benchmark, downloadable from HF. Three splits: `main`, `p1` (one extra step), `p2` (two extra steps). 5000 examples per split = 100 templates × 50 instances.
+
+**Setup (per Mirzadeh et al §3.2):**
+- 8-shot CoT prompting (their preliminary experiments showed shot count not significant; we use 8 for direct comparability with the paper's tables)
+- Greedy decoding
+- Exact-match scoring against the question's gold answer
+- Report the accuracy *distribution* across the 50 datasets of 100 examples each (per Mirzadeh Fig 2), not just a single mean
+
+**Models:** phi-1.5 (in-scope-adjacent, has signal on GSM8K = 0.305) + phi-1 (out-of-scope, floor). Skip our 4 × 1.4B models.
+
+**Comparison numbers:**
+- phi-1.5 GSM8K (already have): 0.305
+- phi-1.5 GSM-Symbolic main: TBD
+- phi-1.5 GSM-Symbolic p1: TBD
+- phi-1.5 GSM-Symbolic p2: TBD
+
+The paper's Figure 2 shows GSM8K accuracy on the right tail of the GSM-Symbolic distribution for 21 of 25 tested models, with drops ranging 0.3–9.2 pp. If phi-1.5 shows a similar pattern, that's a clean reproduction of the published finding extended to a smaller model.
+
+**Implementation cost:** ~1 day. Dataset already on HF, just need a wrapper that uses our lm-eval pipeline. (Custom task YAML for `apple/GSM-Symbolic` + run.)
+
+### CF-B — Replicate Wu et al arithmetic counterfactual (§3.1)
+
+**Setup (per Wu et al §3.1):**
+- Default: two-digit base-10 addition (same as Brown et al 2020)
+- Counterfactual bases: 8, 9, 11, 16 (chosen because 8 and 16 are programmer-familiar, 9 and 11 are uncommon)
+- 0-shot and 0-shot-CoT prompts (paper reports both)
+- **CCC (Counterfactual Comprehension Check)** required: ask model the successor relation under each base. If a model fails the CCC, it doesn't understand the base specification and the counterfactual score is uninformative.
+
+**Models:** Wu et al §4 footnote 6 explicitly excluded open-source models due to "unsatisfactory instruction-following ability". Our 1.4B base models will almost certainly fail the CCC. Phi-1.5 has the strongest chance; report it with caveat. Our 4 1.4B base models we report CCC-fail-rate only, not the counterfactual score.
+
+**Code reference:** `https://github.com/ZhaofengWu/counterfactual-evaluation` (paper's released code + data).
+
+**Implementation cost:** ~2 days (clone repo, adapt to our lm-eval pipeline, CCC then conditional probe).
+
+### CF-C — Replicate Wu et al programming counterfactual (§3.2)
+
+**Setup (per Wu et al §3.2):**
+- Default: Python (0-based indexing) on HumanEval
+- Counterfactual: ThonPy (fictional language = Python with 1-based indexing) on HumanEval
+- CCC: simple list indexing on much simpler inputs
+
+**Models:** **phi-1 only.** Our 4 1.4B models score 0.000 on default bigcode HumanEval — can't generate Python at all, ThonPy result will also be 0.000 (no signal). Phi-1.5 = 0.342 lm-eval / similar bigcode — also runnable. Phi-1 = 0.543 bigcode — primary target.
+
+**Headline question:** does phi-1's code-only training give it generalizable code-execution understanding (small drop on ThonPy) or 0-based-indexing memorization (large drop)?
+
+**Implementation cost:** ~1 day. Wu et al's released code includes ThonPy prompts.
+
+### Family A (v1, renamed: skill-decomposition probe, not counterfactual)
+
+Still useful for the matched-token A5 vs B4 finding (B4 has single-digit arithmetic, A5 doesn't). Kept in the doc below under its honest name. Replaces the previous CF-1 framing.
+
+---
+
+## Implementation order (revised, honest)
+
+1. **CF-A first** (~1 day): GSM-Symbolic on phi-1.5 + phi-1. Strict paper replication, dataset already on HF.
+2. **CF-C second** (~1 day): Wu et al ThonPy on phi-1. Clean code-counterfactual signal.
+3. **CF-B third** (~2 days): Wu et al arithmetic counterfactual on phi-1.5. Lower priority because most models will fail the CCC.
+4. **Skill-decomposition (former Family A)** stays as the only published-style result for our 4 × 1.4B models, with the v1 caveat.
+
+**What I am NOT doing this time:**
+- Inventing 4 hand-picked surface formats and calling it counterfactual.
+- Picking MMLU subjects to "rewrite" without the published methodology being on those subjects.
+- Running our 4 × 1.4B models on published counterfactual protocols without the scope caveat.
+
+---
+
+## Original v1 designs (preserved for transparency — superseded above)
+
+### ~~CF-1 — Format-invariant arithmetic (for our 4 1.4B models)~~ (RETRACTED — hand-picked variant, not paper-replicated)
 
 Each arithmetic problem presented in 4 surface formats, single fixed problem set:
 
