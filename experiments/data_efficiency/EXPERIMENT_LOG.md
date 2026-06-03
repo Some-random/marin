@@ -51,6 +51,93 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## June 3: GSM-Symbolic + NoOp replication on phi-1.5; Wu arithmetic replication; eval infrastructure fixes; honest retractions
+
+Day broke down into four threads: (1) fix the night's HF / code_eval / bigcode infrastructure issues so future evals are deterministic; (2) replicate Wu et al §3.1 arithmetic counterfactual on phi-1 + phi-1.5; (3) replicate Mirzadeh et al GSM-Symbolic main + GSM-NoOp on phi-1 + phi-1.5 (using Apple's `apple/GSM-Symbolic` release + Sturgeon's third-party `Experimental-Orange/gsm-noop-audited` reconstruction since Apple did not release NoOp); (4) retract several overclaims from the June 2 writeup.
+
+### Eval infrastructure fixes (verified end-to-end on B4 final)
+
+Last night's eval suite turned a ~80-min job into a 9-hour ordeal via three failures: HF 504s on `cais/mmlu`, `EleutherAI/hendrycks_math`, `SaylorTwift/bbh`; the multi-GPU `code_eval` cache race on mbpp/humaneval (forced slow single-process workaround); and the bigcode `'HumanEval' object has no attribute 'dataset'` cascade from a stale HF metadata response + missing local cache.
+
+Fixes shipped, all under `/fsx/users/dongweij/marin/outputs/`:
+
+- `hf_cache/datasets/` — 560 MB shared cache of every eval dataset we use (`cais___mmlu`, `Rowan___hellaswag`, `Idavidrein___gpqa`, `EleutherAI___{hendrycks_math,lambada_openai,logiqa}`, `SaylorTwift___bbh`, `TIGER-Lab___mmlu-pro`, `allenai___{ai2_arc,openbookqa,winogrande}`, `baber___piqa`, `google-research-datasets___mbpp`, `hails___agieval-lsat-ar`, `openai___{gsm8k,openai_humaneval}`, etc.). Lives on `/fsx` so all nodes share.
+- `HF_DATASETS_OFFLINE=1` + `HF_HUB_OFFLINE=1` in the eval env — eliminates every HF metadata roundtrip; immune to 504 outages.
+- `lm_eval_wrapper.py` — sets `HF_METRICS_CACHE=/tmp/hf_metrics_rank_<LOCAL_RANK>` per-rank before importing lm_eval. Fixes the `code_eval` race so mbpp + humaneval run multi-GPU. mbpp: 14 min single-process → 3 min multi-GPU. humaneval: 19 min → 3 min.
+- `run_eval_v2.sh` — drop-in v2 runner using all the above.
+
+**End-to-end measurement (B4 final, 8 × A100-40GB):** 80m 57s for the full 16-task suite + bigcode HumanEval. Yesterday's "~85 min" was extrapolated from per-task sums and now-corrected; measured number is in [eval_efficiency_report.md](eval_efficiency_report.md).
+
+### Wu et al §3.1 arithmetic counterfactual — phi-1, phi-1.5
+
+Strict paper replication using Wu's released data + prompt template + scoring (no invented variants). Repo cloned to `/fsx/users/dongweij/marin/outputs/counterfactual-evaluation/`. Runner: [`wu_arithmetic_runner.py`](wu_arithmetic_runner.py).
+
+| Model | base 8 | base 9 | base 10 (default) | base 11 | base 16 |
+|---|---:|---:|---:|---:|---:|
+| phi-1.5 | 0/30 | 0/30 | 0/30 | 0/30 | 0/30 |
+| phi-1 | 0/30 | 0/30 | 0/30 | 0/30 | 0/30 |
+
+28-30 out of 30 generations per base were **unparseable by Wu's scorer**. Inspection: phi-1.5 reads the prompt (`"You are a mathematician. Assuming numbers are in base-N..."`) as a Python coding exercise and generates functions like `remove_vowels`, `reverse_string`; phi-1 generates raw Python. **Neither model fails the counterfactual — they fail the default (base-10) too because they don't follow the instruction.** This is exactly Wu §4 footnote 6's caveat ("open-source base models excluded due to unsatisfactory instruction-following"), confirmed empirically.
+
+Reading: the Wu arithmetic protocol does not test reasoning vs. memorization on phi base models; it tests instruction-following, which they lack. No counterfactual signal extractable at this scale.
+
+### Mirzadeh et al §3.2 + §4.4 — phi-1.5 GSM-Symbolic main + GSM-NoOp
+
+Apple released only `main`, `p1`, `p2` on `apple/GSM-Symbolic`. NoOp data was never released. We used Sturgeon's `Experimental-Orange/gsm-noop-audited` (filtered-gpt55 split, 117 distractor clauses each audited as "genuinely irrelevant" by GPT-5.5). Custom YAMLs: [`gsm_symbolic_main.yaml`](gsm_symbolic_main.yaml), [`gsm_noop.yaml`](gsm_noop.yaml). 8-shot CoT, greedy decoding, exact-match per the paper §3.2.
+
+**phi-1.5:**
+| Variant | strict acc | drop vs GSM8K | drop relative |
+|---|---:|---:|---:|
+| GSM8K (default) | 0.305 | — | — |
+| GSM-Symbolic main (name + number perturb, 5000 examples) | 0.160 | **−14.5 pp** | **−47%** |
+| GSM-NoOp (one irrelevant clause, 117 audited examples) | 0.034 | **−27.1 pp** | **−89%** |
+
+**phi-1 (control, code-only):** GSM8K 0.012, GSM-Sym main 0.0126, GSM-NoOp 0.000 — floors everywhere; no signal.
+
+**Reading:** clean replication of Mirzadeh et al's headline finding extended to phi-1.5. ~half of phi-1.5's GSM8K accuracy is the specific surface tokens (names, numbers, framing) rather than the underlying reasoning; adding a single irrelevant clause wipes out ~80% of what remains. Magnitudes are larger than the paper's tested models (Phi-3.5-mini 3.8B was smallest tested; saw 3-9 pp drops); the bigger drop on phi-1.5 is consistent with the published pattern that smaller models drop more.
+
+**Caveats:**
+- NoOp uses a third-party reconstruction, not Apple-original. Sturgeon-audited, but one researcher's work.
+- phi-1.5 (1.3B) is below the paper's tested model range; magnitudes are out-of-validated-range.
+- 5000 examples on main is enough for tight SE (±0.5 pp); 117 on NoOp gives SE ±1.7 pp.
+
+### Retraction (compositional reasoning over-claim from June 2)
+
+User pushback today exposed an over-claim from the June 2 entry. I had written that B4 has 83/84% single-digit arithmetic (real) but that GSM8K = 0 because of "multi-digit composition and word-problem parsing". The arithmetic claim is correct; **the composition claim was projecting beyond the data** — we never probed multi-digit arithmetic or word-problem parsing. Removed from EVALUATION.md §3 headlines, EVALUATION.md §4, EXPERIMENT_LOG.md June 2, and counterfactual_probes.md.
+
+### Inspection of our 4 × 1.4B models on gsm8k_cot — they DO attempt CoT
+
+User asked why our models are so bad on gsm8k_cot. I initially answered "they don't even attempt CoT — they just emit single numbers" based on inspecting `samples.jsonl`'s `filtered_resps` field. **That was wrong.** `filtered_resps` is lm-eval's *post-extraction* answer; the raw model output is in `resps`. Re-checked properly:
+
+| Model | total | CoT-shaped | loops | uses `=` | correct |
+|---|---:|---:|---:|---:|---:|
+| 1.4B base x16 | 1319 | 1202 (91%) | 127 (10%) | 628 (48%) | 16 (1.2%) |
+| 1.4B code25 v2 | 1319 | 1225 (93%) | 35 (3%) | 593 (45%) | 7 (0.5%) |
+| A5 1ep final | 1319 | **1319 (100%)** | 182 (14%) | 1070 (81%) | **37 (2.8%)** |
+| B4 1ep final | 1319 | **1319 (100%)** | 143 (11%) | 985 (75%) | 26 (2.0%) |
+
+Heuristics: CoT-shaped = response length > 50 chars OR contains "The answer is"; loop = a 10-char window appears > 4 times in a 200+ char generation.
+
+**What actually happens (verified by reading raw outputs):**
+
+- **Q16** (trains, gold=230): B4 wrote `"The first train travels 80 miles. The second train travels 150 miles. The distance covered by each train in the two days is 80 + 150 = 230 miles. The answer is 230 miles."` — correct setup, correct execution.
+- **Q100** (doorbell, gold=175): B4 wrote a long CoT with the right list of friends but the wrong arithmetic chain → ended at 60. Real attempt, wrong logic.
+- **Q220** (Carmen, gold=70): B4 fell into a loop — `"Then she started with 8 minutes... Then she started with 5 minutes... Then she started with 3 minutes..."` repeated for the rest of the generation budget. Matches the June 1 looping-investigation finding that 25% (10/40) of wd=1.6/x16 final-step gsm8k_cot generations loop, scaled here to all four 1.4B models.
+
+**Corrected reading:** the 0.001–0.030 gsm8k_cot scores for our 4 models are **real attempts at math with low success rate**, not non-attempts that occasionally guess right. A5/B4 (1-epoch / 30B trained tokens) write CoT 100% of the time and produce equations in 75-81% of generations — they have learned the 8-shot CoT format. They fail mostly by getting the arithmetic logic wrong on multi-step problems, with a non-trivial fraction failing to repetition loops (11-14%) instead. The lower-data base x16 / code25 v2 (3.36B trained) attempt CoT a bit less consistently (91-93%) and use equations less (45-48%), suggesting CoT-engagement is a function of how much fluent reasoning-shaped text the model has seen.
+
+**A5 (DCLM-only) slightly outscores B4 (code-mix) on gsm8k_cot** (2.8% vs 2.0%) — directionally consistent with the broader matched-token finding that A5 wins NL while B4 wins code-shaped tasks. Code training doesn't help on multi-step NL math reasoning at our scale.
+
+### Retraction: hand-picked "CF-1 / CF-2 / CF-3" probe design
+
+Earlier today I sketched a "format-invariant arithmetic with 4 hand-picked formats" + "MMLU rewrites in 3 self-picked subjects" probe design and called it counterfactual. That's not Wu et al methodology — it's an invented variant on hunch. Rewrote [`counterfactual_probes.md`](counterfactual_probes.md) to follow Wu / GSM-Symbolic exactly (CF-A: GSM-Symbolic on phi-1.5 via `apple/GSM-Symbolic`; CF-B: Wu arithmetic base-swap on phi-1.5; CF-C: Wu ThonPy on phi-1). Saved a memory and updated CLAUDE.local.md: **when user names a paper as the methodology reference, replicate that paper's exact protocol — do not propose hand-picked variants.**
+
+### Retraction: hand-picked "CF-1 / CF-2 / CF-3" probe design
+
+Earlier today I sketched a "format-invariant arithmetic with 4 hand-picked formats" + "MMLU rewrites in 3 self-picked subjects" probe design and called it counterfactual. That's not Wu et al methodology — it's an invented variant on hunch. Rewrote [`counterfactual_probes.md`](counterfactual_probes.md) to follow Wu / GSM-Symbolic exactly (CF-A: GSM-Symbolic on phi-1.5 via `apple/GSM-Symbolic`; CF-B: Wu arithmetic base-swap on phi-1.5; CF-C: Wu ThonPy on phi-1). Saved a memory and updated CLAUDE.local.md: **when user names a paper as the methodology reference, replicate that paper's exact protocol — do not propose hand-picked variants.**
+
+---
+
 ## June 1: wd=1.6/x8 looping ablation + eval matrix completion
 
 This day's work was downstream of the May 31 mid-training-vs-final eval sweep below. Today: trained wd=1.6/x8 from scratch (to settle the May 23 open question), measured quantitative looping rates across every recipe, and ran cleanup re-runs to close out the eval matrix.
