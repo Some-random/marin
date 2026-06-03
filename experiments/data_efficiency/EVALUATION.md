@@ -254,9 +254,9 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 
 **‡‡** = bigcode-evaluation-harness (the canonical code-gen runner used by the phi paper). Confirms phi-1 ≈ 54% (paper 50.6%); our 4 small models score 0 (lm-eval-harness gave partial credit that bigcode correctly rejects — see updated caveat below). MBPP via bigcode is broken upstream (`'MBPP' object has no attribute 'dataset'`), so MBPP numbers stay on lm-eval.
 
-**§** = A5s14672 0-shot suite (lambada+copa+wsc+agieval) hit the multi-task `torch.distributed.gather_object` issue on 8-GPU launch; single-process re-run pending.
+**§** = A5s14672 0-shot suite hit the multi-task `torch.distributed.gather_object` issue. Single-process re-run was attempted but is too slow to fill in this gap before final-step evals; will be picked up at the final-checkpoint sweep.
 
-**§§** = bbh / mmlu_pro hit the same multi-task gather issue for several models. Most failed first time; partial coverage shown. Single-process re-runs pending.
+**§§** = bbh / mmlu_pro hit the same multi-task gather issue for several models (succeeded for some by luck). Single-process re-runs were impractically slow (~1h/task, 12 tasks remaining). Will be retried multi-GPU on subtask-by-subtask basis when the final checkpoint sweep runs.
 
 <details>
 <summary><b>Paloma per-subset bpb (16 subsets) — expand</b></summary>
