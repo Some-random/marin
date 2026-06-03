@@ -4,7 +4,7 @@ Written 2026-06-03 after fixing the HF + multi-GPU code_eval issues that turned 
 
 ## TL;DR
 
-**Per-model eval suite: ~85 min on 8 GPUs (estimated by summing per-task durations from last night + verified individual tasks this morning; full end-to-end measurement in progress as of 2026-06-03 13:29 PDT, will update with actual number).** Compose any subset to fit a deadline.
+**Per-model eval suite: measured 80m 57s on 8 × A100-40GB** (B4 final on gpu-dy-5, started 13:29:17 PDT, finished 14:50:14 PDT, 2026-06-03). My earlier estimate was 85 min; actual landed 5% under. Compose any subset to fit a deadline.
 
 **6-model sweep (our 4 + phi-1 + phi-1.5):**
 - 1 node per model in parallel: **~1.5h wall time, 12 GPU-hours**
