@@ -229,6 +229,13 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 | commonsense_qa[0] | 0.192 | 0.212 | 0.212 | 0.200 | 0.175 | **0.507** |
 | social_iqa[0] | 0.366 | 0.362 | 0.408 | 0.394 | 0.364 | **0.523** |
 | logiqa[0] | 0.218 | 0.210 | 0.235 | 0.212 | 0.214 | **0.240** |
+| lambada_openai[0] | 0.238 | 0.197 | pending § | 0.448 | 0.106 | **0.527** |
+| copa[0] | 0.620 | 0.620 | pending § | 0.700 | 0.530 | **0.800** |
+| wsc[0] | 0.365 | 0.365 | pending § | 0.452 | 0.442 | **0.606** |
+| agieval_lsat_ar[0] | 0.226 | 0.252 | pending § | 0.217 | 0.213 | 0.183 |
+| gpqa_diamond[0] | 0.268 | **0.328** | 0.258 | 0.232 | 0.197 | 0.232 |
+| bbh[3] (limit=0.1) §§ | pending §§ | pending §§ | 0.127 | pending §§ | pending §§ | **0.288** |
+| mmlu_pro[5] (limit=0.1) §§ | 0.050 | 0.047 | 0.098 | 0.055 | pending §§ | pending §§ |
 | **Math** | | | | | | |
 | gsm8k[5] | 0.000 | 0.000 | 0.000 | 0.014 | 0.012 | **0.305** |
 | gsm8k_cot[8] | 0.022 | 0.005 | 0.014 | 0.014 | 0.021 | **0.299** |
@@ -246,6 +253,10 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 **‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
 
 **‡‡** = bigcode-evaluation-harness (the canonical code-gen runner used by the phi paper). Confirms phi-1 ≈ 54% (paper 50.6%); our 4 small models score 0 (lm-eval-harness gave partial credit that bigcode correctly rejects — see updated caveat below). MBPP via bigcode is broken upstream (`'MBPP' object has no attribute 'dataset'`), so MBPP numbers stay on lm-eval.
+
+**§** = A5s14672 0-shot suite (lambada+copa+wsc+agieval) hit the multi-task `torch.distributed.gather_object` issue on 8-GPU launch; single-process re-run pending.
+
+**§§** = bbh / mmlu_pro hit the same multi-task gather issue for several models. Most failed first time; partial coverage shown. Single-process re-runs pending.
 
 <details>
 <summary><b>Paloma per-subset bpb (16 subsets) — expand</b></summary>
