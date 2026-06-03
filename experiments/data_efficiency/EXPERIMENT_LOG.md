@@ -133,7 +133,7 @@ Day spans final checkpoint sweep for A5 (`1ep-dclm-A5`, `tmgu1im8`) and B4 (`1ep
 
 ### A5 vs B4 final-step comparison
 
-Both checkpoints converted (Levanter → HF) on this node (gpu-dy-5) using `convert_*_final.py` scripts. Full lm-eval suite run on gpu-dy-5 (B4) and gpu-st-4 (A5) in parallel. Several tasks needed retries due to (a) `code_eval` cache races (multi-GPU lm-eval `code_eval` module collision) and (b) intermittent HF 504 Gateway Timeout on `cais/mmlu`, `EleutherAI/hendrycks_math`, `SaylorTwift/bbh`. Retries on gpu-dy-3 / gpu-dy-4 / gpu-st-4 filled all gaps except A5 mmlu (4 attempts all hit HF 504 on different subtasks — to be retried when HF stabilizes).
+Both checkpoints converted (Levanter → HF) on this node (gpu-dy-5) using `convert_*_final.py` scripts. Full lm-eval suite run on gpu-dy-5 (B4) and gpu-st-4 (A5) in parallel. Several tasks needed retries due to (a) `code_eval` cache races (multi-GPU lm-eval `code_eval` module collision) and (b) intermittent HF 504 Gateway Timeout on `cais/mmlu`, `EleutherAI/hendrycks_math`, `SaylorTwift/bbh`. Retries on gpu-dy-3 / gpu-dy-4 / gpu-st-4 filled all gaps; A5 mmlu took 5 attempts (4 HF 504 failures on different subtasks each time, finally succeeded on the 5th at 00:43-00:47 PDT) and came in at 0.244 vs B4 0.258 (essentially tied at random floor, as expected at our scale).
 
 **Final-step values written into [EVALUATION.md §3](EVALUATION.md#3-canonical-results--all-models). Headline comparison:**
 
@@ -145,6 +145,7 @@ Both checkpoints converted (Levanter → HF) on this node (gpu-dy-5) using `conv
 | arc_challenge 25-shot acc_norm | **0.316** | 0.289 | +2.7 pp |
 | hellaswag 10-shot acc_norm | **0.497** | 0.464 | +3.3 pp |
 | winogrande 5-shot acc | **0.541** | 0.515 | +2.6 pp |
+| mmlu 5-shot acc | 0.244 | **0.258** | −1.4 pp |
 | piqa 0-shot acc | **0.718** | 0.709 | +0.9 pp |
 | boolq 0-shot acc | 0.563 | **0.599** | −3.6 pp |
 | sciq 0-shot acc | **0.834** | 0.829 | +0.5 pp |
@@ -200,7 +201,7 @@ This decomposes the H1 question into **(a) what teaches the foundational capabil
 
 ### Operational notes
 
-- HF `cais/mmlu` had intermittent 504 Gateway Timeouts between ~22:33 and 00:30 PDT, blocking A5 final mmlu across 4 separate launches. B4 final mmlu succeeded on its first try (0.258) before HF degraded. Other affected datasets: `EleutherAI/hendrycks_math` (A5 minerva), `SaylorTwift/bbh` (A5 + B4 bbh first attempt). Retries succeeded for A5 minerva and both bbh once HF stabilized; A5 mmlu still pending.
+- HF `cais/mmlu` had intermittent 504 Gateway Timeouts between ~22:33 and 00:42 PDT, blocking A5 final mmlu across 4 separate launches before the 5th attempt at 00:43-00:47 PDT succeeded (0.244). B4 final mmlu succeeded on its first try (0.258) before HF degraded. Other affected datasets: `EleutherAI/hendrycks_math` (A5 minerva), `SaylorTwift/bbh` (A5 + B4 bbh first attempt). All retries eventually succeeded once HF stabilized.
 - bigcode-evaluation-harness has a new failure mode for B4 final HumanEval: `'HumanEval' object has no attribute 'dataset'` — bigcode lost its dataset loader for the bare-name `openai_humaneval` dataset (rejected as not having `namespace/`). MBPP via bigcode also broken upstream. lm-eval HumanEval=0.104 for B4 is what we have.
 - `code_eval` cache race (multi-GPU lm-eval mbpp/humaneval): root cause is shared `~/.cache/huggingface/metrics/code_eval/default/default_experiment-1-0.arrow` file. Single-process workaround used for A5 mbpp/humaneval retries (~15 min each); B4 mbpp/humaneval ran successfully on first try by luck.
 

@@ -225,7 +225,7 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 | arc_challenge[25] | 0.242 | 0.241 | 0.316 | 0.289 | 0.232 | **0.532** |
 | hellaswag[10] | 0.348 | 0.321 | 0.497 | 0.464 | 0.301 | **0.635** |
 | winogrande[5] | 0.504 | 0.500 | 0.541 | 0.515 | 0.498 | **0.710** |
-| mmlu[5] | 0.252 | 0.256 | pending † | 0.258 | 0.248 | **0.422** |
+| mmlu[5] | 0.252 | 0.256 | 0.244 | 0.258 | 0.248 | **0.422** |
 | commonsense_qa[0] | 0.192 | 0.212 | 0.195 | 0.213 | 0.175 | **0.507** |
 | social_iqa[0] | 0.366 | 0.362 | 0.415 | 0.400 | 0.364 | **0.523** |
 | logiqa[0] | 0.218 | 0.210 | **0.320** | 0.270 | 0.214 | 0.240 |
@@ -247,8 +247,6 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 | **Perplexity (lower=better)** | | | | | | |
 | dclm_200m_val (nats) | 4.070 | 4.596 | **2.821** | 2.878 | — ‡ | — ‡ |
 | paloma_macro (bpb) | 1.631 | 1.824 | 1.122 ¶ | **1.097 ¶** | 1.738 | 1.174 |
-
-**†** = A5 final mmlu hit persistent HF 504 Gateway Timeout on `cais/mmlu` subtask shards (4 separate launches between 22:36 and 00:14 PDT, different subtasks each time — high_school_european_history, philosophy, professional_law, high_school_chemistry). B4 final mmlu (0.258) succeeded on its first launch before HF degraded. To be retried when HF stabilizes; expected ~0.25 (random floor).
 
 **‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
 
@@ -325,7 +323,7 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 
 This is the **controlled** comparison (same total trained tokens, same unique tokens, only data mix differs). It confirms: at 1.4B / 3.3B-token / 16-epoch repetition, 25% code mix doesn't help NL; it actively hurts. The earlier "v1 wins" interpretation from May 26 was retracted June 1 — v1 had 5× more unique tokens, not a fair comparison.
 
-**1-epoch experiment, FINAL step-29343 (~30.77B trained tokens, A5 vs B4):** **A5 (DCLM-only) wins ~11 NL benchmarks by 0.5-5 pp each** (arc_easy +2.2, arc_challenge +2.7, hellaswag +3.3, winogrande +2.6, piqa +0.9, sciq +0.5, openbookqa +1.8, social_iqa +1.5, logiqa +5.0, lambada +2.3, copa +5.0, wsc +15.4 — wsc is noisy, gpqa_diamond +5.1, mmlu_pro +4.3). **B4 (code-mix) wins boolq (+3.6), agieval_lsat_ar (+3.5), mmlu (+0.0; A5 pending due to HF outage), commonsense_qa (+1.8), bbh (+4.6), and decisively wins code-gen (humaneval lm-eval +9.8 pp, mbpp +6.0 pp; bigcode HumanEval = 0 for both — neither model can really generate Python).** In-domain val: A5 wins by 0.06 nats (2.821 vs 2.878). Paloma_macro: B4 slightly lower (1.097 vs 1.122) driven by twitterAAE + code subsets; on mainstream NL subsets (c4_en, wikipedia, m2d2_*, falcon-refinedweb, wikitext_103, redpajama) A5 wins by 1-3 nats × 0.01. **Same overall pattern as the 16-epoch comparison: code-mix HURTS NL while modestly improving code-gen-shaped metrics, with the trade-off persisting at matched compute and 1-epoch (no repetition).** See [§4 arithmetic decomposition probe](#4-counterfactual-probes--arithmetic-decomposition-phase-1) for the underlying mechanistic difference: B4 has 83%/84% on single-digit add/mult while A5 has 35%/13% — code teaches foundational arithmetic even though the benchmark scores stay at floor for both.
+**1-epoch experiment, FINAL step-29343 (~30.77B trained tokens, A5 vs B4):** **A5 (DCLM-only) wins ~11 NL benchmarks by 0.5-5 pp each** (arc_easy +2.2, arc_challenge +2.7, hellaswag +3.3, winogrande +2.6, piqa +0.9, sciq +0.5, openbookqa +1.8, social_iqa +1.5, logiqa +5.0, lambada +2.3, copa +5.0, wsc +15.4 — wsc is noisy, gpqa_diamond +5.1, mmlu_pro +4.3). **B4 (code-mix) wins boolq (+3.6), agieval_lsat_ar (+3.5), mmlu (+1.4), commonsense_qa (+1.8), bbh (+4.6), and decisively wins code-gen (humaneval lm-eval +9.8 pp, mbpp +6.0 pp; bigcode HumanEval = 0 for both — neither model can really generate Python).** In-domain val: A5 wins by 0.06 nats (2.821 vs 2.878). Paloma_macro: B4 slightly lower (1.097 vs 1.122) driven by twitterAAE + code subsets; on mainstream NL subsets (c4_en, wikipedia, m2d2_*, falcon-refinedweb, wikitext_103, redpajama) A5 wins by 1-3 nats × 0.01. **Same overall pattern as the 16-epoch comparison: code-mix HURTS NL while modestly improving code-gen-shaped metrics, with the trade-off persisting at matched compute and 1-epoch (no repetition).** See [§4 arithmetic decomposition probe](#4-counterfactual-probes--arithmetic-decomposition-phase-1) for the underlying mechanistic difference: B4 has 83%/84% on single-digit add/mult while A5 has 35%/13% — code teaches foundational arithmetic even though the benchmark scores stay at floor for both.
 
 **Caveat on code-gen numbers.** We now run HumanEval via both `lm-eval-harness` and `bigcode-evaluation-harness`. Comparison:
 
