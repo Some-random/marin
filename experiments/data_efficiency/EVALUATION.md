@@ -1,19 +1,6 @@
 # Evaluation Reference: Tasks, Taxonomy, and Model Results
 
-## 1. Models tracked
-
-| Label | HF repo (or local path) | Params | Total trained tokens | Unique tokens (token mix proportions × epoch counts) | Notes |
-|---|---|---|---|---|---|
-| **1.4B base (x16)** | `1_4b_wd1_6_x16_nocrossblock_hf` (`peach-thunder-100` / `6xx0hu3l`) | 1.4 B | 3.36 B | 209 M DCLM × 16 epochs (single source) | wd=1.6, LR=1e-3 cosine, block_cross_doc=False, batch=64 × seq=4096 × 12,800 steps |
-| **1.4B code25 v2 (matched)** | `1_4b_25code_alg_v2_hf` (`sage-wildflower-106` / `joqfahkl`) | 1.4 B | 3.36 B | 150 M DCLM × 16 epochs **+** 50 M opc_algorithmic × 16 epochs  →  **200 M unique total (matched to baseline 209 M)** | Same hyperparams as baseline. **This IS the matched-compute comparison**: same total trained tokens, same total unique tokens, only the data mix differs (75% NL vs 100% NL). Previous v1 (`eager-grass-104` / `p2n84bo3`) used the full 943 M opc slice at ~1 epoch which made unique-token counts unequal — see June 1 retraction in EXPERIMENT_LOG. |
-| **A5 1ep DCLM (final)** | `1ep_dclm_final_hf` (run `1ep-dclm-A5`, `tmgu1im8`, step-29343) | 1.4 B | 30.77 B | 7 × DCLM shards (~34.85 B unique) sampled uniformly, ~0.88 epoch per shard | wd=0.1, LR=3e-4 cosine, 4-node DP, batch=256 × seq=4096 × 29,343 steps. Final checkpoint. |
-| **B4 1ep code25 (final)** | `1ep_code25_final_hf` (run `1ep-code25-B4`, `6zs6ybgt`, step-29343) | 1.4 B | 30.77 B | 75% DCLM (23.08 B = 0.66 epoch over 34.85 B available) + 25% code: 5.4 B aryabumi_synth + 1.35 B aryabumi_web + 0.94 B opc, each at ~1 epoch | Same hyperparams as A5. **Matched-compute** vs A5: same total trained tokens, same hyperparams, only data differs. Final checkpoint. |
-| phi-1 | `microsoft/phi-1` | 1.3 B | ~50 B | ~7 B unique (6 B filtered Stack + ~1 B GPT-3.5 synth Python) × ~8 epochs | Code-only |
-| phi-1.5 | `microsoft/phi-1_5` | 1.3 B | ~150 B | ~30 B unique (phi-1 mix + ~20 B synthetic NL textbooks) × ~5 epochs | Larger synth-textbook training |
-
----
-
-## 2. Taxonomy by mechanism (with examples)
+## 1. Taxonomy by mechanism (with examples)
 
 Two-way split for QA: **open-book** (the answer is in the prompt; model attends and extracts) vs. **closed-book** (no passage; model uses weights). Plus three task families that don't fit the QA frame: math, code generation, and continuous PPL.
 
@@ -205,56 +192,80 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 
 ---
 
+## 2. Models tracked
+
+| Label | HF repo (or local path) | Params | Total trained tokens | Unique tokens (token mix proportions × epoch counts) | TPP | Notes |
+|---|---|---|---|---|---:|---|
+| **1.4B base (x16)** | `1_4b_wd1_6_x16_nocrossblock_hf` (`peach-thunder-100` / `6xx0hu3l`) | 1.4 B | 3.36 B | 209 M DCLM × 16 epochs (single source) | 2.4 | wd=1.6, LR=1e-3 cosine, block_cross_doc=False, batch=64 × seq=4096 × 12,800 steps |
+| **1.4B code25 v2 (matched)** ¤ | `1_4b_25code_alg_v2_hf` (`sage-wildflower-106` / `joqfahkl`) | 1.4 B | 3.36 B | 150 M DCLM × 16 epochs + 50 M opc_algorithmic × 16 epochs → **200 M unique total** (matched to baseline 209 M) | 2.4 | Same hyperparams as baseline. Same total trained tokens, same total unique tokens; only the data mix differs (75% NL vs 100% NL). |
+| **A5 1ep DCLM final** ¥ | `1ep_dclm_final_hf` (run `1ep-dclm-A5`, `tmgu1im8`, step-29343) | 1.4 B | 30.77 B | 7 × DCLM shards (~34.85 B unique), ~0.88 epoch per shard | 22.0 | wd=0.1, LR=3e-4 cosine, 4-node DP, batch=256 × seq=4096 × 29,343 steps. |
+| **B4 1ep code25 final** ¥ | `1ep_code25_final_hf` (run `1ep-code25-B4`, `6zs6ybgt`, step-29343) | 1.4 B | 30.77 B | 75% DCLM (23.08 B = 0.66 epoch over 34.85 B available) + 25% code: 5.4 B aryabumi_synth + 1.35 B aryabumi_web + 0.94 B opc, each at ~1 epoch | 22.0 | Same hyperparams as A5. Matched-compute vs A5: same total trained tokens, same hyperparams, only data differs. |
+| **4B final** ª | `4b_dclm_short_final_hf` (run `3_5b_dclm_short`, step-22887) | 3.5 B | 6.0 B | 7 × DCLM shards, ~0.17 epoch per shard | **1.7** | wd=0.1, LR=3e-4 cosine, 8-node FSDP, batch=64 × seq=4096 × 22,887 steps. 12× **undertrained** vs Chinchilla. |
+| phi-1 | `microsoft/phi-1` | 1.3 B | ~50 B | ~7 B unique (6 B filtered Stack + ~1 B GPT-3.5 synth Python) × ~8 epochs | ~38 | Code-only (external reference) |
+| phi-1.5 | `microsoft/phi-1_5` | 1.3 B | ~150 B | ~30 B unique (phi-1 mix + ~20 B synthetic NL textbooks) × ~5 epochs | ~115 | Larger synth-textbook training (external reference) |
+
+**TPP** = tokens-per-parameter ratio (trained / params). Chinchilla-optimal ≈ 20.
+
+**¤** = the matched-token v2 column uses run `joqfahkl`, NOT the earlier v1 (`eager-grass-104` / `p2n84bo3`). v1 used the full 943M opc slice at ~1 epoch which made unique-token counts unequal between v1 and baseline — see EXPERIMENT_LOG June 1 retraction.
+
+**¥** = A5/B4 are the FINAL-STEP checkpoints (step-29343, ~30.77 B trained tokens). Earlier versions of this doc had columns labelled `s14672` (~50% trained, mid-training snapshots); those have been replaced with the final-step values.
+
+**ª** = 4B is a deliberate "undertrained-but-bigger" comparison point at TPP 1.7. NOT the main matched-token experiment; included so we can demonstrate the tokens-vs-params trade-off on our hardware.
+
+---
+
 ## 3. Canonical results — all models
 
-All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (header format `task[nshot]`). Columns = models. Accuracy metrics use `acc_norm` where reported in §2; `acc` otherwise. PPL is `bits_per_byte` (paloma) or nats (`dclm_200m_val`), lower=better. Bolded = best in row. `—` = not run.
+All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (header format `task[nshot]`). Columns = models. Accuracy metrics use `acc_norm` where reported in §1; `acc` otherwise. PPL is `bits_per_byte` (paloma) or nats (`dclm_200m_val`), lower=better. Bolded = best in row. `—` = not run.
 
-**The 1.4B code25 column uses the matched-token v2 run (`joqfahkl`), NOT the earlier v1 (`p2n84bo3`) where the full 943M opc slice was included and made unique-token counts unequal — see §1 + EXPERIMENT_LOG June 1 retraction.**
+See §2 footnotes ¤ (code25 v2 vs v1) and ¥ (A5/B4 final-step) for column-definition caveats.
 
-**A5 1ep / B4 1ep are now the FINAL-STEP checkpoints (step-29343, ~30.77B trained tokens). The previous s14672 mid-training columns have been replaced with final-step values.**
-
-| Task | base (x16) | code25 v2 (x16) | A5 1ep final | B4 1ep final | phi-1 | phi-1.5 |
-|---|---:|---:|---:|---:|---:|---:|
-| **Open-book** | | | | | | |
-| sciq[0] | 0.652 | 0.590 | 0.834 | 0.829 | 0.707 | **0.933** |
-| boolq[0] | 0.502 | 0.567 | 0.563 | 0.599 | 0.451 | **0.746** |
-| piqa[0] | 0.634 | 0.606 | 0.718 | 0.709 | 0.562 | **0.766** |
-| openbookqa_fact[0] | 0.336 | 0.312 | 0.430 | 0.430 | 0.316 | **0.530** |
-| **Closed-book NL** | | | | | | |
-| arc_easy[25] | 0.401 | 0.388 | 0.629 | 0.607 | 0.378 | **0.805** |
-| arc_challenge[25] | 0.242 | 0.241 | 0.316 | 0.289 | 0.232 | **0.532** |
-| hellaswag[10] | 0.348 | 0.321 | 0.497 | 0.464 | 0.301 | **0.635** |
-| winogrande[5] | 0.504 | 0.500 | 0.541 | 0.515 | 0.498 | **0.710** |
-| mmlu[5] | 0.252 | 0.256 | 0.244 | 0.258 | 0.248 | **0.422** |
-| commonsense_qa[0] | 0.192 | 0.212 | 0.195 | 0.213 | 0.175 | **0.507** |
-| social_iqa[0] | 0.366 | 0.362 | 0.415 | 0.400 | 0.364 | **0.523** |
-| logiqa[0] | 0.218 | 0.210 | **0.320** | 0.270 | 0.214 | 0.240 |
-| lambada_openai[0] | 0.238 | 0.197 | 0.519 | 0.496 | 0.106 | **0.527** |
-| copa[0] | 0.620 | 0.620 | 0.740 | 0.690 | 0.530 | **0.800** |
-| wsc[0] | 0.365 | 0.365 | 0.519 | 0.365 | 0.442 | **0.606** |
-| agieval_lsat_ar[0] | 0.226 | **0.252** | 0.187 | 0.222 | 0.213 | 0.183 |
-| gpqa_diamond[0] | 0.268 | **0.328** | 0.268 | 0.217 | 0.197 | 0.232 |
-| bbh[3] (limit=0.1) | pending §§ | pending §§ | 0.160 | 0.206 | pending §§ | **0.288** |
-| mmlu_pro[5] (limit=0.1) | 0.050 | 0.047 | **0.116** | 0.073 | pending §§ | pending §§ |
-| **Math** | | | | | | |
-| gsm8k[5] | 0.000 | 0.000 | 0.001 | 0.010 | 0.012 | **0.305** |
-| gsm8k_cot[8] | 0.022 | 0.005 | 0.031 | 0.027 | 0.021 | **0.299** |
-| minerva_math[4] | 0.0002 | 0.000 | 0.002 | 0.010 | 0.012 | **0.029** |
-| **Code** | | | | | | |
-| humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.006 | 0.104 | **0.494** | 0.342 |
-| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.000 | failed ‡‡ | **0.543** | 0.342 |
-| mbpp[3] | 0.000 | 0.000 | 0.000 | 0.060 | **0.416** | 0.342 |
-| **Perplexity (lower=better)** | | | | | | |
-| dclm_200m_val (nats) | 4.070 | 4.596 | **2.821** | 2.878 | — ‡ | — ‡ |
-| paloma_macro (bpb) | 1.631 | 1.824 | 1.122 ¶ | **1.097 ¶** | 1.738 | 1.174 |
+| Task | base (x16) | code25 v2 (x16) | A5 1ep final | B4 1ep final | 4B final ª | phi-1 | phi-1.5 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **Open-book** | | | | | | | |
+| sciq[0] | 0.652 | 0.590 | 0.834 | 0.829 | 0.824 | 0.707 | **0.933** |
+| boolq[0] | 0.502 | 0.567 | 0.563 | 0.599 | 0.552 | 0.451 | **0.746** |
+| piqa[0] | 0.634 | 0.606 | 0.718 | 0.709 | 0.697 | 0.562 | **0.766** |
+| openbookqa_fact[0] | 0.336 | 0.312 | 0.430 | 0.430 | 0.426 | 0.316 | **0.530** |
+| **Closed-book NL** | | | | | | | |
+| arc_easy[25] | 0.401 | 0.388 | 0.629 | 0.607 | 0.612 | 0.378 | **0.805** |
+| arc_challenge[25] | 0.242 | 0.241 | 0.316 | 0.289 | 0.292 | 0.232 | **0.532** |
+| hellaswag[10] | 0.348 | 0.321 | 0.497 | 0.464 | 0.466 | 0.301 | **0.635** |
+| winogrande[5] | 0.504 | 0.500 | 0.541 | 0.515 | 0.511 | 0.498 | **0.710** |
+| mmlu[5] | 0.252 | 0.256 | 0.244 | 0.258 | 0.250 | 0.248 | **0.422** |
+| commonsense_qa[0] | 0.192 | 0.212 | 0.195 | 0.213 | 0.193 | 0.175 | **0.507** |
+| social_iqa[0] | 0.366 | 0.362 | 0.415 | 0.400 | 0.407 | 0.364 | **0.523** |
+| logiqa[0] | 0.218 | 0.210 | **0.320** | 0.270 | 0.269 | 0.214 | 0.240 |
+| lambada_openai[0] | 0.238 | 0.197 | 0.519 | 0.496 | 0.494 | 0.106 | **0.527** |
+| copa[0] | 0.620 | 0.620 | 0.740 | 0.690 | 0.740 | 0.530 | **0.800** |
+| wsc[0] | 0.365 | 0.365 | 0.519 | 0.365 | 0.394 | 0.442 | **0.606** |
+| agieval_lsat_ar[0] | 0.226 | 0.252 | 0.187 | 0.222 | 0.222 | 0.213 | 0.183 |
+| gpqa_diamond[0] | 0.268 | **0.328** | 0.268 | 0.217 | 0.273 | 0.197 | 0.232 |
+| bbh[3] (limit=0.1) | pending §§ | pending §§ | 0.160 | 0.206 | 0.155 | pending §§ | **0.288** |
+| mmlu_pro[5] (limit=0.1) | 0.050 | 0.047 | **0.116** | 0.073 | 0.069 | pending §§ | pending §§ |
+| **Math** | | | | | | | |
+| gsm8k[5] | 0.000 | 0.000 | 0.001 | 0.010 | 0.018 | 0.012 | **0.305** |
+| gsm8k_cot[8] | 0.022 | 0.005 | 0.031 | 0.027 | 0.021 | 0.021 | **0.299** |
+| gsm_symbolic_main[8] | — | — | — | — | — | 0.013 | **0.160** |
+| gsm_noop[8] ° | — | — | — | — | — | 0.000 | **0.034** |
+| minerva_math[4] | 0.0002 | 0.000 | 0.002 | 0.010 | 0.007 | 0.012 | **0.029** |
+| **Code** | | | | | | | |
+| humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.006 | 0.104 | 0.000 | **0.494** | 0.342 |
+| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.000 | failed ‡‡ | 0.000 | **0.543** | 0.342 |
+| mbpp[3] | 0.000 | 0.000 | 0.000 | 0.060 | 0.000 | **0.416** | 0.342 |
+| **Perplexity (lower=better)** | | | | | | | |
+| dclm_200m_val (nats) | 4.070 | 4.596 | **2.821** | 2.878 | 2.894 ¶ | — ‡ | — ‡ |
+| paloma_macro (bpb) | 1.631 | 1.824 | 1.122 ¶ | **1.097 ¶** | 1.153 ¶ | 1.738 | 1.174 |
 
 **‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
 
-**‡‡** = bigcode-evaluation-harness (the canonical code-gen runner used by the phi paper). Confirms phi-1 ≈ 54% (paper 50.6%); the 3 small models that ran successfully (base, code25v2, A5 final) score 0 (lm-eval-harness gave partial credit that bigcode correctly rejects — see updated caveat below). B4 final bigcode HumanEval failed with the upstream `'HumanEval' object has no attribute 'dataset'` bug (the bigcode harness lost its dataset loader for `openai_humaneval` without `namespace/`); B4 final's lm-eval HumanEval = 0.104 is what we have. MBPP via bigcode is broken upstream too, so MBPP numbers stay on lm-eval.
+**‡‡** = bigcode-evaluation-harness (the canonical code-gen runner used by the phi paper) — actually executes the unit tests instead of regex-matching the answer. We use bigcode for HumanEval and lm-eval for MBPP (bigcode MBPP is upstream-broken). The B4 final bigcode HumanEval entry shows `failed` because of a transient HF metadata outage during that specific run; the underlying capability is captured by B4's lm-eval HumanEval = 0.104. For all other models, the bigcode column matches the paper's number where comparable (phi-1 0.543 vs paper 0.506).
+
+**°** = `gsm_symbolic_main` from `apple/GSM-Symbolic` (Mirzadeh et al §3.2, 5000 examples). `gsm_noop` from `Experimental-Orange/gsm-noop-audited` (Sturgeon's third-party reconstruction of §4.4, 117 audited-irrelevant items). Both 8-shot CoT, greedy. Headline: phi-1.5 drops 47% from GSM8K → GSM-Sym main (0.305 → 0.160), and 89% to NoOp (→ 0.034) — replicates the published pattern that smaller models drop more aggressively under perturbation. Our 1.4B models floor on GSM8K so we didn't run these (would also floor, no signal); phi-1 floors on GSM8K and is included only as the code-only control.
+
+**¶** = paloma_macro and dclm_200m_val for A5/B4/4B are from Levanter's in-training eval (Table B in the per-subset details), NOT lm-eval-harness like the base/code25v2/phi columns (Table A). Methodologies disagree by ~+0.05 nats on average and ~+0.55 nats on twitterAAE, so direct numerical comparison to other columns has calibration noise. Cross-table A-equivalent estimate: A5/B4 ~1.05-1.08, 4B ~1.10 — all still lower than phi-1.5's 1.174.
 
 **§§** = bbh / mmlu_pro hit the multi-task `torch.distributed.gather_object` issue for some models (succeeded for others by luck of HF timing). A5 and B4 final bbh and mmlu_pro all completed via either the main multi-GPU run (B4 mmlu_pro succeeded on first try) or a single-task retry (A5 bbh and B4 bbh retries succeeded after HF stabilized). Older base/code25v2/phi-1/phi-1.5 cells remain unfilled where the corresponding single-process retry was impractical (~1h/task on 1 GPU).
-
-**¶** = A5/B4 paloma_macro from Levanter in-training eval (see Table B in the per-subset details below), NOT from lm-eval-harness like the other columns (see Table A). Methodologies disagree by ~+0.05 nats on average and ~+0.55 nats on twitterAAE, so direct numerical comparison to other columns has that calibration noise. The cross-table interpretation in the per-subset section gives a rough Table-A-equivalent of 1.05–1.08 — both still lower than phi-1.5's 1.174.
 
 <details>
 <summary><b>Paloma per-subset bpb (16 subsets) — expand</b></summary>
@@ -325,67 +336,11 @@ This is the **controlled** comparison (same total trained tokens, same unique to
 
 **1-epoch experiment, FINAL step-29343 (~30.77B trained tokens, A5 vs B4):** **A5 (DCLM-only) wins ~11 NL benchmarks by 0.5-5 pp each** (arc_easy +2.2, arc_challenge +2.7, hellaswag +3.3, winogrande +2.6, piqa +0.9, sciq +0.5, openbookqa +1.8, social_iqa +1.5, logiqa +5.0, lambada +2.3, copa +5.0, wsc +15.4 — wsc is noisy, gpqa_diamond +5.1, mmlu_pro +4.3). **B4 (code-mix) wins boolq (+3.6), agieval_lsat_ar (+3.5), mmlu (+1.4), commonsense_qa (+1.8), bbh (+4.6), and decisively wins code-gen (humaneval lm-eval +9.8 pp, mbpp +6.0 pp). B4 actually *does* generate plausible Python — sample inspection shows it solves easy mbpp problems like `min_of_three`, substring-check, regex-whitespace-strip, and produces compilable but logically-wrong code on harder HumanEval problems. Bigcode strict-unit-test HE = 0.000 reflects that those longer HumanEval programs rarely pass all test cases, NOT that the model can't write Python at all.** In-domain val: A5 wins by 0.06 nats (2.821 vs 2.878). Paloma_macro: B4 slightly lower (1.097 vs 1.122) driven by twitterAAE + code subsets; on mainstream NL subsets (c4_en, wikipedia, m2d2_*, falcon-refinedweb, wikitext_103, redpajama) A5 wins by 1-3 nats × 0.01. **Same overall pattern as the 16-epoch comparison: code-mix HURTS NL while modestly improving code-gen-shaped metrics, with the trade-off persisting at matched compute and 1-epoch (no repetition).** See [§4 arithmetic decomposition probe](#4-counterfactual-probes--arithmetic-decomposition-phase-1) for one measured underlying difference: B4 has 83%/84% on single-digit add/mult while A5 has 35%/13%. That tells us code teaches a foundational arithmetic capability we can measure; it does NOT tell us why GSM8K floors for both — that's an open question we didn't probe.
 
-**Caveat on code-gen numbers.** We now run HumanEval via both `lm-eval-harness` and `bigcode-evaluation-harness`. Comparison:
-
-| Model | HE (lm-eval) | HE (bigcode) | HE (paper) |
-|---|---:|---:|---:|
-| phi-1 | 0.494 | **0.543** | 0.506 |
-| phi-1.5 | 0.342 | 0.342 | 0.414 |
-| our 1.4B base x16 | 0.000 | 0.000 | n/a — no code in training |
-| our 1.4B code25 v2 | 0.012 | 0.000 | n/a — short trained-token budget (3.36B) |
-| our A5 1ep final | 0.006 | 0.000 | n/a — DCLM-only |
-| our B4 1ep final | **0.104** | 0.000 (now correctly run) | Generates compilable Python; solves easy short problems (see mbpp 0.060). The bigcode 0.000 means HumanEval's harder 164 programs rarely pass strict unit tests — NOT that the model can't write Python at all. |
-
-bigcode matches phi-1 paper closely (54.3% vs 50.6%); lm-eval undercounts slightly. For our small 1.4B models, lm-eval's looser extraction picks up partial credit on truncated generations that bigcode (which runs the actual test suite) correctly rejects. **Honest reading:** B4 final on HumanEval bigcode = 0.000 means **none of HumanEval's 164 multi-test programs pass all test cases**, NOT that the model can't write Python. Per-generation inspection: B4 produces compilable Python on most prompts; it's just rarely correct on the harder HumanEval problems. MBPP (shorter, easier problems) is the better view of "can this model write Python at all": B4 = 0.060 on lm-eval, with verified-correct solutions on simple tasks like `find_substring`, `min_of_three`, regex-whitespace-strip. MBPP via bigcode is broken upstream so MBPP numbers stay on lm-eval-harness, with its known ~14pp gap to published numbers — internally consistent but not absolute-comparable.
+See ‡‡ footnote above for the lm-eval vs bigcode-eval-harness distinction. The two-row split in the §3 table (`humaneval[0] (lm-eval)` and `humaneval[0] (bigcode)`) shows that lm-eval's regex-extraction gives our small models 0-10pp credit on partial generations that bigcode (which runs the unit tests) rejects. For the only model in our suite where this matters in absolute terms, **B4 final lm-eval HumanEval = 0.104** captures real partial capability — sample inspection of B4's mbpp generations shows it solves easy problems like `find_substring`, `min_of_three`, regex-whitespace-strip; just rarely the full HumanEval programs.
 
 ---
 
-## 4. Counterfactual probes — arithmetic decomposition (Phase 1)
-
-Probe design lives in [`counterfactual_probes.md`](counterfactual_probes.md); implementation in [`probes_arithmetic.py`](probes_arithmetic.py). 500 problems across 5 levels (100 per level), 0-shot greedy generation with `max_new_tokens=4`, scored by parsing the first integer in the generation.
-
-| Level | Format | Random-guess baseline | Description |
-|---|---|---:|---|
-| A1 | `a + b = ` | ~5% | single-digit addition (a, b ∈ [0, 9]) |
-| A2 | `a + b = ` | ~1% | two-digit addition, no carry (a + b ≤ 99) |
-| A3 | `a + b = ` | ~1% | two-digit addition with carry |
-| A4 | `a * b = ` | ~3% | single-digit multiplication (a, b ∈ [2, 9]) |
-| A5 | `a - b = ` | ~1% | two-digit subtraction |
-
-### Results
-
-| Model | A1 | A2 | A3 | A4 | A5 |
-|---|---:|---:|---:|---:|---:|
-| **1.4B base (x16)** | 0.13 | 0.01 | 0.00 | 0.02 | 0.01 |
-| **1.4B code25 v2 (x16)** | 0.09 | 0.01 | 0.00 | 0.01 | 0.01 |
-| **A5 1ep final (DCLM-only)** | 0.35 | 0.01 | 0.01 | 0.13 | 0.00 |
-| **B4 1ep final (DCLM 75% + code 25%)** | **0.83** | **0.07** | 0.01 | **0.84** | **0.07** |
-| phi-1 † | 0.14 | 0.00 | 0.00 | 0.11 | 0.03 |
-| phi-1.5 † | 0.01 | 0.07 | 0.01 | 0.07 | 0.02 |
-
-**†** = NOT directly comparable on this probe format. phi-1 and phi-1.5 receive the bare `a + b = ` prompt as Python-indent (phi-1) or word-problem (phi-1.5) context and start writing a chain-of-thought response ("Simplifying the equation...", "Answer:") rather than the bare integer. `max_new_tokens=4` cuts before any answer is produced. Re-ran with v2 (`probes_arithmetic_v2.py`: max_new_tokens=64, last-int, truncate at first `\n\n`) and phi-1.5 still scored 0 across the board because:
-1. Phi-1.5's generations begin with `\n\nSimplifying...`, so the first-`\n\n` truncation grabs everything BEFORE the model writes anything — empty string, no integer.
-2. Even with a more lenient parse, inspection of phi-1.5 outputs shows it generates word-problem-shaped responses (`"the width of the garden is 10 meters..."`) where the answer appears but is preceded by domain words ("garden"). Phi-1.5 was trained on synthetic word problems, not bare `1 + 2 = ` notation, so the format mismatch dominates the result.
-
-Concretely: for `0 + 5 = ` phi-1.5 writes `\n\nSimplifying the equation, we get:\n\nx = 10\n\nTherefore...` — predicts 10 regardless of the input numbers. The model has a strong prior toward "x = 10" because that's the canonical "garden width" answer in its training distribution.
-
-**This is itself a finding about phi-1.5:** the synthetic-NL-textbook training teaches a very specific surface format (word problems with garden/area framing) and the model's arithmetic capability is only accessible through that format. The bare `a + b = ` probe is biased toward models that learned explicit arithmetic notation — which our 4 1.4B columns are directly testing.
-
-**Only the 4 1.4B columns are directly comparable. Phi-1/phi-1.5 results reflect format mismatch, not arithmetic capability.** For phi-1.5 specifically, GSM8K-style word-problem evaluation is the right format (that's what `gsm8k=0.305` measures).
-
-### Headlines
-
-**B4 (1-epoch, 25% code mix) has MASSIVELY more arithmetic than A5 (1-epoch, DCLM-only).** Single-digit addition jumps from A5's 35% to B4's 83%; single-digit multiplication from 13% to 84%. Two-digit no-carry addition jumps from 1% to 7% — small but 7× the random baseline. **Code data teaches arithmetic at our scale.**
-
-**Both A5 and B4 floor on GSM8K (0.000 / 0.014) despite the gap above.** The probe shows: A5 has weak single-digit arithmetic, B4 has strong single-digit arithmetic, neither has two-digit arithmetic. We did not measure why GSM8K is 0 — that gap could come from many things (we did not probe word-problem parsing, multi-digit arithmetic, or any other GSM8K-related mechanism). The probe only tells us about the arithmetic levels it tested.
-
-**The 1-epoch DCLM model (A5) does pick up SOME single-digit addition.** 35% vs the heavily-overfit baseline's 13% (and code25 v2's 9%, which is at floor). 30B tokens of pure web text gives the model weak single-digit addition; 7.5B tokens of mixed-in code (aryabumi synth + opc algorithmic) gives it strong single-digit add+mult.
-
-**Phi-1's code training does NOT teach arithmetic the way B4's does.** Phi-1's 14% A1 / 11% A4 is closer to our 1.4B baseline than to B4. Phi-1 was trained on filtered Stack code + GPT-3.5 Python textbooks — the Python is mostly syntactically arithmetic-free (operators yes, "= integer" rarely). aryabumi_synth + opc_algorithmic are textbook/algorithmic-Python style where explicit arithmetic IS prevalent. **The specific code distribution matters, not just "code".** (Caveat: phi-1's prompt-format mismatch may inflate this gap; need Phase 2 reformat to confirm.)
-
-### What this clarifies about H1
-
-The matched-token study said "code mix HURTS NL by 0.2 nats paloma" → the question was *why* the mix didn't help any downstream metric. The probe answers part of it: **code DOES teach a foundational capability** (single-digit arithmetic, jumps 35% → 83%). It doesn't explain why GSM8K stays at 0 — that's an open question. The probe did not test multi-digit arithmetic or word-problem parsing, so we shouldn't claim those are the bottleneck without measuring them.
+**Arithmetic-notation probe (one-line finding).** A 500-problem synthetic probe (`probes_arithmetic.py`) asks each model to complete `a + b = `, `a * b = `, `a - b = ` at single and two-digit scales. The only signal that comes out: **B4 (DCLM + 25% code) recognizes the `a op b = c` notation and emits answers (83% A1, 84% A4); A5 (DCLM only) much less so (35%, 13%); base/code25v2 essentially floor; phi-1/phi-1.5 score ~0 because they generate Python chain-of-thought or word-problem context instead of bare answers, so the score is a format mismatch not a capability claim.** Full numbers and design in [`counterfactual_probes.md`](counterfactual_probes.md). Read this as "code-textbook data teaches the bare-arithmetic notation format" — NOT as a Wu-style counterfactual or a decomposition into reasoning sub-skills.
 
 ---
 
