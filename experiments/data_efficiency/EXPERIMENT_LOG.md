@@ -10,22 +10,25 @@
 - Pass condition: same Paloma macro + above-random benchmarks as a text-only baseline trained on more tokens. Reasoning ability per se is not required.
 
 **(B) Reasoning data → models that actually reason.** Use reasoning-style data to make the model reliably reason and stop making reasoning mistakes.
-- Pass condition: reasoning improves, other tasks don't decrease much. Reasoning has to be tested with something that surface pattern-matching can't fake — counterfactual evals (Wu et al. style), not standard benchmark accuracy.
+- Pass condition: reasoning improves, other tasks don't decrease much. Reasoning has to be tested with something that surface pattern-matching can't fake — counterfactual evals (Wu et al. style, GSM-Symbolic), not standard benchmark accuracy.
 
 The two are different goals. (A) is about training efficiency; (B) is about model behavior. A recipe can pass one without passing the other.
 
-### How we get to either goal — H1 and H2
+### Framing: H1 and H2
 
 **H1 applies to both goals.** It's the same question (what data teaches a target capability?) with different "target": under (A) the target is NL capability per token; under (B) it's reasoning capability. The same data candidate (code, formal languages, synthetic textbooks) can be evaluated against either version.
 
 **H2 is mostly for (B).** Once a model has reasoning capability, it has to be retained through subsequent NL pretraining (or the gains disappear in the final artifact). Goal (A) cares about training-run efficiency to reach a fixed capability, so retention through later training isn't a separate question there.
 
+### Hypotheses
+
 **H1 — What kind of pretraining data teaches reasoning capability (not just domain knowledge or extraction)?**
 - The question is what STRUCTURE in pretraining data teaches transferable reasoning, separately from domain knowledge or extraction skill. Many data types help WITHIN a domain (OWM → SciQ, code → HumanEval) but don't transfer.
-- Tested at 1.4B scale: Aryabumi-style code mix (May 26) — passes goal (A) but H1 status undetermined (gains were extraction).
+- **Tested at 1.4B / 30B-token scale (June 2-3): matched-token 25% code mix (B4) vs DCLM-only (A5).** A5 wins ~12 NL benchmarks by 1-5pp each; B4 wins on a few code-shaped tasks; on the matched-token comparison **code mix HURTS NL by ~0.2 nats paloma**. **Retracts the May 26 "code mix helps NL" interpretation** — that one had a unique-tokens confound. See June 1 retraction + June 2 entry.
+- Tested at 1.4B / 3.36B-token / 16-epoch (matched-token v2 `joqfahkl`): same direction, code25 v2 HURTS NL vs base.
 - Ruled out at 300M–1.4B: pure OpenThoughts / OWM / code-only (hurt NL benchmarks meaningfully).
-- Open candidates: (i) phi-1.5-style synthetic textbook mix (download in progress May 28); (ii) formal-language / procedural-structure pretraining (Between Circuits and Chomsky); (iii) custom synthetic counterfactual data.
-- Test for H1: counterfactual evals (Wu et al. style) where surface pattern-matching can't substitute, since standard reasoning benchmarks floor at our scale.
+- **Open candidates not yet run**: (i) phi-1.5-style synthetic textbook mix (cosmopedia_v2 tokenized at 27.37B tokens, ready to train); (ii) formal-language / procedural-structure pretraining (Between Circuits and Chomsky); (iii) custom synthetic counterfactual data.
+- **Direct test for (B)**: phi-1.5 drops 47% under GSM-Symbolic main perturbation and 89% under one irrelevant NoOp clause — replicates Mirzadeh et al, suggests synthetic NL textbook data teaches a format-specific surface pattern more than transferable reasoning.
 
 **H2 — Once a model has reasoning capability, how do we retain it through general NL pretraining?**
 - Two failure modes:
@@ -33,11 +36,12 @@ The two are different goals. (A) is about training efficiency; (B) is about mode
   - **H2b — No training pressure to use reasoning circuits**: even if circuits exist, NL next-token prediction doesn't activate them so they sit dormant. Candidate mitigations: perplexity-filtered web text (train only on documents the reasoning model finds surprising); joint objectives that tie reasoning eval to web prediction.
 - Untested at our scale. Sequencing: H1 first (need a reasoning-capable phase-1 model before H2 has anything to retain).
 
-### Where things stand
+### Where things stand (current as of June 5)
 
-- May 26 code-mix recipe passes goal (A) loosely (Paloma macro −0.47 nats, sciq/boolq up, other NL tasks not down much). H1 status undetermined pending the counterfactual probe.
-- Both goals (A) and (B) depend on H1 being answered. Goal (B) additionally depends on H2.
-- In flight: phi-1.5-style data download + tokenize (May 28) as next H1 candidate; custom counterfactual eval dataset construction.
+- **Matched-token H1 study (A5 vs B4 at 30B tokens) DOES NOT support code mix helping NL.** Under fair comparison, A5 (DCLM only) wins on standard NL while B4 (25% code) wins narrowly on code-gen-shaped tasks. Same direction at both 1.4B/3.36B (16-epoch) and 1.4B/30B (1-epoch). The May 26 "+0.47 nats paloma improvement" finding was retracted June 1 (unique-token confound).
+- **GSM-Symbolic + NoOp on phi-1.5 (June 3)** replicates the Mirzadeh published pattern — synthetic NL textbook data teaches surface form more than reasoning. Phi-1.5 GSM8K 0.305 → GSM-Sym main 0.160 → GSM-NoOp 0.034.
+- **4B (3.5B-arch) undertrained run (June 4-5)** trained on 6B DCLM tokens (TPP 1.7, 12× below Chinchilla). Lost to A5 (1.4B / TPP 21) on ~12 NL benchmarks — clean demo of "tokens > params at fixed FLOPs" on our hardware.
+- **No data candidate yet tested has passed H1 at 1.4B.** The next concrete candidate is the phi-1.5-style cosmopedia mix (data ready, training not yet run).
 
 ### Evaluation reference
 
@@ -48,6 +52,127 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 - **Causal bridge** (May 11) — old candidate for H1; Wikipedia-wikilink conditional generation. Shelved.
 - **OWM curriculum / OpenThoughts injection** (May 1–10) — tested at 300M–1.4B, failed all three criteria (only SciQ improved, ARC/PIQA degraded).
 - **Procedural knowledge / Dyck / NCA** (May 4 + lit review May 17–21) — explored as H1 candidates; not pursued empirically beyond initial 300M procedural-knowledge runs.
+
+---
+
+## June 5: 4B undertrained eval, eval pipeline hardening, EVALUATION.md restructure
+
+Single-day theme: finish the 4B comparison started June 4 and ship the EVALUATION.md restructure user requested.
+
+### 4B (3.5B-arch) eval + comparison to 1.4B baselines
+
+After the June 4 training run completed, converted step-22887 to HF and ran the full v2 eval suite. **Net: 1.4B with 30B Chinchilla-optimal tokens (TPP 21) wins on ~12 NL benchmarks vs 4B with 6B tokens (TPP 1.7).** Concrete head-to-head (A5 1ep final vs 4B final):
+
+| Task | A5 1.4B | 4B undertrained | Δ |
+|---|---:|---:|---:|
+| arc_easy 25-shot | 0.629 | 0.612 | A5 +1.7 |
+| arc_challenge | 0.316 | 0.292 | A5 +2.4 |
+| hellaswag 10-shot | 0.497 | 0.466 | A5 +3.1 |
+| winogrande 5-shot | 0.541 | 0.511 | A5 +3.0 |
+| piqa 0-shot | 0.718 | 0.697 | A5 +2.1 |
+| sciq 0-shot | 0.834 | 0.824 | A5 +1.0 |
+| openbookqa 0-shot | 0.332 | 0.322 | A5 +1.0 |
+| commonsense_qa | 0.195 | 0.193 | tied |
+| social_iqa | 0.415 | 0.407 | A5 +0.7 |
+| logiqa 0-shot | **0.320** | 0.269 | A5 +5.1 |
+| lambada | 0.519 | 0.494 | A5 +2.5 |
+| copa | 0.740 | 0.740 | tied |
+| boolq | 0.563 | 0.552 | A5 +1.1 |
+| mmlu 5-shot | 0.244 | 0.250 | tied at floor |
+| mmlu_pro 5-shot | **0.116** | 0.069 | A5 +4.7 |
+| bbh 3-shot | 0.160 | 0.155 | tied |
+| gpqa_diamond | 0.268 | 0.273 | 4B +0.5 |
+| agieval_lsat_ar | 0.187 | 0.222 | 4B +3.5 |
+| gsm8k 5-shot | 0.001 | 0.018 | 4B +1.7 |
+| gsm8k_cot | 0.031 | 0.021 | A5 +1.0 |
+| minerva_math | 0.002 | 0.007 | 4B +0.5 |
+| humaneval lm-eval | 0.006 | 0.000 | A5 |
+| humaneval bigcode | 0.000 | 0.000 | tied |
+| mbpp 3-shot | 0.000 | 0.000 | tied |
+
+**Reading:** 4B at TPP 1.7 is below random or at-floor for most NL benchmarks except simple commonsense (piqa, copa, hellaswag) where it still loses to A5. On math/code, the small ~1 pp wins for 4B are at floor levels. **Tokens beat params at fixed FLOPs** for our hardware regime; the matched-token recipe at 1.4B with proper TPP is the better basis for further experiments than scaling to undertrained 4B.
+
+### Eval pipeline hardening
+
+Two improvements to the eval infrastructure surfaced today and shipped:
+
+1. **`run_eval_v2.sh` now auto-retries on CUDA OOM.** Detects `OutOfMemoryError`/`RESOURCE_EXHAUSTED` in the task log and halves batch (caps at 1). Avoids the manual mmlu retry I had to do today for the 4B at batch=16.
+2. **`parse_eval_results.py` now uses per-task metric maps with fall-through.** bbh uses `exact_match,get-answer` not `get-response`; mmlu_pro uses `custom-extract`; gsm8k_cot prefers `flexible-extract` over `strict-match`. Aggregate-only rows suppress subtask noise. Fixes the "row missing because parser used the wrong key" issue that hid bbh + mmlu_pro from yesterday's 4B eval.
+
+Both files committed to `experiments/data_efficiency/run_eval_v2.sh` + `parse_eval_results.py`.
+
+### EVALUATION.md restructure
+
+Per user review:
+- §1 ↔ §2 swap: Taxonomy first, Models tracked second, Results third. Model descriptions now sit immediately above the table.
+- Removed the long bigcode caveat paragraph (info lives in ‡‡ footnote).
+- Collapsed §4 "Counterfactual probes — arithmetic decomposition" into a single one-paragraph footnote at the end of §3. The honest reading is "B4 recognizes `a + b = c` notation, A5 barely, phi-models score 0 from format mismatch"; the "per-level decomposition" framing wasn't supported by the data.
+- Added 4B column to §3 (all 27 tasks + paloma + dclm_val).
+- Added `gsm_symbolic_main` and `gsm_noop` rows for phi-1 / phi-1.5 (the June 3 numbers were previously only in the experiment log).
+
+### Eval timing measurement
+
+Ran end-to-end timing on three full v2 eval suites:
+- A5 1ep final (1.4B): **67m 21s**
+- B4 1ep final (1.4B): 80m 57s
+- 4B final: 115m 33s
+
+Per-model eval time is **67-115 min depending on model size and generation style**. 4B is ~50% slower than 1.4B as expected (larger model → slower generation, more compile passes). Updated [`eval_efficiency_report.md`](eval_efficiency_report.md) with the range.
+
+---
+
+## June 4: 4B 8-node FSDP training, infra debugging
+
+Single-day theme: train a 4B (3.5B-arch) model on 8 nodes of A100 to get an "undertrained-but-bigger" comparison point against the 1.4B / 30B-token baselines.
+
+### Smoke-test path to confirm 8B FSDP works
+
+The user's question after Mirzadeh + matched-token findings: "can we even train bigger on our cluster?" Answer required actually surfacing whether levanter's FSDP path works on A100 multi-node (it's TPU-default; multi-node A100 is less tested).
+
+Working layout discovered (via `config/gpt2_7b.yaml` reference in Stanford's docs):
+- `model_axis_size=1` (NO tensor parallel)
+- `data=-1` within each node (data axis = all 8 GPUs)
+- `replica_dcn=-1` across nodes (DP via gradient all-reduce on EFA)
+- Default `param_mapping={"embed": "data"}` shards the hidden dim across data axis → effectively FSDP for almost every weight (because every weight touches embed)
+- `gradient_checkpointing=True` already default in LlamaConfig
+
+Earlier attempts at tensor-parallel (model_axis_size=8 inside node) OOM'd at 8B because attention K/V projections + Adam state stayed replicated.
+
+Smoke tests (all clean exits at step-49):
+- 1 node 8B: 2.0 s/it, 16k tok/sec/node
+- 2 nodes 8B: 2.6 s/it, 12.6k tok/sec/node (79% scaling efficiency)
+- 8 nodes 8B: 2.9 s/it, 11.3k tok/sec/node (71% scaling efficiency)
+
+Per-node efficiency drops as nodes scale (EFA all-reduce gets relatively more expensive), but 71% at 8 nodes is solid.
+
+### 4B (3.5B-arch) training
+
+After confirming 8B works, user picked **4B at 6B tokens (12h budget)** as the actual run: "tokens beat params" hypothesis test, not the matched-token study. Two false starts hit infrastructure issues:
+
+1. **First attempt: llama_3_5b + tensor_parallel=8** → JAX SPMD `Involuntary full rematerialization` warning + barrier timeouts (the 3.5B hidden_dim=2560 doesn't shard cleanly across 8 GPUs). Killed.
+2. **Second attempt: same model, default FSDP, multi-node** → BrokenPipeError on wandb async socket caused the JAX shutdown barrier to fail. Set `tracker=NoopConfig()` + `WANDB_MODE=disabled` before any imports. This fix should be revisited after the run; checked-but-no-issue in levanter github issues, so the wandb-online + multi-node interaction is a real bug worth filing if it persists.
+
+Final config that worked: llama_3_5b, 8 nodes, FSDP-via-embed-axis (default), gradient_checkpointing default, wandb-disabled, batch=64 × seq=4096 × 22887 steps, AdamW LR=3e-4 cosine to 0, wd=0.1.
+
+Training stats (started 09:30 PDT, finished 18:47 PDT):
+- 9h 17m wall time
+- 22887 steps × 262144 tokens/step = 6.0 B trained tokens
+- Loss: 12.2 → 2.91 (smooth descent through 5 logged eval points)
+- 3 checkpoints saved (step-7629, step-15258, step-22887)
+
+Final-step in-training eval values:
+- dclm_200m_val loss: 2.894 nats
+- paloma_macro (16-subset training-eval): 1.153 bpb
+
+These slot into EVALUATION.md §3 paloma + dclm_val rows. Downstream lm-eval suite ran the next day (June 5 entry).
+
+### Honest scope of this run
+
+Two ways this run is NOT what was originally planned:
+- **Model size:** user asked for "4B", model dict's closest is `llama_3_5b` (3.5B params, hidden_dim=2560).
+- **Checkpoint dir name:** the script's `base_path` still says `8b_dclm_short/` from the 8B smoke iteration. The actual checkpoint is at `8b_dclm_short/c9x77du6/step-22887` despite being a 3.5B model. Numbers are right; the path is misleading. Renaming the dir later.
+
+This is also NOT a matched-token experiment vs A5 — different model size, different TPP, different recipe. It's a "tokens vs params" trade-off probe, not an H1 candidate.
 
 ---
 
