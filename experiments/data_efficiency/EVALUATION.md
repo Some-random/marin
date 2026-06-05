@@ -2,7 +2,7 @@
 
 ## 1. Taxonomy by mechanism (with examples)
 
-Two-way split for QA: **open-book** (the answer is in the prompt; model attends and extracts) vs. **closed-book** (no passage; model uses weights). Plus three task families that don't fit the QA frame: math, code generation, and continuous PPL.
+Two-way split for QA: **open-book** (the answer is in the prompt; model attends and extracts) vs. **closed-book** (no passage; model uses weights). Plus four task families that don't fit the QA frame: math (with perturbation-robust variants), code generation, multi-domain aggregates, and continuous PPL.
 
 ### A. Open-book QA
 
@@ -86,6 +86,28 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > - **options**: A) Civic Park is north of the administrative service area / B) The leisure area is southwest of the cultural area / C) The cultural district is in the northeast of the business district / D) The business district is southeast of the leisure area
 > - **label**: a
 
+**copa** — Choice of Plausible Alternatives (super_glue/copa). 2-way MC: given a premise, pick the more plausible **cause** or **effect** of it. The `question` field is the literal string "cause" or "effect" and tells the model which direction to reason.
+
+> - **premise**: "The man turned on the faucet."
+> - **question**: effect
+> - **choice1**: "The toilet filled with water."
+> - **choice2**: "Water flowed from the spout."
+> - **label**: 1 (choice2)
+
+**wsc** — Winograd Schema Challenge (super_glue config `wsc.fixed`). Binary coreference: given a sentence with two flagged spans, decide whether the second span (a pronoun) co-refers with the first span (a noun phrase). Adversarially constructed so that pure pattern-matching fails — the model has to use world knowledge.
+
+> - **text**: "Bernard, who had not told the government official that he was less than 21 when he filed for a homestead claim, did not consider that he had done anything dishonest. Still, anyone who knew that he was 19 years old could take his claim away."
+> - **span1_text**: "anyone"  • **span2_text**: "him"
+> - **label**: 0 (the pronoun "him" does NOT refer to "anyone")
+
+**lambada_openai** — last-word prediction from a narrative passage. The model sees the full passage minus its final word and is scored by whether the most-likely next token matches the gold word. Tests long-range narrative coherence and discourse continuation, not QA.
+
+> Passage end (final word elided):
+>
+> > "…'Figured if you're going to be out at night getting hit by cars, you might as well have some backup.' I look at him, feeling stunned. Like this is some sort of sign. But as I stare at Harlin, his mouth curved in a confident grin, I don't care about ___"
+>
+> Gold word: `signs`.
+
 ### C. Math (multi-step generation)
 
 **gsm8k** (logprob, 5-shot) and **gsm8k_cot** (free generation, 8-shot CoT) — same problems, different scoring.
@@ -100,6 +122,18 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > - **problem**: "How many vertical asymptotes does the graph of $y=\\frac{2}{x^2+x-6}$ have?"
 > - **solution**: "The denominator of the rational function factors into $x^2+x-6=(x-2)(x+3)$. Since the numerator is always nonzero, there is a vertical asymptote whenever the denominator is $0$, which occurs for $x = 2$ and $x = -3$. Therefore, the graph has $\\boxed{2}$ vertical asymptotes."
 > - **answer**: 2
+
+**gsm_symbolic_main** — GSM-Symbolic main split (Mirzadeh et al 2024, `apple/GSM-Symbolic`). Re-instantiations of GSM8k templates where every named entity and integer is re-sampled while keeping the underlying arithmetic structure. Compared against gsm8k, isolates "is the model solving the problem, or pattern-matching the surface form?"
+
+> - **original_question** (GSM8k #473): "Benny saw a 10-foot shark with 2 6-inch remoras attached to it. What percentage of the shark's body length is the combined length of the remoras?" — gold 10
+> - **question** (symbolic instance): "Rania saw a 210-foot whale with 7 72-inch remoras attached to it. What percentage of the whale's body length is the combined length of the remoras?" — gold 20
+> - Same template, name and numbers re-drawn, arithmetic structure (inches → feet conversion, then percentage) preserved.
+
+**gsm_noop** — GSM-NoOp (Mirzadeh et al 2024 §4.4). GSM8k problems with one extra clause inserted that is grammatically plausible but mathematically irrelevant. Tests whether the model can ignore irrelevant context or gets distracted into incorporating it. Our eval uses `Experimental-Orange/gsm-noop-audited`, a 117-item third-party reconstruction (the Apple-original NoOp split was not released).
+
+> - **original_question** (GSM8k #1223): "To make a call from a phone booth, you must pay ₣0.6 for each minute of your call. After 30 minutes, that price drops to ₣0.5 per minute. How much would a 78-minute call cost?" — gold 42
+> - **question** (with NoOp clause): "To make a call from a phone booth, you must pay ₣0.6 for each minute of your call. After 30 minutes, that price drops to ₣0.5 per minute. **If you had placed the same call on a weekend, the initial per-minute rate would have been 15% cheaper.** How much would a 78-minute call cost on a weekday?" — gold still 42.
+> - The weekend-discount clause is a hypothetical that does not apply (the question specifies a weekday call). A model that applies the 15% discount has been distracted by the no-op.
 
 ### D. Code generation
 
@@ -137,7 +171,37 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 >   assert remove_Occ("PHP","P") == "H"
 >   ```
 
-### E. Continuous PPL
+### E. Aggregate / multi-domain reasoning
+
+Tasks that aggregate many subtasks across heterogeneous domains. Reported as the unweighted mean of per-subtask scores. Useful as a single "frontier reasoning" number, but a poor diagnostic since subtask composition is fixed and individual signals are averaged out.
+
+**bbh** — Big-Bench Hard. 27 subtasks (`bbh_boolean_expressions`, `bbh_causal_judgement`, `bbh_logical_deduction_five_objects`, …) that the original BIG-bench paper identified as the hardest splits. Each subtask is free-generation, scored by an answer-extraction regex (`exact_match,get-answer`). 3-shot in our pipeline.
+
+> Subtask example (`bbh_boolean_expressions`):
+> - **input**: "not ( True ) and ( True ) is"
+> - **target**: "False"
+
+**mmlu_pro** — harder MMLU successor. 10-way MC (vs. MMLU's 4-way) drawn from STEM exams and textbooks with longer, more reasoning-heavy questions; subtasks are organized by `category` (math, physics, chemistry, …). Scored by `exact_match,custom-extract` after letter extraction. 5-shot, 2048-context (phi-1/phi-1.5 cannot run this — `n/a (ctx)`).
+
+> - **category**: math
+> - **question**: "The symmetric group $S_n$ has $n!$ elements. … Find the characteristic of the ring 2Z."
+> - **options** (10): "0" / "30" / "3" / "10" / "12" / "50" / "2" / "100" / "20" / "5"
+> - **answer**: A (= "0")
+
+**agieval_lsat_ar** — LSAT Analytical Reasoning subset of AGIEval (Zhong et al 2023). Verbal logic puzzles (scheduling, grouping, ordering) with 5 candidate solutions per question; each candidate is a fully specified assignment that must satisfy the puzzle constraints.
+
+> - **query**: "Of the eight students—George, Helen, Irving, Kyle, Lenore, Nina, Olivia, and Robert—in a seminar, exactly six will give individual oral reports during three consecutive days—Monday, Tuesday, and Wednesday. Exactly two reports will be given each day … [further constraints]"
+> - **choices** (5, each a complete schedule): "(A) Mon. morning: Helen; Mon. afternoon: Robert; Tues. morning: Olivia; …" / "(B) Mon. morning: Irving; …" / …
+> - **gold**: option C
+
+**gpqa_diamond** — graduate-level physics, chemistry, biology MC questions written by domain PhDs (Rein et al 2023). "Diamond" is the highest-quality validated subset (~198 questions). 4-way MC; expert validators score >65%, non-expert validators with web access score <35%.
+
+> - **subdomain**: Physics (general)
+> - **question**: "Two quantum states with energies E1 and E2 have lifetimes of 10⁻⁹ s and 10⁻⁸ s respectively. We want to clearly distinguish these two energy levels. Which of the following could be their energy difference?"
+> - **correct answer**: 10⁻⁴ eV
+> - **distractors**: 10⁻¹¹ eV / 10⁻⁸ eV / 10⁻⁹ eV
+
+### F. Continuous PPL
 
 **Paloma** — 16 held-out web/forum/code text subsets. Primary continuous signal at our scale. Eval = mean next-token cross-entropy.
 
@@ -239,6 +303,7 @@ See §2 footnotes ¤ (code25 v2 vs v1) and ¥ (A5/B4 final-step) for column-defi
 | lambada_openai[0] | 0.238 | 0.197 | 0.519 | 0.496 | 0.494 | 0.106 | **0.527** |
 | copa[0] | 0.620 | 0.620 | 0.740 | 0.690 | 0.740 | 0.530 | **0.800** |
 | wsc[0] | 0.365 | 0.365 | 0.519 | 0.365 | 0.394 | 0.442 | **0.606** |
+| **Aggregate / multi-domain reasoning** | | | | | | | |
 | agieval_lsat_ar[0] | 0.226 | 0.252 | 0.187 | 0.222 | 0.222 | 0.213 | 0.183 |
 | gpqa_diamond[0] | 0.268 | **0.328** | 0.268 | 0.217 | 0.273 | 0.197 | 0.232 |
 | bbh[3] (limit=0.1) | 0.025 | 0.026 | 0.160 | 0.206 | 0.155 | 0.238 | **0.288** |
