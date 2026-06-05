@@ -241,8 +241,8 @@ See §2 footnotes ¤ (code25 v2 vs v1) and ¥ (A5/B4 final-step) for column-defi
 | wsc[0] | 0.365 | 0.365 | 0.519 | 0.365 | 0.394 | 0.442 | **0.606** |
 | agieval_lsat_ar[0] | 0.226 | 0.252 | 0.187 | 0.222 | 0.222 | 0.213 | 0.183 |
 | gpqa_diamond[0] | 0.268 | **0.328** | 0.268 | 0.217 | 0.273 | 0.197 | 0.232 |
-| bbh[3] (limit=0.1) | pending §§ | pending §§ | 0.160 | 0.206 | 0.155 | pending §§ | **0.288** |
-| mmlu_pro[5] (limit=0.1) | 0.050 | 0.047 | **0.116** | 0.073 | 0.069 | pending §§ | pending §§ |
+| bbh[3] (limit=0.1) | 0.025 | 0.026 | 0.160 | 0.206 | 0.155 | 0.238 | **0.288** |
+| mmlu_pro[5] (limit=0.1) | 0.050 | 0.047 | **0.116** | 0.073 | 0.069 | n/a (ctx) ™ | n/a (ctx) ™ |
 | **Math (standard)** | | | | | | | |
 | gsm8k[5] | 0.000 | 0.000 | 0.001 | 0.010 | 0.018 | 0.012 | **0.305** |
 | gsm8k_cot[8] | 0.022 | 0.005 | 0.031 | 0.027 | 0.021 | 0.021 | **0.299** |
@@ -252,7 +252,7 @@ See §2 footnotes ¤ (code25 v2 vs v1) and ¥ (A5/B4 final-step) for column-defi
 | gsm_noop[8] | — | — | — | — | — | 0.000 | **0.034** |
 | **Code** | | | | | | | |
 | humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.006 | 0.104 | 0.000 | **0.494** | 0.342 |
-| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.000 | failed ‡‡ | 0.000 | **0.543** | 0.342 |
+| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | **0.543** | 0.342 |
 | mbpp[3] | 0.000 | 0.000 | 0.000 | 0.060 | 0.000 | **0.416** | 0.342 |
 | **Perplexity (lower=better)** | | | | | | | |
 | dclm_200m_val (nats) | 4.070 | 4.596 | **2.821** | 2.878 | 2.894 ¶ | — ‡ | — ‡ |
@@ -260,13 +260,13 @@ See §2 footnotes ¤ (code25 v2 vs v1) and ¥ (A5/B4 final-step) for column-defi
 
 **‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
 
-**‡‡** = bigcode-evaluation-harness (the canonical code-gen runner used by the phi paper) — actually executes the unit tests instead of regex-matching the answer. We use bigcode for HumanEval and lm-eval for MBPP (bigcode MBPP is upstream-broken). The B4 final bigcode HumanEval entry shows `failed` because of a transient HF metadata outage during that specific run; the underlying capability is captured by B4's lm-eval HumanEval = 0.104. For all other models, the bigcode column matches the paper's number where comparable (phi-1 0.543 vs paper 0.506).
+**‡‡** = bigcode-evaluation-harness — actually executes HumanEval's unit tests instead of regex-matching the answer. We use bigcode for HumanEval and lm-eval for MBPP (bigcode MBPP is upstream-broken). Phi-1 matches paper (0.543 bigcode vs 0.506 paper).
 
 **°** = `gsm_symbolic_main` from `apple/GSM-Symbolic` (Mirzadeh et al §3.2, 5000 examples). `gsm_noop` from `Experimental-Orange/gsm-noop-audited` (Sturgeon's third-party reconstruction of §4.4, 117 audited-irrelevant items). Both 8-shot CoT, greedy. Headline: phi-1.5 drops 47% from GSM8K → GSM-Sym main (0.305 → 0.160), and 89% to NoOp (→ 0.034) — replicates the published pattern that smaller models drop more aggressively under perturbation. Our 1.4B models floor on GSM8K so we didn't run these (would also floor, no signal); phi-1 floors on GSM8K and is included only as the code-only control.
 
 **¶** = paloma_macro and dclm_200m_val for A5/B4/4B are from Levanter's in-training eval (Table B in the per-subset details), NOT lm-eval-harness like the base/code25v2/phi columns (Table A). Methodologies disagree by ~+0.05 nats on average and ~+0.55 nats on twitterAAE, so direct numerical comparison to other columns has calibration noise. Cross-table A-equivalent estimate: A5/B4 ~1.05-1.08, 4B ~1.10 — all still lower than phi-1.5's 1.174.
 
-**§§** = bbh / mmlu_pro hit the multi-task `torch.distributed.gather_object` issue for some models (succeeded for others by luck of HF timing). A5 and B4 final bbh and mmlu_pro all completed via either the main multi-GPU run (B4 mmlu_pro succeeded on first try) or a single-task retry (A5 bbh and B4 bbh retries succeeded after HF stabilized). Older base/code25v2/phi-1/phi-1.5 cells remain unfilled where the corresponding single-process retry was impractical (~1h/task on 1 GPU).
+**™** = mmlu_pro 5-shot prompts run 2000-2400 tokens; phi-1 and phi-1.5 both have `max_position_embeddings = 2048`, so the eval cannot run without truncating the prompt past the few-shot examples. Not a missing run — a model context limitation.
 
 <details>
 <summary><b>Paloma per-subset bpb (16 subsets) — expand</b></summary>
