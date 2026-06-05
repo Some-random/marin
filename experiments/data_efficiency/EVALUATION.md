@@ -204,7 +204,7 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 | phi-1 | `microsoft/phi-1` | 1.3 B | ~50 B | ~3.9 × 10²⁰ | ~7 B unique (6 B filtered Stack + ~1 B GPT-3.5 synth Python) × ~8 epochs | Code-only (external reference) |
 | phi-1.5 | `microsoft/phi-1_5` | 1.3 B | ~150 B | ~1.2 × 10²¹ | ~30 B unique (phi-1 mix + ~20 B synthetic NL textbooks) × ~5 epochs | Larger synth-textbook training (external reference) |
 
-**FLOPs column** is the Chinchilla approximation 6·N·D (Hoffmann et al 2022). Useful for understanding which models had comparable training compute, but doesn't predict per-task accuracy on its own — for that we just look at the actual numbers in §3.
+**FLOPs column** is the standard 6·N·D approximation (Hoffmann et al 2022 / Kaplan 2020) — a rough compute marker, not a capability number.
 
 **¤** = the matched-token v2 column uses run `joqfahkl`, NOT the earlier v1 (`eager-grass-104` / `p2n84bo3`). v1 used the full 943M opc slice at ~1 epoch which made unique-token counts unequal between v1 and baseline — see EXPERIMENT_LOG June 1 retraction.
 
@@ -243,12 +243,13 @@ See §2 footnotes ¤ (code25 v2 vs v1) and ¥ (A5/B4 final-step) for column-defi
 | gpqa_diamond[0] | 0.268 | **0.328** | 0.268 | 0.217 | 0.273 | 0.197 | 0.232 |
 | bbh[3] (limit=0.1) | pending §§ | pending §§ | 0.160 | 0.206 | 0.155 | pending §§ | **0.288** |
 | mmlu_pro[5] (limit=0.1) | 0.050 | 0.047 | **0.116** | 0.073 | 0.069 | pending §§ | pending §§ |
-| **Math** | | | | | | | |
+| **Math (standard)** | | | | | | | |
 | gsm8k[5] | 0.000 | 0.000 | 0.001 | 0.010 | 0.018 | 0.012 | **0.305** |
 | gsm8k_cot[8] | 0.022 | 0.005 | 0.031 | 0.027 | 0.021 | 0.021 | **0.299** |
-| gsm_symbolic_main[8] | — | — | — | — | — | 0.013 | **0.160** |
-| gsm_noop[8] ° | — | — | — | — | — | 0.000 | **0.034** |
 | minerva_math[4] | 0.0002 | 0.000 | 0.002 | 0.010 | 0.007 | 0.012 | **0.029** |
+| **Math (perturbation-robust)** ° | | | | | | | |
+| gsm_symbolic_main[8] | — | — | — | — | — | 0.013 | **0.160** |
+| gsm_noop[8] | — | — | — | — | — | 0.000 | **0.034** |
 | **Code** | | | | | | | |
 | humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.006 | 0.104 | 0.000 | **0.494** | 0.342 |
 | humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.000 | failed ‡‡ | 0.000 | **0.543** | 0.342 |
@@ -334,7 +335,7 @@ See §2 footnotes ¤ (code25 v2 vs v1) and ¥ (A5/B4 final-step) for column-defi
 
 This is the **controlled** comparison (same total trained tokens, same unique tokens, only data mix differs). It confirms: at 1.4B / 3.3B-token / 16-epoch repetition, 25% code mix doesn't help NL; it actively hurts. The earlier "v1 wins" interpretation from May 26 was retracted June 1 — v1 had 5× more unique tokens, not a fair comparison.
 
-**1-epoch experiment, FINAL step-29343 (~30.77B trained tokens, A5 vs B4):** **A5 (DCLM-only) wins ~11 NL benchmarks by 0.5-5 pp each** (arc_easy +2.2, arc_challenge +2.7, hellaswag +3.3, winogrande +2.6, piqa +0.9, sciq +0.5, openbookqa +1.8, social_iqa +1.5, logiqa +5.0, lambada +2.3, copa +5.0, wsc +15.4 — wsc is noisy, gpqa_diamond +5.1, mmlu_pro +4.3). **B4 (code-mix) wins boolq (+3.6), agieval_lsat_ar (+3.5), mmlu (+1.4), commonsense_qa (+1.8), bbh (+4.6), and decisively wins code-gen (humaneval lm-eval +9.8 pp, mbpp +6.0 pp). B4 actually *does* generate plausible Python — sample inspection shows it solves easy mbpp problems like `min_of_three`, substring-check, regex-whitespace-strip, and produces compilable but logically-wrong code on harder HumanEval problems. Bigcode strict-unit-test HE = 0.000 reflects that those longer HumanEval programs rarely pass all test cases, NOT that the model can't write Python at all.** In-domain val: A5 wins by 0.06 nats (2.821 vs 2.878). Paloma_macro: B4 slightly lower (1.097 vs 1.122) driven by twitterAAE + code subsets; on mainstream NL subsets (c4_en, wikipedia, m2d2_*, falcon-refinedweb, wikitext_103, redpajama) A5 wins by 1-3 nats × 0.01. **Same overall pattern as the 16-epoch comparison: code-mix HURTS NL while modestly improving code-gen-shaped metrics, with the trade-off persisting at matched compute and 1-epoch (no repetition).** See [§4 arithmetic decomposition probe](#4-counterfactual-probes--arithmetic-decomposition-phase-1) for one measured underlying difference: B4 has 83%/84% on single-digit add/mult while A5 has 35%/13%. That tells us code teaches a foundational arithmetic capability we can measure; it does NOT tell us why GSM8K floors for both — that's an open question we didn't probe.
+**1-epoch matched-token study (A5 vs B4 at step 29343 / ~30.77B trained tokens):** A5 (DCLM-only) wins on standard NL benchmarks (~12 tasks); B4 (DCLM + 25% code) wins on code-gen (humaneval lm-eval +9.8 pp, mbpp +6.0 pp) and a small handful of NL tasks (boolq, agieval_lsat_ar, bbh). Same direction as the 16-epoch comparison: matched-token code mix HURTS standard NL while modestly improving code-shaped metrics. In-domain dclm_200m_val: A5 better by 0.06 nats (2.821 vs 2.878). The B4 humaneval bigcode = 0.000 (after retry) reflects HumanEval's stricter unit-test scoring — sample inspection shows B4 produces compilable Python and solves easy mbpp problems; it just rarely passes HumanEval's harder unit tests.
 
 See ‡‡ footnote above for the lm-eval vs bigcode-eval-harness distinction. The two-row split in the §3 table (`humaneval[0] (lm-eval)` and `humaneval[0] (bigcode)`) shows that lm-eval's regex-extraction gives our small models 0-10pp credit on partial generations that bigcode (which runs the unit tests) rejects. For the only model in our suite where this matters in absolute terms, **B4 final lm-eval HumanEval = 0.104** captures real partial capability — sample inspection of B4's mbpp generations shows it solves easy problems like `find_substring`, `min_of_three`, regex-whitespace-strip; just rarely the full HumanEval programs.
 
