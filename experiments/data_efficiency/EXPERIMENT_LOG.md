@@ -40,7 +40,7 @@ The two are different goals. (A) is about training efficiency; (B) is about mode
 
 - **Matched-token H1 study (A5 vs B4 at 30B tokens) DOES NOT support code mix helping NL.** Under fair comparison, A5 (DCLM only) wins on standard NL while B4 (25% code) wins narrowly on code-gen-shaped tasks. Same direction at both 1.4B/3.36B (16-epoch) and 1.4B/30B (1-epoch). The May 26 "+0.47 nats paloma improvement" finding was retracted June 1 (unique-token confound).
 - **GSM-Symbolic + NoOp on phi-1.5 (June 3)** replicates the Mirzadeh published pattern — synthetic NL textbook data teaches surface form more than reasoning. Phi-1.5 GSM8K 0.305 → GSM-Sym main 0.160 → GSM-NoOp 0.034.
-- **4B (3.5B-arch) undertrained run (June 4-5)** trained on 6B DCLM tokens (TPP 1.7, 12× below Chinchilla). Lost to A5 (1.4B / TPP 21) on ~12 NL benchmarks — clean demo of "tokens > params at fixed FLOPs" on our hardware.
+- **4B (3.5B-arch) run (June 4-5)** trained on 6B DCLM tokens at 1.3 × 10²⁰ FLOPs. Lost to A5 (1.4B at 2.6 × 10²⁰ FLOPs) on ~12 NL benchmarks. **Note this is NOT a controlled comparison** — A5 used 2× the training FLOPs of 4B, so "A5 wins" partly reflects "A5 had more compute". Useful as a "what does an 8-GPU-day 4B run look like" data point, not as a "tokens > params" demonstration.
 - **No data candidate yet tested has passed H1 at 1.4B.** The next concrete candidate is the phi-1.5-style cosmopedia mix (data ready, training not yet run).
 
 ### Evaluation reference
@@ -61,7 +61,9 @@ Single-day theme: finish the 4B comparison started June 4 and ship the EVALUATIO
 
 ### 4B (3.5B-arch) eval + comparison to 1.4B baselines
 
-After the June 4 training run completed, converted step-22887 to HF and ran the full v2 eval suite. **Net: 1.4B with 30B Chinchilla-optimal tokens (TPP 21) wins on ~12 NL benchmarks vs 4B with 6B tokens (TPP 1.7).** Concrete head-to-head (A5 1ep final vs 4B final):
+After the June 4 training run completed, converted step-22887 to HF and ran the full v2 eval suite. **Net: 1.4B trained on 30B tokens (2.6 × 10²⁰ FLOPs) wins on ~12 NL benchmarks vs 4B trained on 6B tokens (1.3 × 10²⁰ FLOPs).** Critically, A5 used ~2× the training compute of 4B — so this is NOT a controlled "tokens vs params" comparison. It's a "what does an 8-GPU-day 4B run look like vs a 4-node-day 1.4B run" comparison.
+
+Concrete head-to-head (A5 1ep final vs 4B final):
 
 | Task | A5 1.4B | 4B undertrained | Δ |
 |---|---:|---:|---:|
@@ -90,7 +92,7 @@ After the June 4 training run completed, converted step-22887 to HF and ran the 
 | humaneval bigcode | 0.000 | 0.000 | tied |
 | mbpp 3-shot | 0.000 | 0.000 | tied |
 
-**Reading:** 4B at TPP 1.7 is below random or at-floor for most NL benchmarks except simple commonsense (piqa, copa, hellaswag) where it still loses to A5. On math/code, the small ~1 pp wins for 4B are at floor levels. **Tokens beat params at fixed FLOPs** for our hardware regime; the matched-token recipe at 1.4B with proper TPP is the better basis for further experiments than scaling to undertrained 4B.
+**Reading:** 4B is below random or at-floor for most NL benchmarks except simple commonsense (piqa, copa, hellaswag) where it still loses to A5. On math/code, the small ~1 pp wins for 4B are at floor levels. **A5 wins on most benchmarks, but A5 also had ~2× the training FLOPs** — so we can't cleanly attribute the gap to "tokens beat params". What this tells us: at our cluster's daily budget, training a bigger model is worse than training a 1.4B model longer; the next step is to actually fix-compute and re-run (e.g., train 4B for the same FLOPs as A5).
 
 ### Eval pipeline hardening
 
@@ -147,7 +149,7 @@ Per-node efficiency drops as nodes scale (EFA all-reduce gets relatively more ex
 
 ### 4B (3.5B-arch) training
 
-After confirming 8B works, user picked **4B at 6B tokens (12h budget)** as the actual run: "tokens beat params" hypothesis test, not the matched-token study. Two false starts hit infrastructure issues:
+After confirming 8B works, user picked **4B at 6B tokens (12h budget)** as the actual run, to see what a bigger-but-undertrained run looks like vs the 1.4B baselines (NOT a controlled tokens-vs-params experiment — see honest scope below). Two false starts hit infrastructure issues:
 
 1. **First attempt: llama_3_5b + tensor_parallel=8** → JAX SPMD `Involuntary full rematerialization` warning + barrier timeouts (the 3.5B hidden_dim=2560 doesn't shard cleanly across 8 GPUs). Killed.
 2. **Second attempt: same model, default FSDP, multi-node** → BrokenPipeError on wandb async socket caused the JAX shutdown barrier to fail. Set `tracker=NoopConfig()` + `WANDB_MODE=disabled` before any imports. This fix should be revisited after the run; checked-but-no-issue in levanter github issues, so the wandb-online + multi-node interaction is a real bug worth filing if it persists.
@@ -172,7 +174,7 @@ Two ways this run is NOT what was originally planned:
 - **Model size:** user asked for "4B", model dict's closest is `llama_3_5b` (3.5B params, hidden_dim=2560).
 - **Checkpoint dir name:** the script's `base_path` still says `8b_dclm_short/` from the 8B smoke iteration. The actual checkpoint is at `8b_dclm_short/c9x77du6/step-22887` despite being a 3.5B model. Numbers are right; the path is misleading. Renaming the dir later.
 
-This is also NOT a matched-token experiment vs A5 — different model size, different TPP, different recipe. It's a "tokens vs params" trade-off probe, not an H1 candidate.
+This is also NOT a matched-token experiment vs A5 — different model size, different training compute (2× less than A5), different recipe. It's a "what does an 8-GPU-day 4B run look like" comparison, not a controlled tokens-vs-params experiment and not an H1 candidate.
 
 ---
 
