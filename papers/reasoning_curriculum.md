@@ -394,7 +394,18 @@
 <details>
 <summary><h2>Curriculum & Data Selection</h2></summary>
 
-### [Improving Pretraining Data Using Perplexity Correlations](https://arxiv.org/abs/2409.05816) (Thrush, Potts & Hashimoto, 2025)
+### [Scaling Data-Constrained Language Models](https://arxiv.org/abs/2305.16264) (Muennighoff, Rush, Barak, Le Scao, Tazi, Piktus, Pyysalo, Wolf, Raffel, 2023)
+
+**Motivation:** Chinchilla's scaling law (Hoffmann et al 2022) was fit to single-epoch training and predicts compute-optimal D ≈ 20 N. But when unique data is scarce, you have to either repeat data, add code, or accept a smaller model — Chinchilla can't tell you which. This paper extends Chinchilla's law with explicit terms for the diminishing return of repeated tokens and excess parameters, fit on 182 training runs.
+
+**Experiment Setup:** GPT-2-style architecture, trained on C4 subsets at three fixed unique-data budgets (100M, 400M, 1.5B tokens) and three FLOP budgets (9.3 × 10²⁰, 2.1 × 10²¹, 9.3 × 10²¹) corresponding to 2.8B/4.2B/8.7B compute-optimal models. Cosine LR with 10× decay. Models trained up to 8.7B params × 178B tokens, with epoch counts up to 44. Loss is held-out C4 (same distribution as train). The parametric fit (Equations 5 and 6) is:
+- $D' = U_D + U_D R_D^* (1 - e^{-R_D / R_D^*})$ — effective tokens, where $U_D$ = unique tokens, $R_D$ = repetitions, $R_D^* \approx 15$ (the "half-life" of repeat data: ~16 epochs).
+- $N' = U_N + U_N R_N^* (1 - e^{-R_N / R_N^*})$ — effective parameters (symmetric formula for excess params).
+- $L(N, D) = A / N'^\alpha + B / D'^\beta + E$ — same functional form as Chinchilla, with N → N' and D → D'. They reuse Chinchilla's fitted A, B, α, β, E constants.
+
+**Conclusion:** Repeating data is "almost as good as new data" for up to ~4 epochs (25% unique data budget); after that returns drop quickly. The data-constrained law predicts that with 9.3 × 10²¹ FLOPs and 25B unique tokens, allocating extra compute to *more epochs* (rather than more parameters) gives lower loss than Chinchilla's equal-scaling recipe — the optimal model has 27% fewer parameters than Chinchilla would predict. Code augmentation (filling NL gap with Python code) lets you scale ~2× further before returns vanish. Headline: the "TPP ≈ 20" Chinchilla rule applies only at one epoch; repeated-data regimes need this extended law (with R_D* ≈ 15) which favours more epochs over more parameters.
+
+
 
 **Motivation:** Data-driven approaches to pretraining data selection require expensive retraining runs, and no algorithm consistently beats hand-crafted classifiers. The authors ask whether existing public LLMs can be leveraged for training-free data selection by exploiting correlations between per-domain perplexity and benchmark performance.
 
