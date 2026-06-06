@@ -62,30 +62,46 @@ DCLM_SHARDS = [
 ]
 DCLM_VAL = f"{BASE_TOKENIZED}/data_efficiency/dclm_200m_val-415aea"
 
-# === Code (Stack-style, stages 1+2) and Markup (stages 1+2) — TO BE FILLED ===
-# Once the data source is decided (StarCoderData per paper if access granted,
-# else codeparrot/github-code), set these to per-language tensorstore caches.
-# The mixture is computed per Aryabumi Table 3 (Stack) and Table 4 (Markup),
-# re-normalized over the top-10 / top-5 languages respectively.
-STACK_LANG_CACHES: dict[str, str] = {
-    # "java":       f"{BASE_TOKENIZED}/stack_java-XXXXXX",
-    # "javascript": f"{BASE_TOKENIZED}/stack_javascript-XXXXXX",
-    # "php":        f"{BASE_TOKENIZED}/stack_php-XXXXXX",
-    # "python":     f"{BASE_TOKENIZED}/stack_python-XXXXXX",
-    # "c-sharp":    f"{BASE_TOKENIZED}/stack_csharp-XXXXXX",
-    # "typescript": f"{BASE_TOKENIZED}/stack_typescript-XXXXXX",
-    # "c":          f"{BASE_TOKENIZED}/stack_c-XXXXXX",
-    # "cpp":        f"{BASE_TOKENIZED}/stack_cpp-XXXXXX",
-    # "go":         f"{BASE_TOKENIZED}/stack_go-XXXXXX",
-    # "ruby":       f"{BASE_TOKENIZED}/stack_ruby-XXXXXX",
-}
-MARKUP_LANG_CACHES: dict[str, str] = {
-    # "markdown": f"{BASE_TOKENIZED}/markup_markdown-XXXXXX",
-    # "yaml":     f"{BASE_TOKENIZED}/markup_yaml-XXXXXX",
-    # "json":     f"{BASE_TOKENIZED}/markup_json-XXXXXX",
-    # "html":     f"{BASE_TOKENIZED}/markup_html-XXXXXX",
-    # "css":      f"{BASE_TOKENIZED}/markup_css-XXXXXX",
-}
+# === Code (Stack-style, stages 1+2) and Markup (stages 1+2) ===
+# Tokenization caches produced by `experiments/data_efficiency/tokenize_starcoderdata.py`
+# Cache prefixes: stack_<safe_lang>-<hash>, markup_<lang>-<hash>.
+# default_tokenize replaces "-" with "_" in step names, so c-sharp -> stack_c_sharp.
+_TOKENIZED_BASE = Path(BASE_TOKENIZED)
+
+
+def _resolve_cache(prefix: str) -> str:
+    matches = sorted(_TOKENIZED_BASE.glob(f"{prefix}-*"))
+    if not matches:
+        raise FileNotFoundError(
+            f"No tokenized cache for prefix '{prefix}' in {BASE_TOKENIZED}. "
+            f"Run `MARIN_PREFIX=/fsx/users/dongweij/marin/outputs .venv/bin/python "
+            f"-m experiments.data_efficiency.tokenize_starcoderdata` first."
+        )
+    return str(matches[-1])
+
+
+_STACK_LANGS = ["java", "javascript", "php", "python", "c-sharp",
+                "typescript", "c", "cpp", "go", "ruby"]
+_MARKUP_LANGS = ["markdown", "yaml", "json", "html", "css"]
+
+
+def _stack_caches() -> dict[str, str]:
+    return {lang: _resolve_cache(f"stack_{lang.replace('-', '_')}")
+            for lang in _STACK_LANGS}
+
+
+def _markup_caches() -> dict[str, str]:
+    return {lang: _resolve_cache(f"markup_{lang}") for lang in _MARKUP_LANGS}
+
+
+# Auto-resolve at import (raises FileNotFoundError if tokenization incomplete).
+try:
+    STACK_LANG_CACHES: dict[str, str] = _stack_caches()
+    MARKUP_LANG_CACHES: dict[str, str] = _markup_caches()
+except FileNotFoundError as _e:
+    STACK_LANG_CACHES = {}
+    MARKUP_LANG_CACHES = {}
+    print(f"[c5-prod] WARN: {_e}")
 
 # === Aryabumi Table 3 ratios (Stack), top-10 re-normalized ===
 STACK_RATIOS = {
