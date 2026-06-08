@@ -2919,3 +2919,1539 @@ int main(){
 
 ---
 
+
+---
+
+# Additional sources (added 2026-06-07 PST — C5-v2 candidates)
+
+
+## Stack-Edu / Python (SmolLM2's code data — classifier-filtered Stack v2; content fetched on-demand from Software Heritage S3)
+
+Source: ``/fsx/users/dongweij/marin/outputs/raw/stack-edu/Python/*.parquet` (metadata) → softwareheritage S3 `content/{blob_id}` (gzipped)`
+
+### Sample 1
+
+_(deyvisonguilherme/TCGuaruja / /api/bll/categoria.py (score 2.52))_
+
+```
+import falcon
+from dal.categoria import categoriaDAL
+
+class categoriaBLL(object):
+    def on_get(self, req, resp):
+        try:
+            resp.status = falcon.HTTP_200
+            resp.body = ('\nO homem não é nada além daquilo que a educação faz dele.\n\n'
+                         '    ~ Immanuel Kant\n\n')
+        except(IOError):
+            raise falcon.HTTPError(falcon.HTTP_725,'ERROR')
+
+    def on_post(self, req, resp):
+        try:
+            negocio = categoriaDAL()
+            negocio.add(req['categoria'])
+            resp.status = falcon.HTTP_200
+            resp.body = ('cadastro efetuado com sucesso')
+        except(IOError):
+            raise falcon.HTTPError
+
+
+    def on_put(self, req, resp):
+        try:
+            pass
+        except(IOError):
+            raise falcon.HTTPError
+
+
+    def on_delete(self, req, resp):
+        try:
+            pass
+        except(IOError):
+            raise falcon.HTTPError
+```
+
+### Sample 2
+
+_(maximilianh/pubMunch / /lib/maxXml.py (score 3.45))_
+
+```
+#!/usr/bin/env python
+import logging, urllib
+import xml.etree.cElementTree as etree
+
+class XmlParser(object):
+    """ class to represent an xml tree (using ElementTree)
+        Functions Accept PATH which is a /a/b/c style xpath-like expression to refer to elements
+        PATH is not a complete XPATH implementation
+
+        getText... functions return just a string
+        getXml... functions return an XmlParser-object
+        ...First  functions get only the first instance
+        ...All    functions return an iterator
+
+    >>> xp = XmlParser(string="<fruit><apple size='big'>boskoop</apple><apple size='small'>granny smith</apple><pear>mypear</pear></fruit>")
+    >>> xp.getTextFirst("pineapple", default="NothingAtAll")
+    'NothingAtAll'
+    >>> xp.getTextFirst("apple")
+    'boskoop'
+    >>> list(xp.getTextAll("apple"))
+    ['boskoop', 'granny smith']
+    >>> list(xp.getTextAll("apple", reqAttrDict={'size':'big'}))
+    ['boskoop']
+
+    """
+    def __init__(self, string=None, url=None, root=None, removeNamespaces=False):
+        self.root=None
+        if string!=None:
+            self.fromString(string, removeNamespaces)
+        elif url!=None:
+            self.fromUrl(url, removeNamespaces)
+        elif root!=None:
+            self.root=root
+
+    def getAttr(self, name):
+        return self.root.attrib.get(name, None)
+
+    def getText(self):
+        if self.root.text==None:
+            return ""
+        else:
+            return self.root.text
+
+    def getTextTail(self):
+    
+... [truncated; full doc has 6,421 chars]
+```
+
+### Sample 3
+
+_(kumaraguru-pk/cloud-sheet / /server.py (score 2.64))_
+
+```
+import flask
+from werkzeug.utils import ArgumentValidationError
+app = flask.Flask(__name__)
+from sheets import *
+from flask import jsonify
+sheet_manager = SheetManager()
+
+
+@app.route("/sheets/<sheet_id>/worksheets/<wsheet_id>",methods=['GET'])
+def index(sheet_id, wsheet_id):
+    sheet_manager.create(sheet_id, wsheet_id)
+    rows = [str(i+1) for i in range(10)]
+    columns = [chr(i+ord('A')) for i in range(10)]
+    worksheet_local = {}
+    for row in rows:
+        for col in columns:
+            if col+row in sheet_manager.sheets[sheet_id].worksheets[wsheet_id].cells:
+                info = {
+                    'value':sheet_manager.sheets[sheet_id].worksheets[wsheet_id].cells[col+row].value,
+                    'formula':sheet_manager.sheets[sheet_id].worksheets[wsheet_id].cells[col+row].formula
+                    }
+                worksheet_local[col+row] = info
+            else:
+                worksheet_local[col+row] = {}
+    return flask.render_template('index.html', rows=rows, columns=columns, worksheet_local=worksheet_local, sheet_id=sheet_id, wsheet_id=wsheet_id)
+
+@app.route('/sheets/<sheet_id>/worksheets/<wsheet_id>/cell/<cell_id>/<value>', methods=['PUT'])
+def update_cell(sheet_id, wsheet_id, cell_id,value):
+    # show the user profile for that user
+    try:
+        return jsonify(sheet_manager.sheets[sheet_id].worksheets[wsheet_id].update_cell(cell_id,value))
+    except CircularReferenceException as err:
+        return "Circular reference", 422
+    except Argumen
+... [truncated; full doc has 1,857 chars]
+```
+
+### Sample 4
+
+_(karinafl510/postman-practice / /api/count.py (score 3.00))_
+
+```
+# define functions for HTTP verb methods used in rest apps
+
+from flask_restful import Resource # convert class as resource
+from flask import request
+import logging as logger
+from .calcs import days_between, weeks_between, months_between
+
+
+class count(Resource): # Task class is inheriting from Resource class
+
+    def get(self,choice):
+        logger.debug("Inside get method of count")
+
+        return {"Type" : "Calculating {}".format(choice)},200
+
+    def post(self,choice):
+        logger.debug("Inside post method of count")
+
+        # retrieve data from postman body
+        req_data = request.get_json()
+        date1 = req_data['Date 1']
+        date2 = req_data['Date 2']
+
+        # calculation functions
+        days = days_between(date1, date2)
+        weeks = weeks_between(date1, date2)
+        months = months_between(date1, date2)
+
+        if choice=='days':
+            return {"Days" : "{}".format(days)},200
+        if choice=='weeks':
+            return {"Weeks" : "{}".format(weeks)},200
+        if choice=='months':
+            return {"Months" : "{}".format(months)},200
+        if choice=='all':
+            return {
+                "Days" : "{} days".format(days),
+                "Weeks" : "{} weeks".format(weeks),
+                "Months" : "{} months".format(months)
+            },200
+
+
+    def put(self,choice):
+        logger.debug("Inside put method of count")
+        return {"message" : "inside put method of count. CHOICE-
+... [truncated; full doc has 1,805 chars]
+```
+
+### Sample 5
+
+_(valevo/Thesis / /src/subsampling/heap.py (score 2.56))_
+
+```
+# -*- coding: utf-8 -*-
+
+from data.reader import wiki_from_pickles
+from data.corpus import Words, Articles, Sentences
+
+from stats.stat_functions import compute_vocab_size
+
+from stats.mle import Heap
+
+from jackknife.plotting import hexbin_plot
+
+import numpy as np
+import numpy.random as rand
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+import pickle
+import os
+        
+def heap(corp, rng):
+    vocab_sizes = []
+    for i, ntoks in enumerate(rng):
+        if i % 10 == 0:
+            print(i, ntoks)
+        subsample = Sentences.subsample(corp, ntoks)
+        vocab_size = compute_vocab_size(subsample)
+        vocab_sizes.append(vocab_size)
+        
+    return vocab_sizes
+
+def heap_from_file(save_dir, rng_params):
+    rng_params = map(str, rng_params)
+    required_file_name = "vocab_growth_" + "_".join(rng_params) + ".pkl"
+    print(required_file_name)
+    if required_file_name in os.listdir(save_dir):
+        with open(save_dir + required_file_name, "rb") as handle:
+            return pickle.load(handle)
+    else:
+        raise FileNotFoundError
+
+
+def do_mles(rng, vocab_sizes, save_dir):
+    with open(save_dir + "mle_heap_point_estimates.txt", "w") as handle:
+        for vs in vocab_sizes:
+            heap = Heap(vs, rng)
+            heap_fit = heap.fit(start_params=np.asarray([100000.0, 1.0]), 
+                                        method="powell", full_output=True)    
+            heap.register_fit(heap_fit)
+
+            handle.write(heap.print_result(string=True))
+ 
+... [truncated; full doc has 3,206 chars]
+```
+
+### Sample 6
+
+_(DenBlacky808/--Python / /3. Cells.py (score 3.86))_
+
+```
+class Cell:
+    def __init__(self, population):
+        self.population = population
+
+    def __add__(self, other):
+        return self.population + other.population
+
+    def __sub__(self, other):
+        if self.population >= other.population:
+            return self.population - other.population
+        else:
+            return 'Ячеек в первой клетке меньше чем во второй!'
+
+    def __mul__(self, other):
+        return Cell(self.population * other.population)
+
+    def __truediv__(self, other):
+        return Cell(self.population // other.population)
+
+    def make_order(self, raw):
+        num = self.population // raw
+        return print('\n'.join([(''.join(['*' for _ in range(raw)])) for _ in range(num)]) + '\n' + ''.join(
+            ['*' for _ in range(self.population - num * raw)]))
+
+
+cells_1 = Cell(13)
+cells_2 = Cell(25)
+print(cells_1 + cells_2)
+print(cells_1 - cells_2)
+print(cells_2 - cells_1)
+cells_3 = cells_1 * cells_2
+cells_4 = cells_2 / cells_1
+print(cells_3.population)
+print(cells_4.population)
+cells_2.make_order(7)
+
+```
+
+### Sample 7
+
+_(anuckp/calculator / /calculator.py (score 4.09))_
+
+```
+x=int(input("Enter the first num: "))
+y=int(input("Enter the second num: "))
+while True:
+    z=input("Enter the operator: ")
+    if z=='+':
+        result=x+y
+        print(result)
+        break
+
+    elif z=='-':
+        result=x-y
+        print(result)
+        break
+    
+    elif z=='*':
+        result=x*y
+        print(result)
+        break
+    
+    elif z=='/':
+        result=x/y
+        print(result)
+        break
+    elif z=='%':
+        result=x%y
+        print(result)
+        break
+    else:
+        print("choose in between + - * /")
+    
+
+```
+
+### Sample 8
+
+_(Alexanderklau/Algorithm / /Everyday_alg/2021/01/2021_01_22/number-of-rectangles-that-can-form-the-largest-square.py (score 3.52))_
+
+```
+# coding: utf-8
+
+__author__ = 'Yemilice_lau'
+
+"""
+给你一个数组 rectangles ，其中 rectangles[i] = [li, wi] 表示第 i 个矩形的长度为 li 、宽度为 wi 。
+
+如果存在 k 同时满足 k <= li 和 k <= wi ，就可以将第 i 个矩形切成边长为 k 的正方形。例如，矩形 [4,6] 可以切成边长最大为 4 的正方形。
+
+设 maxLen 为可以从矩形数组 rectangles 切分得到的 最大正方形 的边长。
+
+返回可以切出边长为 maxLen 的正方形的矩形 数目 。
+
+ 
+
+示例 1：
+
+输入：rectangles = [[5,8],[3,9],[5,12],[16,5]]
+输出：3
+解释：能从每个矩形中切出的最大正方形边长分别是 [5,3,5,5] 。
+最大正方形的边长为 5 ，可以由 3 个矩形切分得到。
+示例 2：
+
+输入：rectangles = [[2,3],[3,7],[4,3],[3,7]]
+输出：3
+"""
+
+rectangles = [[5,8],[3,9],[5,12],[16,5]]
+
+
+z = []
+
+for i in rectangles:
+    z.append(min(i))
+
+
+
+v = []
+for i in list(set(z)):
+    v.append(z.count(i))
+
+
+print(sum(1 for i in z if i == max(v)))
+
+```
+
+### Sample 9
+
+_(CapstoneProject18/Twitter-sentiment-analysis / /m7.py (score 4.00))_
+
+```
+'''
+---------------------------------------------------------------------------------------------------
+#pseudocode
+#1 importing csv module
+#2 file = open ("file path")
+#3 data of file which is read is Stored in a variable csv_file
+#4  for loop :
+     #making count of row
+     #if > 1
+     #masking the first 4 numbers with x
+     #printing row
+#5 else printing number without masking
+----------------------------------------------------------------------------------------------------
+'''
+#importing csv
+import csv
+#open file
+file = open('C:\\Users\\764024\\Desktop\\exercises\\Worksheet in Problems.csv')
+#reading csv file variable name(file) 
+csv_file = csv.reader(file)
+count = -1
+#for every row in csv file we run the loop
+for row in csv_file:
+            
+    count = count+1
+    #storing that row in variable a
+    if count > 0:
+        a = row[0]
+    #printing the row details and replacing first 3 digits with x and displaying last four digits
+        row[0] = (a[-4:].rjust(len(a),'x'))
+        print(row)
+    else:
+        print(row)
+file.close()
+
+```
+
+### Sample 10
+
+_(RuiboZhang1/test_one / /10001st prime.py (score 3.42))_
+
+```
+import time
+start=time.clock()
+i=int(input('please enter  an integer:'))
+#创建一个空list
+
+r=list()
+NumPrime = 0
+#添加元素2
+r.append(2)
+#从3开始挨个筛选
+for a in range(3,i):
+    b=False
+
+#用a除以小于a的质数b
+    for b in r:
+        if a%b==0:
+            b=False
+            break
+        else:
+            b=True
+    if b==True:
+        r.append(a)
+        NumPrime +=1
+        if NumPrime == 10000:
+            break
+
+print (r)
+print(NumPrime)
+print(r[10000])
+t=(time.clock()-start)
+print (t)
+```
+
+---
+
+## Nemotron-Pretraining-Specialized-v1.1 / Code-Concepts (synthetic Python from concept-taxonomy prompts, gpt-oss-20b/120b)
+
+Source: ``/fsx/users/dongweij/marin/outputs/raw/nemotron_specialized_v11/Nemotron-Pretraining-Code-Concepts/*.parquet``
+
+### Sample 1
+
+_(shard part_000021.parquet, row 89338, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+def max_subarray_from_parentheses(expr: str) -> int:
+    """
+    Parse a string of comma‑separated integers optionally enclosed in parentheses,
+    produce a flat list, then treat it as a line graph of consecutive nodes
+    and search for the contiguous subsequence with maximum sum (Kadane style).
+    >>> max_subarray_from_parentheses("(1,2,-3)(4,5)(-6,7)")
+    9
+    >>> max_subarray_from_parentheses("(5)(-1,2)(3)(-4,1)")
+    9
+    """
+    # ------------------------------------------------------------
+    # 1. Extract all integer tokens from the expression.
+    #    Parentheses are only delimiters; they can be replaced by commas.
+    # ------------------------------------------------------------
+    tokens = expr.replace('(', ',').replace(')', ',').split(',')
+    # keep non‑empty trimmed parts and convert them to ints
+    nums = [int(tok) for tok in tokens if tok.strip()]
+
+    # ------------------------------------------------------------
+    # 2. Kadane's algorithm – maximum sub‑array sum in O(n).
+    #    If the list is empty we return 0 (nothing to sum).
+    # ------------------------------------------------------------
+    if not nums:
+        return 0
+
+    max_ending = max_sofar = nums[0]
+    for x in nums[1:]:
+        # best sum of a sub‑array that ends at the current element
+        max_ending = max(x, max_ending + x)
+        # best sum seen so far
+        max_sofar = max(max_sofar, max_ending)
+
+    return max_sofar
+```
+
+### Sample 2
+
+_(shard part_000054.parquet, row 13605, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+from typing import List
+
+def prime_substring_count(digits: str) -> int:
+    """
+    Count every contiguous substring of a digit string that, when interpreted as an
+    integer (ignoring leading zeros), is a prime number.  The function uses a
+    sieve of Eratosthenes to generate primes only up to the largest possible
+    integer represented by the string, and then searches all substrings.
+
+    >>> prime_substring_count("1012")
+    2
+    >>> prime_substring_count("13")
+    2
+    >>> prime_substring_count("123")
+    3
+    """
+    # Edge case: empty string
+    if not digits:
+        return 0
+
+    # Largest integer that can appear among substrings
+    max_val = int(digits)
+    if max_val < 2:
+        return 0
+
+    # --------- Sieve of Eratosthenes ----------
+    is_prime = [True] * (max_val + 1)
+    is_prime[0] = is_prime[1] = False
+    p = 2
+    while p * p <= max_val:
+        if is_prime[p]:
+            step = p
+            start = p * p
+            for multiple in range(start, max_val + 1, step):
+                is_prime[multiple] = False
+        p += 1
+    # ------------------------------------------
+
+    count = 0
+    n = len(digits)
+    # Enumerate all contiguous substrings
+    for i in range(n):
+        # Build the number incrementally to avoid repeated int() on the same prefix,
+        # but the straightforward conversion is still O(1) per substring given small sizes.
+        for j in range(i + 1, n + 1):
+            val = int(digits[i:j])          # leading zeros are ign
+... [truncated; full doc has 1,587 chars]
+```
+
+### Sample 3
+
+_(shard part_000010.parquet, row 35404, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+from typing import List
+
+def has_prime_pair_with_sum(prime_count: int, target: int) -> bool:
+    """
+    Generate the first `prime_count` primes, push them onto a stack,
+    then ask whether any two primes from that stack add up to `target`.
+    The algorithm uses the classic two‑sum technique on the prime list.
+    It returns True if such a pair exists, otherwise False.
+
+    >>> has_prime_pair_with_sum(10, 20)
+    True   # 13 + 7
+    >>> has_prime_pair_with_sum(5, 9)
+    False  # primes are 2,3,5,7,11; none sum to 9
+    >>> has_prime_pair_with_sum(15, 50)
+    True   # 43 + 7 (within the first 15 primes)
+    """
+    # ---------- helper to test primality ----------
+    def is_prime(n: int) -> bool:
+        if n < 2:
+            return False
+        if n == 2:
+            return True
+        if n % 2 == 0:
+            return False
+        i = 3
+        while i * i <= n:
+            if n % i == 0:
+                return False
+            i += 2
+        return True
+
+    # ---------- generate first `prime_count` primes ----------
+    primes: List[int] = []
+    candidate = 2
+    while len(primes) < prime_count:
+        if is_prime(candidate):
+            primes.append(candidate)
+        candidate += 1
+
+    # Need at least two numbers for a pair
+    if len(primes) < 2:
+        return False
+
+    # ---------- classic two‑sum on the sorted list ----------
+    left, right = 0, len(primes) - 1
+    while left < right:
+        s = primes[left] + primes[right]
+        if s == target:
+      
+... [truncated; full doc has 1,616 chars]
+```
+
+### Sample 4
+
+_(shard part_000021.parquet, row 147052, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+from typing import List, Tuple
+
+def csv_contiguous_sums(csv: str) -> List[Tuple[int, int, int]]:
+    """Return a list of contiguous ranges and their sums from a comma‑separated string.
+
+    The input string contains integers separated by commas.
+    Consecutive integers in the sequence that form a continuous block
+    (each element +1 from the previous) are grouped as a range.
+    For each range you must produce a tuple (start, end, sum) where
+    * start  – first value of the range
+    * end    – last value of the range
+    * sum    – arithmetic sum of all values inside the range
+
+    Example 1:
+    >>> csv_contiguous_sums("1,2,3,5,6,10")
+    [(1, 3, 6), (5, 6, 11), (10, 10, 10)]
+
+    Example 2:
+    >>> csv_contiguous_sums("4,5,6,7,8")
+    [(4, 8, 34)]
+
+    Example 3:
+    >>> csv_contiguous_sums("9")
+    [(9, 9, 9)]
+    """
+    # Edge case: empty string -> no ranges
+    if not csv.strip():
+        return []
+
+    # Convert the CSV string to a list of integers
+    numbers = [int(item) for item in csv.split(",")]
+
+    result: List[Tuple[int, int, int]] = []
+    start = numbers[0]
+    prev = numbers[0]
+
+    for n in numbers[1:]:
+        # If the current number continues the contiguous block
+        if n == prev + 1:
+            prev = n
+            continue
+
+        # Block ended – compute the range and its sum
+        end = prev
+        # arithmetic series sum: count * (first + last) // 2
+        count = end - start + 1
+        total = count * (start + end) // 2
+        result.
+... [truncated; full doc has 1,761 chars]
+```
+
+### Sample 5
+
+_(shard part_000021.parquet, row 183943, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+from typing import List
+
+def unique_or_sum(arrays: List[List[int]]) -> int:
+    """Compute the sum of unique bitwise OR values from a list of integer sub‑lists. For each sub‑list, compute the bitwise OR of its elements, collect these OR results into a set to remove duplicates, and sum the unique values.
+
+    >>> unique_or_sum([[1, 2], [3], [1, 2]])
+    3
+    >>> unique_or_sum([[5, 2], [15], [8, 1]])
+    31
+    >>> unique_or_sum([[0], [0, 1], [1]])
+    1
+    """
+    # Set to keep distinct OR results
+    seen = set()
+
+    for sub in arrays:
+        # Bitwise OR of an empty list is defined as 0 (neutral element)
+        cur = 0
+        for num in sub:
+            cur |= num
+        seen.add(cur)
+
+    # Sum of the unique OR values
+    return sum(seen)
+```
+
+### Sample 6
+
+_(shard part_000015.parquet, row 42933, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+from typing import List, Tuple
+
+def max_xor_path(adj: List[List[Tuple[int, int]]]) -> int:
+    """
+    Compute the maximum XOR‑sum of edge weights along any simple path
+    from vertex 0 to vertex n‑1 in an undirected graph.
+
+    The graph is given as an adjacency list where adj[u] is a list of
+    (v, w) pairs meaning an edge between u and v with integer weight w.
+    Vertices are numbered from 0.
+
+    The algorithm performs a depth‑first search using an explicit stack
+    (potentially very large recursion depth) and tracks the XOR value
+    of the current path.  Whenever the destination vertex is reached,
+    the XOR value of that path is compared to the current best result,
+    and the maximum is returned.
+
+    Examples
+    -------
+    >>> # Graph: 0--1--2  (weights 5 and 3)
+    >>> adj1 = [[(1, 5)], [(0, 5), (2, 3)], [(1, 3)]]
+    >>> max_xor_path(adj1)
+    6
+    >>> # Graph:
+    >>> # 0--1 (1), 1--2 (2), 0--2 (4), 2--3 (8)
+    >>> adj2 = [[(1, 1), (2, 4)], [(0, 1), (2, 2)], [(1, 2), (0, 4), (3, 8)], [(2, 8)]]
+    >>> max_xor_path(adj2)
+    12
+    """
+    n = len(adj)
+    if n == 0:
+        return 0
+    # best XOR found so far
+    best = 0
+
+    # visited[i] == True while vertex i is on the current DFS stack
+    visited = [False] * n
+
+    # stack holds frames (node, xor_to_node, next_index)
+    # next_index is the position of the next neighbour to explore
+    stack: List[Tuple[int, int, int]] = [(0, 0, 0)]
+    visited[0] = True
+
+    while stack:
+        node, cur_xor, nxt 
+... [truncated; full doc has 2,223 chars]
+```
+
+### Sample 7
+
+_(shard part_000000.parquet, row 237477, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+from typing import Dict
+
+def filter_dict_by_value_range(dictionary: Dict[str, int], low: int, high: int) -> Dict[str, int]:
+    """Return a new dictionary containing only the entries from the input dictionary whose integer values lie within the inclusive range [low, high].
+
+    The original dictionary is left unchanged.  
+    The function uses a simple brute‑force scan of all keys to select the qualifying entries.
+
+    >>> filter_dict_by_value_range({'a': 1, 'b': 4, 'c': 7}, 3, 6)
+    {'b': 4}
+    >>> filter_dict_by_value_range({'x': 10, 'y': 20}, 5, 15)
+    {'x': 10}
+    >>> filter_dict_by_value_range({'p': 5}, 6, 10)
+    {}
+    """
+    # Use a dictionary comprehension to copy only those key‑value pairs
+    # whose values fall within the inclusive range [low, high].
+    return {k: v for k, v in dictionary.items() if low <= v <= high}
+```
+
+### Sample 8
+
+_(shard part_000027.parquet, row 202791, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+from typing import List
+
+def shortest_path_weight(edge_list: List[str], start: str, end: str) -> int:
+    """
+    Given a directed graph encoded as a list of strings in the form
+    "node_a,node_b,weight", convert the string representation to a graph
+    and return the total weight of the shortest path from **start** to
+    **end**. If no path exists, return -1.
+
+    >>> shortest_path_weight(
+    ...     ["A,B,3", "B,C,2", "A,C,5"], "A", "C")
+    5
+    >>> shortest_path_weight(
+    ...     ["A,B,1", "B,C,4", "A,C,10"], "A", "C")
+    5
+    """
+    # ------------------------------------------------------------------
+    # Build adjacency list: node -> list of (neighbor, weight)
+    # ------------------------------------------------------------------
+    graph = {}
+    for token in edge_list:
+        a, b, w = token.split(',')
+        w = int(w)
+        graph.setdefault(a, []).append((b, w))
+        # Ensure every node appears in the dict (even if it has no outgoing edges)
+        graph.setdefault(b, [])
+
+    # Trivial case: start equals end -> zero weight
+    if start == end:
+        return 0
+
+    # If start node does not exist in the graph, there is no path
+    if start not in graph:
+        return -1
+
+    # ------------------------------------------------------------------
+    # Dijkstra's algorithm (using a min‑heap) to find the shortest distance
+    # ------------------------------------------------------------------
+    import heapq
+
+    INF = float('inf')
+    dist = {node
+... [truncated; full doc has 2,075 chars]
+```
+
+### Sample 9
+
+_(shard part_000005.parquet, row 230327, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+from typing import Dict, List
+
+def find_encrypted_palindromic_path(
+    graph: Dict[int, List[int]],
+    labels: Dict[int, str],
+    shift: int,
+    start: int,
+    goal: int,
+    max_depth: int = 10
+) -> bool:
+    """Return True if there is a simple path from `start` to `goal` such that the
+    concatenated node labels along the path, when each character is shifted
+    by `shift` (a Caesar‑cipher encryption), form a palindrome string.
+
+    The search must not revisit nodes and cannot exceed `max_depth` edges.
+
+    >>> find_encrypted_palindromic_path(
+    ...     {0:[1], 1:[2], 2:[]},
+    ...     {0:"ab", 1:"c", 2:"ba"},
+    ...     shift=1,
+    ...     start=0,
+    ...     goal=2
+    ... )
+    True
+
+    >>> find_encrypted_palindromic_path(
+    ...     {0:[1,2], 1:[3], 2:[3], 3:[]},
+    ...     {0:"x", 1:"y", 2:"z", 3:"x"},
+    ...     shift=2,
+    ...     start=0,
+    ...     goal=3
+    ... )
+    False
+
+    >>> find_encrypted_palindromic_path(
+    ...     {0:[1], 1:[2,3], 2:[4], 3:[4], 4:[]},
+    ...     {0:"a", 1:"b", 2:"c", 3:"b", 4:"a"},
+    ...     shift=0,
+    ...     start=0,
+    ...     goal=4,
+    ...     max_depth=5
+    ... )
+    True
+    """
+    # Helper: apply Caesar shift to a string (wrap for letters, leave others)
+    def caesar(s: str, k: int) -> str:
+        res = []
+        for ch in s:
+            if 'a' <= ch <= 'z':
+                res.append(chr(((ord(ch) - 97 + k) % 26) + 97))
+            elif 'A' <= ch <= 'Z':
+                res.append(chr(((ord(ch) -
+... [truncated; full doc has 2,736 chars]
+```
+
+### Sample 10
+
+_(shard part_000038.parquet, row 98984, category=Nemotron-Pretraining-Code-Concepts)_
+
+```
+from typing import List
+
+def has_two_sum_modulo(nums: List[int], mod: int, target: int) -> bool:
+    """Check if any two distinct elements of *nums* satisfy
+    (nums[i] + nums[j]) % mod == target.
+
+    The task combines the classic two‑sum problem, efficient bit
+    manipulation for lookup, and modular arithmetic properties.
+    Using a bit set (bit vector) helps achieve linear time.
+
+    >>> has_two_sum_modulo([1, 4, 5, 6], 7, 6)
+    True
+    >>> has_two_sum_modulo([2, 2, 2], 4, 0)
+    True
+    >>> has_two_sum_modulo([1, 2, 3], 5, 4)
+    False
+    """
+    # Normalise the target to the same modular range.
+    target %= mod
+
+    # `seen` will store residues we have already processed.
+    # Using a set gives O(1) average‑time membership tests,
+    # which is effectively the same as a bit‑vector for this problem.
+    seen = set()
+
+    for value in nums:
+        # Only the residue modulo `mod` matters for the sum.
+        residue = value % mod
+
+        # We need a complement `c` such that (residue + c) % mod == target.
+        # Rearranging gives c ≡ target - residue (mod mod).
+        complement = (target - residue) % mod
+
+        # If we have already seen the needed complement, we have a valid pair.
+        if complement in seen:
+            return True
+
+        # Record the current residue for future checks.
+        seen.add(residue)
+
+    # No suitable pair was found.
+    return False
+```
+
+---
+
+## Nemotron-Pretraining-Specialized-v1.1 / Unconditional-Algorithmic (synthetic Python from minimal 'write a function' prompts, gpt-oss-120b + Qwen3-235B)
+
+Source: ``/fsx/users/dongweij/marin/outputs/raw/nemotron_specialized_v11/Nemotron-Pretraining-Unconditional-Algorithmic/*.parquet``
+
+### Sample 1
+
+_(shard part_000000.parquet, row 1728, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+Problem:
+Shortest Path with Exactly K Edges
+
+You are given a directed weighted graph with N vertices (numbered 1 … N) and M edges. All edge weights are non‑negative integers.
+
+For each query you are given three integers u, v, K. You have to output the length of the shortest path that starts at vertex u, ends at vertex v and uses exactly K edges. If no such path exists output -1.
+
+Input
+N M
+a1 b1 w1
+...
+aM bM wM
+Q
+u1 v1 K1
+...
+uQ vQ KQ
+
+Constraints
+1 ≤ N ≤ 100
+0 ≤ M ≤ N·(N‑1)
+1 ≤ ai, bi ≤ N
+0 ≤ wi ≤ 10^9
+1 ≤ Q ≤ 2000
+0 ≤ Ki ≤ 10^9
+
+If there are multiple edges between the same pair of vertices keep only the smallest weight.
+
+Output
+For each query output a single integer – the length of the shortest path that uses exactly K edges, or -1 if such a path does not exist.
+
+Sample
+Input
+4 5
+1 2 3
+2 3 4
+3 4 5
+1 3 10
+2 4 1
+5
+1 4 2
+1 4 3
+1 4 4
+2 3 1
+3 1 0
+
+Output
+4
+12
+-1
+4
+-1
+
+Explanation
+* K = 2: 1 → 2 (3) → 4 (1) → total 4.
+* K = 3: 1 → 2 (3) → 3 (4) → 4 (5) → total 12.
+* K = 4: no path with exactly 4 edges exists.
+* K = 1 from 2 to 3 is the direct edge weight 4.
+* K = 0 from 3 to 1 is possible only if u == v; here it isn’t, so -1.
+
+Solution:
+```python
+import sys
+
+INF = 10 ** 18
+
+def min_plus_mat_mul(A, B, n):
+    """C = A ⊗ B (min‑plus multiplication) for n×n matrices."""
+    C = [[INF] * n for _ in range(n)]
+    for i in range(n):
+        Ai = A[i]
+        Ci = C[i]
+        for k in range(n):
+            aik = Ai[k]
+            if aik == INF:
+                continue
+            Bk =
+... [truncated; full doc has 3,274 chars]
+```
+
+### Sample 2
+
+_(shard part_000000.parquet, row 117524, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+1. Task:
+
+Write a python function `minimumDeletionSize(strs: List[str]) -> int` that, given a list of equal‑length strings, returns the minimum number of columns that must be deleted so that each remaining column is sorted in non‑decreasing order when read top‑to‑bottom. The solution should run in O(m·n) time where `m` is the number of strings and `n` is their length.
+
+2. Hint:
+Iterate column by column. Keep a boolean array `sorted[i]` indicating whether the pair of rows `i` and `i+1` is already confirmed to be in correct order by a previous column. If a column causes any unsorted pair to become decreasing, that column must be deleted. Otherwise, mark newly sorted pairs. Count deleted columns.
+
+3. Starter Code:
+def minimumDeletionSize(strs):
+    
+
+4. Answer:
+def minimumDeletionSize(strs):
+    if not strs:
+        return 0
+
+    m, n = len(strs), len(strs[0])
+    # sorted[i] == True means rows i and i+1 are already ordered
+    sorted_pair = [False] * (m - 1)
+    deletions = 0
+
+    for col in range(n):
+        delete_this = False
+        for i in range(m - 1):
+            if not sorted_pair[i] and strs[i][col] > strs[i + 1][col]:
+                delete_this = True
+                break
+
+        if delete_this:
+            deletions += 1
+            continue
+
+        # Update sorted pairs with this column
+        for i in range(m - 1):
+            if strs[i][col] < strs[i + 1][col]:
+                sorted_pair[i] = True
+
+        # Early exit: if all pairs are sorted, we can stop
+
+... [truncated; full doc has 2,395 chars]
+```
+
+### Sample 3
+
+_(shard part_000000.parquet, row 11504, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+**Problem**
+
+> **Path K‑th Smallest (Hard)**
+> 
+> You are given a tree with `N` vertices (`1 ≤ N ≤ 2·10⁵`).  
+> The vertices are numbered from `1` to `N`.  
+> Each vertex `i` has an integer value `a[i]` (`0 ≤ a[i] ≤ 10⁹`).
+> 
+> The tree is rooted at vertex `1`.  
+> You have to answer `Q` queries (`1 ≤ Q ≤ 2·10⁵`).  
+> Queries are given online and are of two types:
+> 
+> 1. **Update** – `1  u  x`  
+>    Change the value of vertex `u` to `x` (`0 ≤ x ≤ 10⁹`).
+> 
+> 2. **Path‑kth** – `2  u  v  k`  
+>    Consider the simple path from `u` to `v` (both inclusive).  
+>    Let `S` be the multiset of values of the vertices on this path.  
+>    Output the `k`‑th smallest element of `S` (1‑based).  
+>    If `k` is larger than the number of vertices on the path, output `-1`.
+> 
+> All queries must be processed in the order they appear.
+> 
+> **Input**
+> ```
+> N Q
+> a[1] a[2] … a[N]
+> N‑1 lines:  u v          (edges of the tree)
+> Q lines:   type …        (queries as described)
+> ```
+> 
+> **Output**
+> For each query of type 2 print the answer on a separate line.
+> 
+> **Constraints**
+> * `1 ≤ N, Q ≤ 2·10⁵`
+> * The sum of `N` over all test files does not exceed `2·10⁵`.
+> * The sum of `Q` over all test files does not exceed `2·10⁵`.
+> * `0 ≤ a[i], x ≤ 10⁹`
+> * `1 ≤ u, v ≤ N`
+> * `1 ≤ k ≤ N`
+
+--------------------------------------------------------------------
+
+### Explanation / Reasoning  
+
+The classic way to answer “k‑th smallest on a path” is to use a **persistent segment tree** (also called a
+... [truncated; full doc has 14,554 chars]
+```
+
+### Sample 4
+
+_(shard part_000000.parquet, row 174886, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+# Question
+
+Write a function to find the lexicographical order of two given strings without using any built-in comparison functions. The function should return 0 if the strings are equal, a negative value if the first string is lexicographically smaller, and a positive value if it is greater. Constraints: no built‑in comparison operators and avoid explicit loops or recursion. Assume ASCII input (bonus for Unicode).
+
+# Explanation
+1. Use zip to pair characters from both strings and map with a lambda that computes the difference of their ASCII codes. 2. Find the first non‑zero difference; if such a difference exists, return it. 3. If all paired characters are equal, return the difference in lengths of the two strings. This approach satisfies the lexicographical ordering rules while avoiding explicit comparison operators and loops.
+
+# Starter Code:
+def string_compare(str1, str2):
+    
+
+# Implementation
+def string_compare(str1, str2):
+    diff = list(map(lambda x: ord(x[0]) - ord(x[1]), zip(str1, str2)))
+    first_non_zero = next((d for d in diff if d != 0), 0)
+    if first_non_zero != 0:
+        return first_non_zero
+    return len(str1) - len(str2)
+
+# Testing
+```python
+print(string_compare("apple", "banana"))  # -1
+print(string_compare("hello", "hello"))   # 0
+print(string_compare("zebra", "apple"))   # 25
+print(string_compare("abc", "abcd"))      # -3
+print(string_compare("xyz", "XYZ"))       # 32
+```
+```
+
+### Sample 5
+
+_(shard part_000000.parquet, row 33095, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+**Problem – “K‑Turn Unique Paths”**
+
+You are given an `N × M` grid.  
+Some cells contain obstacles (marked with `#`), all other cells are free (marked with `.`).  
+You start in the top‑left cell `(0, 0)` and want to reach the bottom‑right cell `(N‑1, M‑1)`.  
+From any free cell you may move **only** to the cell directly to the right or directly below it (i.e. directions **right** or **down**) and you may never step on an obstacle.
+
+A **turn** is a change of moving direction:  
+* moving right after having moved down, or  
+* moving down after having moved right.
+
+The first step does **not** count as a turn because there is no previous direction.
+
+Given an integer `K (0 ≤ K ≤ 10)`, count how many different paths from `(0, 0)` to `(N‑1, M‑1)` use **at most** `K` turns.
+
+The answer can be large; output it modulo `10⁹+7`.
+
+---
+
+### Input
+```
+N M K
+grid line 1
+grid line 2
+...
+grid line N
+```
+* `1 ≤ N, M ≤ 100`
+* `0 ≤ K ≤ 10`
+* Each of the next `N` lines contains exactly `M` characters, each either `.` (free) or `#` (obstacle).  
+  The start `(0,0)` and the target `(N‑1,M‑1)` are always free.
+
+### Output
+A single integer – the number of valid paths modulo `1 000 000 007`.
+
+### Sample
+**Input**
+```
+3 3 1
+...
+.#.
+...
+```
+**Output**
+```
+2
+```
+**Explanation**
+
+The two admissible paths with at most one turn are  
+
+* Right → Right → Down → Down (0 turns)  
+* Down → Down → Right → Right (0 turns)  
+
+All other paths need at least two turns because they must go around the obstacle at `(1,1)`.
+... [truncated; full doc has 4,539 chars]
+```
+
+### Sample 6
+
+_(shard part_000000.parquet, row 76494, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+**Problem**
+
+You are given an array `A` of `N` integers (`1 ≤ N ≤ 2·10⁵`).  
+You have to process `Q` operations (`1 ≤ Q ≤ 2·10⁵`).  
+Each operation is one of the two types  
+
+* **Update** `1  i  x` – set `A[i] = x` (`1‑based index`).  
+* **Query**  `2  L  R` – consider the sub‑array `A[L … R]`.  
+  From this sub‑array you may choose any subset of positions such that **no two chosen positions are adjacent**.  
+  Output the maximum possible sum of the chosen elements.
+
+All array values and updates satisfy `|A[i]| ≤ 10⁹`.
+
+The answer for each query fits into a signed 64‑bit integer.
+
+---
+
+### Input
+```
+N Q
+A1 A2 … AN
+op1
+op2
+…
+opQ
+```
+Each operation line has the format described above.
+
+### Output
+For each query (`op = 2`) output a single line containing the answer.
+
+
+
+---
+
+## Explanation  
+
+For a fixed interval `[L,R]` the problem is exactly the **Maximum‑Weight Independent Set on a path**.  
+For a path we can solve it with a simple DP:
+
+```
+dp0 = 0                         # best sum ending at previous position, previous not taken
+dp1 = -∞                        # best sum ending at previous position, previous taken
+for each value v in the interval:
+        new_dp0 = max(dp0, dp1)                 # we do NOT take current
+        new_dp1 = dp0 + v                       # we take current, previous must be not taken
+        dp0, dp1 = new_dp0, new_dp1
+answer = max(dp0, dp1)
+```
+
+Running this DP for every query would be `O(N·Q)` – far too slow.
+
+### Segment‑tree formulation  
+
+A se
+... [truncated; full doc has 7,167 chars]
+```
+
+### Sample 7
+
+_(shard part_000000.parquet, row 150315, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+"""
+Write a function square_and_sort that takes a list of integers and returns a new list of the squares of those integers sorted in ascending order.
+assert square_and_sort([-4, -2, 0, 1, 3]) == [0, 1, 4, 9, 16]
+"""
+from typing import List
+
+def square_and_sort(arr: List[int]) -> List[int]:
+    
+      """
+      Return a new list containing the squares of the integers in *arr* sorted in ascending order.
+      """
+      squared = [x * x for x in arr]
+      squared.sort()
+      return squared
+
+"""
+Write a function map that takes a list and a callable and returns a new list with each element transformed by the callable.
+assert map([True, False], lambda x: not x) == [False, True]
+"""
+from typing import Callable, List, Any
+
+def map(array: List[Any], func: Callable[[Any], Any]) -> List[Any]:
+    
+      """Return a new list where each element of *array* is transformed by *func*.
+  
+      The function handles empty or ``None`` inputs by returning an empty list.
+      """
+      if not array:
+          return []
+      result: List[Any] = []
+      for item in array:
+          result.append(func(item))
+      return result
+
+"""
+Write a function max_sum_no_adjacent(arr) that returns the maximum sum of a subsequence of arr where no two chosen elements are adjacent. Return 0 for empty or all-negative inputs.
+assert max_sum_no_adjacent([0,0,0]) == 0
+"""
+def max_sum_no_adjacent(arr: list[int]) -> int:
+    
+      '''Return the maximum sum of a subsequence of *arr* with no adjacent elements.
+     
+... [truncated; full doc has 2,966 chars]
+```
+
+### Sample 8
+
+_(shard part_000000.parquet, row 69552, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+Problem: Minimum‑Time Travel with a Cost Budget
+
+You are given a directed graph with `N` vertices (numbered `1 … N`) and `M` edges.  
+Each edge `i` is described by four integers  
+
+* `u_i` – start vertex  
+* `v_i` – end vertex  
+* `t_i` – time required to traverse the edge ( `1 ≤ t_i ≤ 10⁹`  )  
+* `c_i` – cost to use the edge ( `0 ≤ c_i ≤ 10⁹` )
+
+You have a budget `C` ( `0 ≤ C ≤ 10⁹` ).  
+Starting from vertex `1`, you want to reach vertex `N`.  
+
+**Goal** – find the minimum total time needed to travel from `1` to `N` while the sum of costs of the used edges does **not exceed** `C`.  
+If it is impossible, output `-1`.
+
+---
+
+### Constraints
+| Symbol | Value |
+|--------|-------|
+| `1 ≤ N ≤ 10⁵` | number of vertices |
+| `1 ≤ M ≤ 2·10⁵` | number of edges |
+| `0 ≤ C ≤ 10⁹` | total cost budget |
+| `1 ≤ u_i, v_i ≤ N` | edge endpoints |
+| `1 ≤ t_i ≤ 10⁹` | edge time |
+| `0 ≤ c_i ≤ 10⁹` | edge cost |
+
+The graph may contain multiple edges and self‑loops.  
+All edges are directed.
+
+---
+
+### Input
+```
+N M C
+u₁ v₁ t₁ c₁
+u₂ v₂ t₂ c₂
+...
+u_M v_M t_M c_M
+```
+
+### Output
+A single integer – the minimum possible total time, or `-1` if no feasible route exists.
+
+---
+
+## Explanation / Reasoning  
+
+The problem is a classic *constrained shortest‑path* problem: we must minimise one metric (time) while a second metric (cost) is bounded.  
+A naïve DP `dp[node][cost]` is impossible because `C` can be as large as `10⁹`.  
+Instead we keep, for each vertex, **only the Pareto‑optimal states** that have been
+... [truncated; full doc has 7,264 chars]
+```
+
+### Sample 9
+
+_(shard part_000000.parquet, row 9632, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+**Problem – Color‑Constrained Shortest Path**
+
+You are given a directed weighted graph with `N` vertices (numbered `1 … N`) and `M` edges.  
+Each edge `i` is described by four integers  
+
+```
+ui  vi  wi  ci
+```
+
+* `ui → vi` is a directed edge,
+* `wi` ( `1 ≤ wi ≤ 10^6` ) is its length,
+* `ci` ( `1 ≤ ci ≤ C` ) is its colour.
+
+You have to travel from vertex `1` to vertex `N`.  
+During the whole trip the following restrictions must hold:
+
+1. **No two consecutive edges may have the same colour.**  
+   (If you have just used an edge of colour `c`, the next edge you traverse must have a different colour.)
+
+2. **You may use at most `K` different colours in total** (including the colour of the first edge).  
+
+Find the minimum possible total length of a path that satisfies both restrictions.  
+If no such path exists, output `-1`.
+
+---
+
+### Input  
+
+```
+N M C K
+u1 v1 w1 c1
+u2 v2 w2 c2
+...
+uM vM wM cM
+```
+
+* `1 ≤ N ≤ 5 000`
+* `1 ≤ M ≤ 20 000`
+* `1 ≤ C ≤ 10`
+* `1 ≤ K ≤ C`
+* `1 ≤ ui, vi ≤ N`
+* `1 ≤ wi ≤ 10^6`
+* `1 ≤ ci ≤ C`
+
+The graph may contain parallel edges and self‑loops.
+
+### Output  
+
+A single integer – the length of the shortest feasible path, or `-1` if it does not exist.
+
+---
+
+### Explanation of the required algorithm  
+
+The problem is a classic shortest‑path problem, but the state of the traveller is not only the current vertex.  
+Two additional pieces of information influence which edges can be taken next:
+
+* **The colour of the last traversed edge** – we must forbid taking ano
+... [truncated; full doc has 5,496 chars]
+```
+
+### Sample 10
+
+_(shard part_000000.parquet, row 90036, category=Nemotron-Pretraining-Unconditional-Algorithmic)_
+
+```
+**Problem: Smallest Subarray to Sort**
+
+You are given an array `nums` of `n` integers.  
+Your task is to find the length of the shortest (contiguous) subarray that, if you sort **only** this subarray in non‑decreasing order, the whole array becomes sorted in non‑decreasing order.
+
+If the array is already sorted, return `0`.
+
+**Input Format**
+
+```
+n                     // 1 ≤ n ≤ 10^5
+a1 a2 a3 … an         // -10^9 ≤ ai ≤ 10^9
+```
+
+**Output Format**
+
+```
+len                  // length of the required subarray (0 ≤ len ≤ n)
+```
+
+**Example**
+
+```
+Input
+7
+1 3 2 2 2 4 5
+
+Output
+4
+```
+
+*Explanation*: Sorting the subarray `nums[2..5] = [3,2,2,2]` yields `[1,2,2,2,3,4,5]`, which is fully sorted. Its length is `4`.
+
+---
+
+**Explanation / Reasoning**
+
+The problem can be solved in linear time with a single pass from both ends:
+
+1. **Find the left boundary**  
+   Scan from the left while the array is non‑decreasing. The first index `l` where `nums[l] > nums[l+1]` is the leftmost position that is out of order. If no such index exists the array is already sorted → answer `0`.
+
+2. **Find the right boundary**  
+   Scan from the right while the array is non‑increasing when read backwards (i.e. `nums[r-1] ≤ nums[r]`). The first index `r` where `nums[r-1] > nums[r]` marks the rightmost out‑of‑order element.
+
+3. **Determine the needed extension**  
+   The subarray `nums[l..r]` certainly needs to be sorted, but elements outside it may still be out of place after sorting because they are larger tha
+... [truncated; full doc has 3,023 chars]
+```
+
+---

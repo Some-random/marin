@@ -63,6 +63,16 @@
 
 ---
 
+### [SmolLM2: When Smol Goes Big — Data-Centric Training of a Small Language Model](https://arxiv.org/abs/2502.02737) (Allal et al., HuggingFace, 2025)
+
+**Motivation:** Existing small LMs (Qwen2.5-1.5B, Llama3.2-1B) achieve strong results but their training data is closed and ad-hoc, leaving the community without a recipe for "what works at small scale." SmolLM2 argues that small-model performance is bottlenecked by data quality and stage-wise data mixing more than by architecture or scale, and demonstrates that with three new curated datasets (FineMath, Stack-Edu, SmolTalk) and explicit per-stage ablations one can match much larger frontier-derived small models entirely from public open data.
+
+**Experiment Setup:** A 1.7B-parameter Llama2-style transformer (49,152 vocab, GPT-2 tokenizer) trained on **~11 trillion tokens over four stages** on 256 H100s using nanotron (~$250K compute). Stage 1 (0–6T): 60% FineWeb-Edu + 40% DCLM web, 10% StarCoderData code, 0% math. Stage 2 (6–8T): 75% web + 20% code + 5% math (OpenWebMath). Stage 3 (8–10T): web flipped to 40/60 FineWeb-Edu/DCLM, math ramped to ~10%, and **Stack-Edu (125B tokens of classifier-filtered Stack v2 with a StarEncoder educational-value classifier trained on Llama-3-70B annotations) replaces StarCoderData**. Stage 4 / decay (10–11T): 58% web, 24% Stack-Edu, 14% math (FineMath-4+ and InfiWebMath-3+), 4% Cosmopedia v2. Released datasets: **FineMath 54B (FineMath-3+ 34B + FineMath-4+ 10B), Stack-Edu 125B across 15 languages (21.8B Python, 42.1B Java, ...), SmolTalk 1M conversations**. Notably code is *introduced from stage 1* and ramps up; this is mixed-throughout, not "code-first then NL."
+
+**Conclusion:** SmolLM2-1.7B reaches HumanEval 22.6, MMLU-Pro 19.4, GSM8K 31.1, HellaSwag 68.7, ARC 60.5, CommonsenseQA 43.6 — outperforming Llama3.2-1B on every reported NL task and beating Qwen2.5-1.5B on MMLU-Pro, HellaSwag, ARC, CSQA (loses on HumanEval, GSM8K). Empirically, Stack-Edu consistently outperforms raw StarCoder2Data on MultiPL-E across all programming languages, validating that classifier-based educational-value filtering of large code corpora outperforms scale alone. The recipe is *not* code-first: code is present from stage 1 (10% → 24%), and quality of code data (educational classifier filter) matters more than ordering.
+
+---
+
 ### [MAI-Thinking-1: Building a Hill-Climbing Machine](https://microsoft.ai/wp-content/uploads/2026/06/main_20260602_2.pdf) (The Microsoft AI Team, 2026)
 
 **Motivation:** Frame model development as a system-level optimization problem — a "hill-climbing machine" that integrates data pipelines, training infra, RL environments, eval suites, and safety into one empirical loop. Build from scratch on licensed human-generated data, with no distillation from third-party models, no LM-generated synthetic data in pretraining, and explicit removal of AI-generated content from sources. First product of the process is MAI-Thinking-1, a frontier STEM/agentic-coding reasoning model.

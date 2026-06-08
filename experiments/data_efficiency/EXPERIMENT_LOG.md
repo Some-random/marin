@@ -55,6 +55,121 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## June 7: C5 evals (stage-1 + final), A5 step-14672 control, 4-shot HumanEval, data-source review, EVALUATION.md update, C5-v2 sourcing
+
+Resume from yesterday's mid-training crash completed in the early morning (final step 29,343 reached on run-id `vj95091k`).
+
+### Full v2 evals: C5-stage1 (step-14672) and C5-final (step-29343)
+
+Converted both checkpoints to HF (`c5_stage1_step14672_hf` and `c5_final_step29343_hf`). Ran the full v2 eval suite on each. Numbers below from `parse_eval_results.py`; full per-task table is in `EVALUATION.md §3` with both columns now added.
+
+**Selected results (acc/acc_norm/pass@1 per the canonical primary metric per task):**
+
+| Task | A5 1ep final | B4 1ep final | **C5 stage-1** | **C5 final** |
+|---|---:|---:|---:|---:|
+| sciq[0] | 0.834 | 0.829 | 0.707 | 0.754 |
+| piqa[0] | 0.718 | 0.709 | 0.583 | 0.591 |
+| boolq[0] | 0.563 | 0.599 | 0.619 | 0.623 |
+| openbookqa_fact[0] | 0.430 | 0.430 | 0.306 | 0.316 |
+| arc_easy[25] | 0.629 | 0.607 | 0.362 | 0.385 |
+| arc_challenge[25] | 0.316 | 0.289 | 0.209 | 0.208 |
+| hellaswag[10] | 0.497 | 0.464 | 0.292 | 0.298 |
+| winogrande[5] | 0.541 | 0.515 | 0.513 | 0.517 |
+| mmlu[5] | 0.244 | 0.258 | 0.265 | 0.269 |
+| lambada_openai[0] | 0.519 | 0.496 | 0.144 | 0.185 |
+| bbh[3] | 0.160 | 0.206 | 0.199 | 0.235 |
+| humaneval[0] lm-eval | 0.006 | 0.104 | 0.037 | 0.061 |
+| humaneval[0] bigcode | 0.000 | 0.000 | 0.012 | 0.037 |
+| mbpp[3] | 0.000 | 0.060 | 0.050 | 0.104 |
+| dclm_200m_val (nats) | **2.821** | 2.878 | 4.011 | 3.928 |
+| paloma_macro (bpb) | 1.122 | **1.097** | 1.351 | 1.325 |
+
+### A5 step-14672 control eval (Aryabumi 0-shot suite)
+
+Evaluated A5's mid-training checkpoint at the same step count as C5-stage1 (15.4 B trained tokens), on the Aryabumi 0-shot composite (`boolq, piqa, sciq, social_iqa, copa, hellaswag, winogrande, arc_easy, cb, storycloze_2018_local, triviaqa, nq_open`). Result: **A5 step-14672 NL composite ≈ 0.58, vs C5-stage1 ≈ 0.40.** A5-final (step 29,343) composite ≈ 0.58 also — so A5 saturates the NL composite by mid-training under DCLM-only data. C5-stage1 trained on the same 15.4 B-token budget reaches 0.40 instead. (Composite numbers stored in `outputs/eval_results/a5_step14672_aryabumi_0shot_20260607_0013/`.)
+
+### EVALUATION.md updates
+
+- §2 (Models tracked): added rows for **C5 stage-1** and **C5 1ep code→text final** with full data-mix / hyperparams / run-id / FLOPs.
+- §3 (Canonical results): added 2 columns (C5 stage-1, C5 final) for all 27 tasks + dclm_200m_val + paloma_macro rows. Both pulled from `parse_eval_results.py` (lm-eval) + bigcode `metrics.json` + wandb summary (dclm/paloma).
+- New `†` footnote describes C5 recipe + resume forensics (`7mnu0nch` → `vj95091k` after dy-9 power-cycle).
+- Existing `‡‡‡` footnote already covers phi-1 (fine-tuned) vs phi-1.5 (base) — kept.
+- Commit `56d0e6b3b`; pushed to `origin/main`.
+
+### 4-shot HumanEval — phi-1.5 vs C5-stage1 vs C5-final
+
+Custom runner (`outputs/run_humaneval_fewshot.py`): hold out HumanEval problems 0–3 as in-context worked examples (full prompt + canonical_solution), evaluate on the remaining 160 problems. Greedy decoding, 512 max new tokens, bigcode-style stop sequences.
+
+| Model | 0-shot bigcode HE | 4-shot pass@1 | Δ |
+|---|---:|---:|---:|
+| phi-1.5 | 0.342 | 0.350 (56/160) | +0.008 |
+| C5-stage1 | 0.012 | 0.056 (9/160) | +0.044 |
+| C5-final | 0.037 | 0.069 (11/160) | +0.032 |
+
+10-example side-by-side at `experiments/data_efficiency/c5_vs_phi15_humaneval_fewshot_samples.md` (same 10 IDs as the 0-shot `c5_stage1_vs_phi1_humaneval_samples.md` reference).
+
+### Code-data source review (7 sources × 10 samples each)
+
+Wrote `code_data_source_samples.md` with random docs from each source, plus a preamble table containing: avg tokens/doc under Llama-3.1 tokenizer (sampled 500 docs each, 750 for StarCoderData = 50 × 15 langs), local snapshot row count, published row count (HF datasets-server API), estimated total tokens. Sources:
+
+| # | Source | avg tok/doc | local rows | published rows | est total tok |
+|---|---|---:|---:|---:|---:|
+| 1 | bigcode/starcoderdata (15 local langs) | 1,893 | 19,920,523 | 206,642,239 (all langs) | ~391 B (all langs) |
+| 2 | codeparrot/github-code (Python only) | 1,465 | 634,376 | 7,226,626 (Python) | ~10.6 B (Python) |
+| 3 | nvidia/OpenCodeReasoning FULL | 8,594 | 567,850 | 337,766 ‡ | ~4.88 B (local) |
+| 4 | nvidia/OpenCodeReasoning solution-only | 289 | 567,806 | 337,766 ‡ | ~0.16 B (local) |
+| 5 | OpenCoder-LLM/opc-annealing-corpus / algorithmic_corpus | 184 | 5,322,920 | 5,322,920 | ~0.98 B |
+| 6 | OpenCoder-LLM/opc-annealing-corpus / synthetic_code_snippet | 379 | (HF stream) | 3,081,235 | ~1.17 B |
+| 7 | OpenCoder-LLM/opc-annealing-corpus / synthetic_qa | 434 | (HF stream) | 3,238,929 | ~1.41 B |
+
+**‡** HF datasets-server reports 337,766 rows (sum of `split_0` + `split_1` parquet configs) but our local snapshot has 567,850 — likely a dataset-server count vs an older snapshot of OpenCodeReasoning.
+
+For #7 (synthetic_qa), inspection of 3 random samples found Go code with Chinese inline comments, a Java snippet with the `Arrays.asList(int[])` footgun, and a leetcode-cli scraped solution with `# @lc app=leetcode id=914` headers — confirming the dataset is raw multi-language LeetCode user submissions, not GPT-cleaned synthetic.
+
+### C5-v2 sourcing — Stack-Edu + Nemotron-Specialized-v1.1
+
+Started downloads for two candidate sources (background):
+- `HuggingFaceTB/stack-edu` (125 B tokens, 167 M rows; classifier-filtered Stack v2; the code data SmolLM2 trained on). Download target: `outputs/raw/stack-edu/`. Size on disk ~17.5 GB.
+- `nvidia/Nemotron-Pretraining-Specialized-v1.1` (5 configs total ≈ 19.8 M rows / 9.3 B tokens). For C5-v2 we'd use the `Code-Concepts` config (15.2 M rows / 7.3 B tokens; concept-taxonomy synthetic Python from gpt-oss-20b/120b) and the `Unconditional-Algorithmic` config (181 k rows / 195 M tokens; minimal-prompt synthetic Python). Download target: `outputs/raw/nemotron_specialized_v11/`.
+
+C5-v2 design constraint per user: **1-epoch large clean data, no self-generation**. Decision pending on exact mix; eval gates remain end-of-stage-1 (step 14,672) + end-of-training (step 29,343).
+
+### SmolLM2 paper added to reading list
+
+Added entry to `papers/reasoning_curriculum.md` (between OLMo 3 and MAI-Thinking-1). Key facts: 1.7 B params, 11 T total tokens over 4 stages; **code is introduced from stage 1 (10%) and ramps up to 24% — this is mixed-throughout, not "code-first then NL"**. Stage 3 switches from raw StarCoderData to Stack-Edu (classifier-filtered, +1pp on MultiPL-E). New datasets released: FineMath (54 B), Stack-Edu (125 B), SmolTalk (1 M conversations).
+
+---
+
+## June 6: C5 mid-training crash, dy-9 forensics, resume from step-20914
+
+C5 training (8 nodes, 30.77 B token target, Aryabumi recipe) had been running since June 5. Mid-training crash at step 21,201 today.
+
+### Crash forensics
+
+Slurm log + `journalctl --boot=-1 -k` on dy-9 confirmed AWS pcluster's auto-scaler power-cycled the node. Default `SuspendTime=600 s` triggered if the node sat idle (no scheduled job) for 10 minutes — relevant because some pcluster events can briefly show 0 active jobs even during a healthy training run. dy-9's `BootTime` was mid-training; the rest of the cluster lost EFA all-reduce, leading to the cascade Slurm-side abort visible at step 21,201.
+
+### Fix: redundant holder jobs
+
+Added a `sleep infinity` `--no-requeue` holder per dynamic node to prevent the auto-scaler from registering them as idle. Wrapped command: `sbatch --no-requeue --wrap="exec sleep infinity"`. This is a workaround, not a real fix — the pcluster SuspendTime should also be raised, but that's an admin-level change.
+
+### Resume from step-20914
+
+Last clean checkpoint pre-crash was step-20914 (level checkpointing every 7,336 steps; the step-21,201 crash invalidated the in-progress step). Resume script: `experiments/data_efficiency/run_1_4b_c5_resume.py`, which `replace()`s only `load_checkpoint_path` on the production `train_config`. Set `WANDB_RUN_ID=7mnu0nch` and `WANDB_RESUME=allow` to keep the wandb run logically continuous.
+
+Resume verified by 4 checks:
+1. Loader logs "loaded checkpoint from .../step-20914"
+2. Step counter resumes at 20,915 (not 0)
+3. First post-resume step completes without OOM
+4. Loss continuity at ≈ 1.05 (matches pre-crash trajectory; no spike from optimizer-state mismatch)
+
+Wandb did NOT actually resume — a new run-id `vj95091k` got generated despite `WANDB_RESUME=allow + WANDB_RUN_ID=7mnu0nch`. Training itself proceeded correctly; the wandb log is cosmetically split across two run-ids. Documented in EVALUATION.md §2 footnote `†`.
+
+Trained-token accounting (LR schedule + data position both restored from checkpoint):
+- step 20,914 = ~21.94 B trained tokens (= 20,914 × 256 × 4,096 / 1e9)
+- step 29,343 (target) = 30.77 B trained tokens — matches A5/B4 exactly
+
+---
+
 ## June 5: 4B undertrained eval, eval pipeline hardening, EVALUATION.md restructure
 
 Single-day theme: finish the 4B comparison started June 4 and ship the EVALUATION.md restructure user requested.
