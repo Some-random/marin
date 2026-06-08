@@ -264,6 +264,8 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 | **1.4B code25 v2 (matched)** ¤ | `1_4b_25code_alg_v2_hf` (`sage-wildflower-106` / `joqfahkl`) | 1.4 B | 3.36 B | 2.8 × 10¹⁹ | 150 M DCLM × 16 epochs + 50 M opc_algorithmic × 16 epochs → 200 M unique total (matched to baseline 209 M) | Same hyperparams as baseline. Same total trained tokens, same total unique tokens; only the data mix differs (75% NL vs 100% NL). |
 | **A5 1ep DCLM final** ¥ | `1ep_dclm_final_hf` (run `1ep-dclm-A5`, `tmgu1im8`, step-29343) | 1.4 B | 30.77 B | 2.6 × 10²⁰ | 7 × DCLM shards (~34.85 B unique), ~0.88 epoch per shard | wd=0.1, LR=3e-4 cosine, 4-node DP, batch=256 × seq=4096 × 29,343 steps. |
 | **B4 1ep code25 final** ¥ | `1ep_code25_final_hf` (run `1ep-code25-B4`, `6zs6ybgt`, step-29343) | 1.4 B | 30.77 B | 2.6 × 10²⁰ | 75% DCLM (23.08 B = 0.66 epoch over 34.85 B available) + 25% code: 5.4 B aryabumi_synth + 1.35 B aryabumi_web + 0.94 B opc, each at ~1 epoch | Same hyperparams as A5. Matched-compute vs A5: same total trained tokens, same hyperparams, only data differs. |
+| **C5 stage-1 (code-only)** † | `c5_stage1_step14672_hf` (run `vocal-microwave-132` / `7mnu0nch`, step-14672) | 1.4 B | 15.39 B | 1.3 × 10²⁰ | 100% code+markup: 80% Aryabumi multi-lang Stack (12.31 B ≈ 1 epoch at Aryabumi Table 3 ratios) + 20% markup (3.08 B ≈ 1 epoch at Aryabumi Table 4 ratios) | wd=0.1, LR=3e-4 cosine, 8-node DP, batch=256 × seq=4096 × 14,672 steps. End-of-stage-1 snapshot of the code→text recipe — LR continues into stage 2, so this is mid-cosine, not a fully-cooled checkpoint. |
+| **C5 1ep code→text final** † | `c5_final_step29343_hf` (run `rural-forest-133` / `vj95091k`, step-29343 — resumed from `7mnu0nch`/step-20914 after a dy-9 power-cycle crash at step 21,201) | 1.4 B | 30.77 B | 2.6 × 10²⁰ | Stage 1 (15.39 B, as above) then stage 2 (15.39 B): 90% DCLM (13.85 B ≈ 0.40 epoch over 34.85 B available) + 10% (80% Stack + 20% markup) | Same hyperparams as A5/B4. Matched-compute vs A5/B4: same total trained tokens, same hyperparams, only data ordering and ratios differ. Single continuous cosine LR across both stages. |
 | **4B final** ª | `4b_dclm_short_final_hf` (run `3_5b_dclm_short`, step-22887) | 3.5 B | 6.0 B | 1.3 × 10²⁰ | 7 × DCLM shards, ~0.17 epoch per shard | wd=0.1, LR=3e-4 cosine, 8-node FSDP, batch=64 × seq=4096 × 22,887 steps. |
 | phi-1 | `microsoft/phi-1` | 1.3 B | ~50 B | ~3.9 × 10²⁰ | ~7 B unique (6 B filtered Stack + ~1 B GPT-3.5 synth Python) × ~8 epochs | Code-only (external reference). **NOT a base model** — see ‡‡‡ footnote: this is the phi-1-base pretrained model PLUS a 180M-token fine-tune on synthetic HumanEval-shaped CodeExercises. Per the paper, phi-1-base alone = 29% HumanEval; the fine-tune adds ~+22 pp. phi-1-base is not publicly released. |
 | phi-1.5 | `microsoft/phi-1_5` | 1.3 B | ~150 B | ~1.2 × 10²¹ | ~30 B unique (phi-1 mix + ~20 B synthetic NL textbooks) × ~5 epochs | Larger synth-textbook training (external reference). **Base model — no instruction or format fine-tune** (per phi-1.5 paper). The right apples-to-apples reference for our base models on code-gen tasks. |
@@ -276,52 +278,54 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 
 **ª** = 4B is a "tokens-vs-params" comparison point. Note that 4B used 1.3 × 10²⁰ FLOPs vs A5's 2.6 × 10²⁰ — A5 has ~2× more training compute, so the A5 > 4B comparison is partly explained by raw compute rather than purely by "tokens vs params". Treat the comparison as "what does an 8-GPU-day 4B run look like vs an 8-GPU-day 1.4B run", not as a controlled experiment.
 
+**†** = C5 implements the Aryabumi et al "To Code, or Not To Code?" (2408.10914) two-stage code→text recipe at our scale. Stage 1 is code-only (Aryabumi Tables 3+4 ratios: 80% multi-language StarCoderData + 20% markup); stage 2 reverts to mostly NL (90% DCLM + 10% mixed). C5-stage1 and C5-final share the same wandb run logically but are split across two run-ids (`7mnu0nch` and `vj95091k`) because the original run crashed at step 21,201 when AWS pcluster's auto-scaler (SuspendTime=600s) power-cycled compute node `dy-9` mid-training. The resume reloaded from step-20914 with `WANDB_RUN_ID=7mnu0nch + WANDB_RESUME=allow`, but a new run-id was generated; the optimizer state, LR schedule position, and data position were all restored from the checkpoint — only the wandb log is cosmetically split.
+
 ---
 
 ## 3. Canonical results — all models
 
 All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (header format `task[nshot]`). Columns = models. Accuracy metrics use `acc_norm` where reported in §1; `acc` otherwise. PPL is `bits_per_byte` (paloma) or nats (`dclm_200m_val`), lower=better. Bolded = best in row. `—` = not run.
 
-See §2 footnotes ¤ (code25 v2 vs v1) and ¥ (A5/B4 final-step) for column-definition caveats.
+See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), and † (C5 code→text stages and resume forensics) for column-definition caveats.
 
-| Task | base (x16) | code25 v2 (x16) | A5 1ep final | B4 1ep final | 4B final ª | phi-1 | phi-1.5 |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| **Open-book** | | | | | | | |
-| sciq[0] | 0.652 | 0.590 | 0.834 | 0.829 | 0.824 | 0.707 | **0.933** |
-| boolq[0] | 0.502 | 0.567 | 0.563 | 0.599 | 0.552 | 0.451 | **0.746** |
-| piqa[0] | 0.634 | 0.606 | 0.718 | 0.709 | 0.697 | 0.562 | **0.766** |
-| openbookqa_fact[0] | 0.336 | 0.312 | 0.430 | 0.430 | 0.426 | 0.316 | **0.530** |
-| **Closed-book NL** | | | | | | | |
-| arc_easy[25] | 0.401 | 0.388 | 0.629 | 0.607 | 0.612 | 0.378 | **0.805** |
-| arc_challenge[25] | 0.242 | 0.241 | 0.316 | 0.289 | 0.292 | 0.232 | **0.532** |
-| hellaswag[10] | 0.348 | 0.321 | 0.497 | 0.464 | 0.466 | 0.301 | **0.635** |
-| winogrande[5] | 0.504 | 0.500 | 0.541 | 0.515 | 0.511 | 0.498 | **0.710** |
-| mmlu[5] | 0.252 | 0.256 | 0.244 | 0.258 | 0.250 | 0.248 | **0.422** |
-| commonsense_qa[0] | 0.192 | 0.212 | 0.195 | 0.213 | 0.193 | 0.175 | **0.507** |
-| social_iqa[0] | 0.366 | 0.362 | 0.415 | 0.400 | 0.407 | 0.364 | **0.523** |
-| logiqa[0] | 0.218 | 0.210 | **0.320** | 0.270 | 0.269 | 0.214 | 0.240 |
-| lambada_openai[0] | 0.238 | 0.197 | 0.519 | 0.496 | 0.494 | 0.106 | **0.527** |
-| copa[0] | 0.620 | 0.620 | 0.740 | 0.690 | 0.740 | 0.530 | **0.800** |
-| wsc[0] | 0.365 | 0.365 | 0.519 | 0.365 | 0.394 | 0.442 | **0.606** |
-| **Aggregate / multi-domain reasoning** | | | | | | | |
-| agieval_lsat_ar[0] | 0.226 | 0.252 | 0.187 | 0.222 | 0.222 | 0.213 | 0.183 |
-| gpqa_diamond[0] | 0.268 | **0.328** | 0.268 | 0.217 | 0.273 | 0.197 | 0.232 |
-| bbh[3] (limit=0.1) | 0.025 | 0.026 | 0.160 | 0.206 | 0.155 | 0.238 | **0.288** |
-| mmlu_pro[5] (limit=0.1) | 0.050 | 0.047 | **0.116** | 0.073 | 0.069 | n/a (ctx) ™ | n/a (ctx) ™ |
-| **Math (standard)** | | | | | | | |
-| gsm8k[5] | 0.000 | 0.000 | 0.001 | 0.010 | 0.018 | 0.012 | **0.305** |
-| gsm8k_cot[8] | 0.022 | 0.005 | 0.031 | 0.027 | 0.021 | 0.021 | **0.299** |
-| minerva_math[4] | 0.0002 | 0.000 | 0.002 | 0.010 | 0.007 | 0.012 | **0.029** |
-| **Math (perturbation-robust)** ° | | | | | | | |
-| gsm_symbolic_main[8] | — | — | — | — | — | 0.013 | **0.160** |
-| gsm_noop[8] | — | — | — | — | — | 0.000 | **0.034** |
-| **Code** | | | | | | | |
-| humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.006 | 0.104 | 0.000 | **0.494** | 0.342 |
-| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | **0.543** | 0.342 |
-| mbpp[3] | 0.000 | 0.000 | 0.000 | 0.060 | 0.000 | **0.416** | 0.342 |
-| **Perplexity (lower=better)** | | | | | | | |
-| dclm_200m_val (nats) | 4.070 | 4.596 | **2.821** | 2.878 | 2.894 ¶ | — ‡ | — ‡ |
-| paloma_macro (bpb) | 1.631 | 1.824 | 1.122 ¶ | **1.097 ¶** | 1.153 ¶ | 1.738 | 1.174 |
+| Task | base (x16) | code25 v2 (x16) | A5 1ep final | B4 1ep final | C5 stage-1 † | C5 final † | 4B final ª | phi-1 | phi-1.5 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Open-book** | | | | | | | | | |
+| sciq[0] | 0.652 | 0.590 | 0.834 | 0.829 | 0.707 | 0.754 | 0.824 | 0.707 | **0.933** |
+| boolq[0] | 0.502 | 0.567 | 0.563 | 0.599 | 0.619 | 0.623 | 0.552 | 0.451 | **0.746** |
+| piqa[0] | 0.634 | 0.606 | 0.718 | 0.709 | 0.583 | 0.591 | 0.697 | 0.562 | **0.766** |
+| openbookqa_fact[0] | 0.336 | 0.312 | 0.430 | 0.430 | 0.306 | 0.316 | 0.426 | 0.316 | **0.530** |
+| **Closed-book NL** | | | | | | | | | |
+| arc_easy[25] | 0.401 | 0.388 | 0.629 | 0.607 | 0.362 | 0.385 | 0.612 | 0.378 | **0.805** |
+| arc_challenge[25] | 0.242 | 0.241 | 0.316 | 0.289 | 0.209 | 0.208 | 0.292 | 0.232 | **0.532** |
+| hellaswag[10] | 0.348 | 0.321 | 0.497 | 0.464 | 0.292 | 0.298 | 0.466 | 0.301 | **0.635** |
+| winogrande[5] | 0.504 | 0.500 | 0.541 | 0.515 | 0.513 | 0.517 | 0.511 | 0.498 | **0.710** |
+| mmlu[5] | 0.252 | 0.256 | 0.244 | 0.258 | 0.265 | 0.269 | 0.250 | 0.248 | **0.422** |
+| commonsense_qa[0] | 0.192 | 0.212 | 0.195 | 0.213 | 0.196 | 0.196 | 0.193 | 0.175 | **0.507** |
+| social_iqa[0] | 0.366 | 0.362 | 0.415 | 0.400 | 0.346 | 0.354 | 0.407 | 0.364 | **0.523** |
+| logiqa[0] | 0.218 | 0.210 | **0.320** | 0.270 | 0.295 | 0.287 | 0.269 | 0.214 | 0.240 |
+| lambada_openai[0] | 0.238 | 0.197 | 0.519 | 0.496 | 0.144 | 0.185 | 0.494 | 0.106 | **0.527** |
+| copa[0] | 0.620 | 0.620 | 0.740 | 0.690 | 0.550 | 0.540 | 0.740 | 0.530 | **0.800** |
+| wsc[0] | 0.365 | 0.365 | 0.519 | 0.365 | 0.365 | 0.365 | 0.394 | 0.442 | **0.606** |
+| **Aggregate / multi-domain reasoning** | | | | | | | | | |
+| agieval_lsat_ar[0] | 0.226 | 0.252 | 0.187 | 0.222 | 0.248 | 0.235 | 0.222 | 0.213 | 0.183 |
+| gpqa_diamond[0] | 0.268 | **0.328** | 0.268 | 0.217 | 0.263 | 0.263 | 0.273 | 0.197 | 0.232 |
+| bbh[3] (limit=0.1) | 0.025 | 0.026 | 0.160 | 0.206 | 0.199 | 0.235 | 0.155 | 0.238 | **0.288** |
+| mmlu_pro[5] (limit=0.1) | 0.050 | 0.047 | **0.116** | 0.073 | 0.051 | 0.065 | 0.069 | n/a (ctx) ™ | n/a (ctx) ™ |
+| **Math (standard)** | | | | | | | | | |
+| gsm8k[5] | 0.000 | 0.000 | 0.001 | 0.010 | 0.003 | 0.010 | 0.018 | 0.012 | **0.305** |
+| gsm8k_cot[8] | 0.022 | 0.005 | 0.031 | 0.027 | 0.016 | 0.024 | 0.021 | 0.021 | **0.299** |
+| minerva_math[4] | 0.0002 | 0.000 | 0.002 | 0.010 | 0.002 | 0.007 | 0.007 | 0.012 | **0.029** |
+| **Math (perturbation-robust)** ° | | | | | | | | | |
+| gsm_symbolic_main[8] | — | — | — | — | — | — | — | 0.013 | **0.160** |
+| gsm_noop[8] | — | — | — | — | — | — | — | 0.000 | **0.034** |
+| **Code** | | | | | | | | | |
+| humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.006 | 0.104 | 0.037 | 0.061 | 0.000 | **0.494** | 0.342 |
+| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.000 | 0.000 | 0.012 | 0.037 | 0.000 | **0.543** | 0.342 |
+| mbpp[3] | 0.000 | 0.000 | 0.000 | 0.060 | 0.050 | 0.104 | 0.000 | **0.416** | 0.342 |
+| **Perplexity (lower=better)** | | | | | | | | | |
+| dclm_200m_val (nats) | 4.070 | 4.596 | **2.821** | 2.878 | 4.011 | 3.928 | 2.894 ¶ | — ‡ | — ‡ |
+| paloma_macro (bpb) | 1.631 | 1.824 | 1.122 ¶ | **1.097 ¶** | 1.351 ¶ | 1.325 ¶ | 1.153 ¶ | 1.738 | 1.174 |
 
 **‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
 
