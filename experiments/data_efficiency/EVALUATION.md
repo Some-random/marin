@@ -400,6 +400,49 @@ See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→te
 
 </details>
 
+### C5-v3 (Aryabumi-faithful: separate cosine per phase) — phase 1 vs phase 2 hero
+
+C5-v3 is the Aryabumi-faithful version of the C5 recipe: instead of a single continuous cosine LR across both stages (the C5/C5-v2 design), **each phase gets its own fresh cosine LR (3e-4 → 0)** and phase 2 is launched as a separate process via `initialize_from_checkpoint_path` (model weights only, fresh optimizer, step counter restarts at 0). Per-phase budget matches C5/C5-v2 stage budgets: 14,672 steps × 256 batch × 4096 seq ≈ 15.4 B tokens per phase, 30.77 B total. Phase 1 = 80% clean code + 20% Stack-Edu Markdown (same caches as C5-v2 stage-1). Phase 2 = 90% DCLM + 10% (80% clean code + 20% markup), init from phase 1 step-14671.
+
+Both runs evaluated with the same v2 lm-eval-harness pipeline used for the rest of §3. Phase 1 mbpp + humaneval re-run with the single-GPU `code_eval` fix (see footnote on `eval_intermediate.sh`). Phase 2 (hero, run `85ip8s5o`, 8-node, finished 19:38 PDT 2026-06-10).
+
+| Task | C5-v3 phase 1 (code-LM, 15.4 B) | C5-v3 final (hero, +text, 30.77 B) | Δ (phase 2 − phase 1) |
+|---|---:|---:|---:|
+| **Open-book** | | | |
+| sciq[0] | 0.720 | 0.728 | **+0.008** |
+| boolq[0] | **0.595** | 0.443 | **−0.152** |
+| piqa[0] | 0.581 | **0.649** | **+0.068** |
+| openbookqa_fact[0] | 0.236 | **0.296** | **+0.060** |
+| openbookqa[0] | 0.138 | **0.176** | **+0.038** |
+| **Closed-book NL** | | | |
+| arc_easy[25] | 0.397 | **0.536** | **+0.139** |
+| arc_challenge[25] | 0.183 | **0.214** | **+0.031** |
+| hellaswag[10] | 0.275 | **0.323** | **+0.048** |
+| winogrande[5] | **0.515** | 0.508 | −0.007 |
+| mmlu[5] (mean of 61 subjects) | **0.259** | 0.238 | **−0.021** |
+| commonsense_qa[0] | **0.203** | 0.193 | −0.010 |
+| social_iqa[0] | 0.358 | **0.383** | **+0.025** |
+| logiqa[0] | 0.214 | **0.220** | +0.006 |
+| **Math** | | | |
+| gsm8k[5] | **0.008** | 0.002 | −0.006 |
+| gsm8k_cot[8] | **0.014** | 0.004 | −0.010 |
+| minerva_math[4] | **0.025** | 0.001 | **−0.024** |
+| **Code** | | | |
+| humaneval[0] (lm-eval) | **0.250** | 0.128 | **−0.122** |
+| mbpp[3] | **0.216** | 0.046 | **−0.170** |
+
+**Mean Δ on the 13 NL/open-book tasks = +0.019** (about +1.9 pp net NL gain).
+**Mean Δ on the 5 math+code tasks = −0.066** (about −6.6 pp regression).
+
+**Pattern:** phase 2 trades code+math knowledge for NL knowledge. The wins on NL (arc_easy +14 pp, hellaswag +5 pp, piqa +7 pp, openbookqa_fact +6 pp) are accompanied by clear losses on what the code-LM was good at (mbpp −17 pp, humaneval −12 pp) and surprisingly mild-to-negative motion on mmlu (−2 pp mean) and boolq (−15 pp). The boolq regression is the biggest unforced loss — the code-only LM was already at 0.595 there, and phase 2 dropped it to 0.443.
+
+**Comparison to existing §3 columns** (rough — see main table for full numbers):
+- vs C5 final (code → text, single continuous cosine, 30.77 B): C5 final hits arc_easy 0.385, hellaswag 0.298, piqa 0.591, mmlu 0.269, mbpp 0.104. C5-v3 final beats C5 final on arc_easy (+15 pp), hellaswag (+3 pp), piqa (+6 pp), but loses on mmlu (−3 pp), boolq (−18 pp), mbpp (−6 pp).
+- vs C5-v2 final (clean code → text, single continuous cosine, 30.77 B): C5-v2 final hits arc_easy 0.418, hellaswag 0.311, piqa 0.600, mmlu 0.245, mbpp 0.298. C5-v3 final beats C5-v2 final on arc_easy (+12 pp), hellaswag (+1 pp), piqa (+5 pp), but loses on mmlu (−1 pp), boolq (−14 pp), mbpp (−25 pp).
+- The "separate cosine per phase" recipe (C5-v3) gives bigger NL wins than the "single continuous cosine" recipe (C5/C5-v2) on the closed-book NL tasks where it wins, but loses substantially on code retention and shows no mmlu lift.
+
+**Tasks not run for C5-v3:** lambada_openai, copa, wsc, agieval_lsat_ar, gpqa_diamond, bbh, mmlu_pro, gsm_symbolic_main, gsm_noop, humaneval bigcode, dclm_200m_val, paloma_macro. Same tasks should be added if we want full §3-style parity. Levanter in-training validation losses + paloma bpb can be pulled from the offline wandb runs (`8dtdcear` for phase 1, `85ip8s5o` for phase 2) by running `wandb sync` first.
+
 ### Headlines
 
 **Phi-1.5** wins on every NL subset (synthetic-textbook-heavy training pays off at 1.3B).

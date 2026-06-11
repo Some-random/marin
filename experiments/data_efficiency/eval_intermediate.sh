@@ -92,18 +92,30 @@ ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$NODE" "
   export HF_ALLOW_CODE_EVAL=1
 
   run_lm_eval() {
-    local TASKS=\"\$1\" NSHOT=\"\$2\" BATCH=\"\$3\" EXTRA=\"\$4\"
+    local TASKS=\"\$1\" NSHOT=\"\$2\" BATCH=\"\$3\" EXTRA=\"\$4\" NPROC=\"\${5:-8}\"
     local OUT=$OUT_ROOT/\${NSHOT}shot__\$(echo \"\$TASKS\" | tr ',' '_' | cut -c1-30)
     mkdir -p \"\$OUT\"
-    echo \"[\$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] tasks=\$TASKS n-shot=\$NSHOT batch=\$BATCH\"
-    .venv/bin/accelerate launch --multi_gpu --num_processes 8 --num_machines 1 \
-      -m lm_eval --model hf \
-      --model_args 'pretrained=$HF_DST,dtype=bfloat16,trust_remote_code=True' \
-      --tasks \"\$TASKS\" --num_fewshot \"\$NSHOT\" --batch_size \"\$BATCH\" \
-      --log_samples --output_path \"\$OUT\" \
-      --include_path /fsx/users/dongweij/marin/experiments/data_efficiency \
-      --trust_remote_code \
-      \$EXTRA > \"\$OUT.log\" 2>&1 && echo '  DONE' || echo '  FAILED-CONTINUE'
+    echo \"[\$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] tasks=\$TASKS n-shot=\$NSHOT batch=\$BATCH nproc=\$NPROC\"
+    if [ \"\$NPROC\" -eq 1 ]; then
+      # single-GPU path — required for code_eval (mbpp/humaneval) because HF evaluate's
+      # metric cache file collides across torchrun ranks
+      .venv/bin/python -m lm_eval --model hf \
+        --model_args 'pretrained=$HF_DST,dtype=bfloat16,trust_remote_code=True' \
+        --tasks \"\$TASKS\" --num_fewshot \"\$NSHOT\" --batch_size \"\$BATCH\" \
+        --log_samples --output_path \"\$OUT\" \
+        --include_path /fsx/users/dongweij/marin/experiments/data_efficiency \
+        --trust_remote_code \
+        \$EXTRA > \"\$OUT.log\" 2>&1 && echo '  DONE' || echo '  FAILED-CONTINUE'
+    else
+      .venv/bin/accelerate launch --multi_gpu --num_processes \$NPROC --num_machines 1 \
+        -m lm_eval --model hf \
+        --model_args 'pretrained=$HF_DST,dtype=bfloat16,trust_remote_code=True' \
+        --tasks \"\$TASKS\" --num_fewshot \"\$NSHOT\" --batch_size \"\$BATCH\" \
+        --log_samples --output_path \"\$OUT\" \
+        --include_path /fsx/users/dongweij/marin/experiments/data_efficiency \
+        --trust_remote_code \
+        \$EXTRA > \"\$OUT.log\" 2>&1 && echo '  DONE' || echo '  FAILED-CONTINUE'
+    fi
   }
 
   run_lm_eval 'arc_easy,arc_challenge' 25 16 ''
@@ -112,8 +124,8 @@ ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$NODE" "
   run_lm_eval 'piqa,boolq,sciq,openbookqa,commonsense_qa,social_iqa,logiqa' 0 16 ''
   run_lm_eval 'openbookqa_fact' 0 16 ''
   run_lm_eval 'gsm8k_cot' 8 8 '--confirm_run_unsafe_code'
-  run_lm_eval 'mbpp' 3 8 '--confirm_run_unsafe_code'
-  run_lm_eval 'humaneval' 0 8 '--confirm_run_unsafe_code'
+  run_lm_eval 'mbpp' 3 8 '--confirm_run_unsafe_code' 1
+  run_lm_eval 'humaneval' 0 8 '--confirm_run_unsafe_code' 1
   run_lm_eval 'minerva_math' 4 8 ''
 " 2>&1 | tee "$OUT_ROOT/eval.log" | grep -E "(tasks=|DONE|FAILED|Error|Traceback)" | head -30
 
