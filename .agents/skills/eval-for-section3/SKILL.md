@@ -12,6 +12,10 @@ description: Evaluate a model for §3 of `experiments/data_efficiency/EVALUATION
 .venv/bin/python experiments/data_efficiency/eval_section3.py fill-from-results <RESULTS_DIR> "<COLUMN_LABEL_SUBSTR>"
 # Verify table is well-formed:
 .venv/bin/python experiments/data_efficiency/eval_section3.py validate
+# Strict mode — fails if any (model, task) cell is missing a value
+# (excluding documented blanks like gsm_symbolic, dclm_200m_val, paloma_macro
+# which are tracked in §3 but not run by the v2 suite):
+.venv/bin/python experiments/data_efficiency/eval_section3.py validate --strict
 ```
 
 The full procedure (only as backup when the tool can't handle a case):

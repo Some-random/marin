@@ -237,14 +237,24 @@ def find_section3_table(lines):
     return header_idx, table_end
 
 
-def validate_table(lines):
-    """Returns list of validation errors; empty if OK."""
+def validate_table(lines, strict: bool = False):
+    """Returns list of validation errors; empty if OK.
+
+    When strict=True, also asserts that EVERY (task, column) pair has a real
+    value unless one of these is true:
+      - the task is in EXPECTED_BLANKS (runs_in_v2_suite=False — gsm_symbolic,
+        gsm_noop, dclm_200m_val, paloma_macro), AND
+      - the cell is `—` or an explicit n/a marker.
+    Mean rows are excluded (their values are computed, not measured).
+    Category header rows are excluded.
+    Any other empty / `—` cell is reported as an error so the user sees
+    exactly which (model, task) pair is missing a number.
+    """
     errors = []
     header_idx, table_end = find_section3_table(lines)
     if header_idx is None:
         errors.append("§3 header line not found")
         return errors
-    header_cells = lines[header_idx].split("|")
     expected_pipe_count = lines[header_idx].count("|")
     for i in range(header_idx, table_end):
         ln = lines[i]
@@ -253,7 +263,8 @@ def validate_table(lines):
         pc = ln.count("|")
         if pc != expected_pipe_count:
             errors.append(f"line {i}: pipe count {pc} != header {expected_pipe_count}: {ln[:80]}")
-    # Mean row placement: each Mean row must be the row immediately after its category's last task row
+
+    # Mean row placement: each Mean row must be immediately after its category's last task row.
     for mean_label, category_label, member_tasks in MEAN_ROWS:
         mean_row_idx = None
         for i in range(header_idx + 1, table_end):
@@ -264,7 +275,6 @@ def validate_table(lines):
         if mean_row_idx is None:
             errors.append(f"missing Mean row: '{mean_label}'")
             continue
-        # Find last member task's row index
         last_member_idx = None
         for member in member_tasks:
             for i in range(header_idx + 1, table_end):
@@ -275,6 +285,71 @@ def validate_table(lines):
             errors.append(
                 f"Mean row '{mean_label}' is at line {mean_row_idx}, expected line {last_member_idx + 1}"
             )
+
+    if strict:
+        # Build per-task expected-blank set.
+        expected_blank_labels = {t.label for t in TASKS if not t.runs_in_v2_suite}
+        all_task_labels = {t.label for t in TASKS}
+
+        # Get column headers (model labels) and their cell indices.
+        header_cells = lines[header_idx].split("|")
+        # Cells layout: [0]="", [1]=" Task ", [2..N-2]=model columns, [N-1]=""
+        model_cols = []  # list of (cell_idx, header_label_for_display)
+        for ci, c in enumerate(header_cells):
+            if ci in (0, 1, len(header_cells) - 1):
+                continue
+            label = c.strip().replace("**", "").strip()
+            # Strip trailing footnote markers like ◊ § ‖ † ª ¥ ¤
+            label = re.sub(r"\s+[◊§‖†ªª¥¤]+(\s+[◊§‖†ªª¥¤]+)*\s*$", "", label).strip()
+            model_cols.append((ci, label))
+
+        # Walk every task row and check each model cell.
+        mean_labels = {m[0] for m in MEAN_ROWS}
+        for i in range(header_idx + 1, table_end):
+            ln = lines[i]
+            if not ln.startswith("|") or ln.startswith("|---|"):
+                continue
+            cells = ln.split("|")
+            label = parse_row_label(cells)
+            if not label:
+                continue
+            if label in mean_labels:
+                continue
+            if label not in all_task_labels:
+                # Category header row or unknown — skip
+                continue
+            task_can_be_blank = label in expected_blank_labels
+            for cell_idx, model_label in model_cols:
+                if cell_idx >= len(cells):
+                    continue
+                raw = cells[cell_idx].strip()
+                stripped = raw.replace("**", "").replace("*", "").replace("¶", "").strip()
+                # Acceptable values:
+                #   a number (parses as float)
+                #   `—` IF the task is expected to be blank
+                #   `n/a (ctx) ™` — explicit "not applicable" marker (e.g. phi-1 mmlu_pro context limit)
+                #   `0.000` etc — counts as a number
+                is_na_marker = stripped.startswith("n/a")
+                is_number = False
+                try:
+                    float(stripped)
+                    is_number = True
+                except ValueError:
+                    pass
+                if is_number or is_na_marker:
+                    continue
+                # Treat `—` plus any trailing footnote marker (‡, ¶, †, ™, ‖, °, etc) as a blank.
+                em_dash_only = re.sub(r"^—[\s‡¶†™‖°◊§ª¥¤‡‡‡]*$", "", stripped)
+                if stripped == "" or em_dash_only == "" or stripped == "—":
+                    if task_can_be_blank:
+                        continue
+                    errors.append(
+                        f"strict: ({model_label!r}, {label!r}) at line {i} is `{stripped or 'empty'}` — should have a value"
+                    )
+                else:
+                    errors.append(
+                        f"strict: ({model_label!r}, {label!r}) at line {i} is unparseable: {raw[:40]!r}"
+                    )
     return errors
 
 
@@ -329,12 +404,13 @@ def recompute_means(lines):
 # ====================================================================
 def cmd_validate(args):
     lines = MD.read_text().split("\n")
-    errors = validate_table(lines)
+    errors = validate_table(lines, strict=args.strict)
     if errors:
         for e in errors:
             print(f"ERROR: {e}")
         sys.exit(1)
-    print("§3 table validation OK.")
+    msg = "§3 table validation OK (strict: every (model, task) cell has a value)." if args.strict else "§3 table validation OK (structure)."
+    print(msg)
 
 
 def cmd_fill_from_results(args):
@@ -434,6 +510,8 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
 
     pv = sub.add_parser("validate", help="Validate §3 table structure")
+    pv.add_argument("--strict", action="store_true",
+                    help="Also assert that every (model, task) cell has a real value (excluding tasks that documented-blanks like gsm_symbolic, dclm_200m_val, paloma_macro).")
     pv.set_defaults(func=cmd_validate)
 
     pf = sub.add_parser("fill-from-results", help="Fill a §3 column from an existing v2-suite results dir")
