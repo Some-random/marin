@@ -261,7 +261,9 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 
 ---
 
-## 2. Models tracked
+<details>
+<summary><h2>2. Models tracked</h2></summary>
+
 
 | Label | HF repo (or local path) | Params (N) | Tokens trained (D) | FLOPs (≈6·N·D) | Unique tokens | Notes |
 |---|---|---|---|---:|---|---|
@@ -298,6 +300,9 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 **†** = C5 implements the Aryabumi et al "To Code, or Not To Code?" (2408.10914) two-stage code→text recipe at our scale. Stage 1 is code-only (Aryabumi Tables 3+4 ratios: 80% multi-language StarCoderData + 20% markup); stage 2 reverts to mostly NL (90% DCLM + 10% mixed). C5-stage1 and C5-final share the same wandb run logically but are split across two run-ids (`7mnu0nch` and `vj95091k`) because the original run crashed at step 21,201 when AWS pcluster's auto-scaler (SuspendTime=600s) power-cycled compute node `dy-9` mid-training. The resume reloaded from step-20914 with `WANDB_RUN_ID=7mnu0nch + WANDB_RESUME=allow`, but a new run-id was generated; the optimizer state, LR schedule position, and data position were all restored from the checkpoint — only the wandb log is cosmetically split.
 
 **◊** = C5-v3 implements the **Aryabumi-faithful separate-cosine-per-phase** version of the C5 recipe. Where C5 and C5-v2 used a single continuous cosine across both stages (so stage 2 inherited a half-decayed LR), C5-v3 runs phase 2 as a **separate process** initialized via Levanter's `initialize_from_checkpoint_path` — model weights only, fresh optimizer state, fresh cosine LR (3e-4 → 0) over phase 2's own budget. This matches our reading of Aryabumi et al §3.1 footnote 5; we have an open email to the authors to confirm. Phase 1 (code+markup) and phase 2 (90% DCLM + 10% code+markup) match C5-v2's data mixes exactly — only the LR schedule across the stage boundary differs.
+
+
+</details>
 
 ---
 
@@ -354,7 +359,7 @@ See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→te
 | mbpp[3] | 0.000 | 0.000 | 0.098 | 0.136 | 0.000 | 0.052 | 0.052 | 0.210 | 0.098 | 0.290 | 0.208 | 0.048 | 0.088 | 0.050 | 0.000 | **0.416** | 0.342 |
 | **Mean Code** | *0.000* | *0.004* | *0.112* | *0.131* | *0.002* | *0.052* | *0.034* | *0.182* | *0.065* | *0.208* | *0.195* | *0.079* | *0.086* | *0.065* | *0.000* | *0.484* | *0.342* |
 | **Perplexity (lower=better)** | | | | | | | | | | | | | | | | | |
-| dclm_200m_val (nats) | 4.070 | 4.596 | 4.626 | 4.427 | **2.821** | 2.878 | 4.011 | 3.997 | 3.928 | 3.850 | — | — | — | — | 2.894 ¶ | — ‡ | — ‡ |
+| dclm_200m_val (nats) | 4.070 | 4.596 | 4.626 | 4.427 | **2.821** | 2.878 | 4.011 | 3.997 | 3.928 | 3.850 | 3.997 | 3.392 | 4.659 | 3.292 | 2.894 ¶ | — ‡ | — ‡ |
 | paloma_macro (bpb) | 1.631 | 1.824 | 1.587 ¶ | 1.519 ¶ | 1.122 ¶ | **1.097 ¶** | 1.351 ¶ | 1.380 ¶ | 1.325 ¶ | 1.334 ¶ | — | — | — | — | 1.153 ¶ | 1.738 | 1.174 |
 
 **‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.

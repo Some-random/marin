@@ -468,6 +468,52 @@ def cmd_fill_from_results(args):
     print("Done. §3 validated.")
 
 
+def cmd_fill_cell(args):
+    """Fill a single (row, column) cell with a value. Validates after."""
+    lines = MD.read_text().split("\n")
+    header_idx, table_end = find_section3_table(lines)
+    if header_idx is None:
+        print("ERROR: §3 header not found")
+        sys.exit(1)
+    col_idx = find_col_idx_in_header(lines[header_idx], args.col)
+    if col_idx is None:
+        print(f"ERROR: column with substring '{args.col}' not found")
+        sys.exit(1)
+    row_idx = None
+    for i in range(header_idx + 1, table_end):
+        cells = lines[i].split("|")
+        if parse_row_label(cells) == args.row:
+            row_idx = i
+            break
+    if row_idx is None:
+        print(f"ERROR: row labeled '{args.row}' not found")
+        sys.exit(1)
+
+    try:
+        v = float(args.value)
+    except ValueError:
+        print(f"ERROR: value '{args.value}' is not a float")
+        sys.exit(1)
+
+    cells = lines[row_idx].split("|")
+    cells[col_idx] = f" {fmt(v)} "
+    lines[row_idx] = "|".join(cells)
+
+    # Recompute Means in case the change affects any aggregate
+    recompute_means(lines)
+
+    # Validate
+    errors = validate_table(lines)
+    if errors:
+        print("VALIDATION FAILED:")
+        for e in errors:
+            print(f"  {e}")
+        sys.exit(1)
+
+    MD.write_text("\n".join(lines))
+    print(f"updated ({args.row!r}, {args.col!r}) = {fmt(v)}")
+
+
 def cmd_run(args):
     """End-to-end: run v2 suite on a node, then fill §3."""
     label = args.label
@@ -518,6 +564,12 @@ def main():
     pf.add_argument("results_dir")
     pf.add_argument("col_label", help="substring that uniquely identifies the column header (e.g. 'C5-v3-small final')")
     pf.set_defaults(func=cmd_fill_from_results)
+
+    pc = sub.add_parser("fill-cell", help="Fill a single (row, column) cell with a value (e.g. dclm_200m_val from a training log)")
+    pc.add_argument("--row", required=True, help="row label (e.g. 'dclm_200m_val (nats)')")
+    pc.add_argument("--col", required=True, help="column header substring (e.g. 'C5-v3 final')")
+    pc.add_argument("--value", required=True, help="numeric value")
+    pc.set_defaults(func=cmd_fill_cell)
 
     pr = sub.add_parser("run", help="Run v2 suite for a single model")
     pr.add_argument("label")
