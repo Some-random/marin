@@ -270,6 +270,10 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 | **C5 1ep code→text final** † | `c5_final_step29343_hf` (run `rural-forest-133` / `vj95091k`, step-29343 — resumed from `7mnu0nch`/step-20914 after a dy-9 power-cycle crash at step 21,201) | 1.4 B | 30.77 B | 2.6 × 10²⁰ | Stage 1 (15.39 B, as above) then stage 2 (15.39 B): 90% DCLM (13.85 B ≈ 0.40 epoch over 34.85 B available) + 10% (80% Stack + 20% markup) | Same hyperparams as A5/B4. Matched-compute vs A5/B4: same total trained tokens, same hyperparams, only data ordering and ratios differ. Single continuous cosine LR across both stages. |
 | **C5-v2 stage-1 (clean code-only)** ‖ | `c5v2_stage1_step14672_hf` (run `glorious-sun-134` / `u23atfbm`, step-14672) | 1.4 B | 15.39 B | 1.3 × 10²⁰ | 100% clean code+markup: 80% code = Stack-Edu Python @ score>3.0 (~54%) + Nemotron Code-Concepts (~45%) + Nemotron Unconditional-Algorithmic (~1%); 20% markup = Stack-Edu Markdown @ score>3.0 | Same hparams as C5. End-of-stage-1 snapshot (mid-cosine). |
 | **C5-v2 1ep clean code→text final** ‖ | `c5v2_final_step29343_hf` (run `glorious-sun-134` / `u23atfbm`, step-29343) | 1.4 B | 30.77 B | 2.6 × 10²⁰ | Stage 1 (15.39 B, as above) + stage 2 (15.39 B): 90% DCLM + 10% (80% clean code + 20% Stack-Edu Markdown), same code-mix ratios as stage 1 | Same hparams as A5/B4/C5. Matched-compute vs C5: same total trained tokens, same hparams, same 80/20 + 90/10 recipe — **only the code+markup data quality differs** (classifier-filtered Stack-Edu + Nemotron synthetic textbook code, vs C5's raw multi-language StarCoderData). Single continuous cosine LR across both stages. |
+| **C5-v3 phase 1 (code-LM, separate cosine)** ◊ | `c5v3_p1_a6_step14671_hf` (run `8dtdcear`, step-14671) | 1.4 B | 15.39 B | 1.3 × 10²⁰ | 100% clean code+markup at 80/20 (same caches as C5-v2 stage-1: Stack-Edu Python @ score>3.0, Nemotron Code-Concepts, Nemotron Unconditional-Algorithmic, Stack-Edu Markdown @ score>3.0) | Same hparams as A5/B4/C5/C5-v2 (wd=0.1, LR=3e-4 cosine, batch=256 × seq=4096 × 14,672 steps). **Difference from C5/C5-v2:** this phase 1 ends with a fully-cooled cosine (LR → 0) instead of mid-cosine, because phase 2 starts a fresh cosine via `initialize_from_checkpoint_path`. |
+| **C5-v3 final (hero, Aryabumi-faithful)** ◊ | `c5v3_p2_a6_step14671_hf` (run `85ip8s5o`, step-14671) | 1.4 B | 30.77 B | 2.6 × 10²⁰ | Phase 1 (15.39 B, as above) + phase 2 (15.39 B): 90% DCLM + 10% (80% clean code + 20% markup), same code-mix ratios as phase 1 | Same per-phase hparams. Phase 2 launched as a separate process with `initialize_from_checkpoint_path` pointing at phase 1's step-14671 — fresh cosine 3e-4 → 0 over phase 2's own budget, fresh optimizer state, step counter restarts at 0. **The "fix" relative to C5/C5-v2 is the separate-cosine-per-phase recipe**, faithful to Aryabumi et al §3.1. |
+| **C5-v3-small phase 1** ◊§ | `c5v3_small_phase1_step6399_hf` (run `ex8j1nax`, step-6399) | 1.4 B | 1.68 B | 1.4 × 10¹⁹ | 100% clean code+markup, same caches as C5-v3 phase 1 | wd=0.1, LR=3e-4 cosine, 1-node DP, batch=64 × seq=4096 × 6,400 steps. Matched-budget probe — does the separate-cosine-per-phase recipe still help at 1/9.2 the budget? Direct comparison to C5-v2-small. |
+| **C5-v3-small final** ◊§ | (phase 2 currently training on dy-5; final HF path TBD) | 1.4 B | 3.36 B | 2.8 × 10¹⁹ | Phase 1 (1.68 B, as above) + phase 2 (1.68 B): 90% DCLM + 10% (80% code + 20% markup) | Same hparams as C5-v3-small phase 1. Phase 2 inits from phase 1 step-6399 with FRESH cosine. **Direct apples-to-apples comparison vs C5-v2-small final** — same total budget, same data, only LR-schedule recipe differs. |
 | **4B final** ª | `4b_dclm_short_final_hf` (run `3_5b_dclm_short`, step-22887) | 3.5 B | 6.0 B | 1.3 × 10²⁰ | 7 × DCLM shards, ~0.17 epoch per shard | wd=0.1, LR=3e-4 cosine, 8-node FSDP, batch=64 × seq=4096 × 22,887 steps. |
 | phi-1 | `microsoft/phi-1` | 1.3 B | ~50 B | ~3.9 × 10²⁰ | ~7 B unique (6 B filtered Stack + ~1 B GPT-3.5 synth Python) × ~8 epochs | Code-only (external reference). **NOT a base model** — see ‡‡‡ footnote: this is the phi-1-base pretrained model PLUS a 180M-token fine-tune on synthetic HumanEval-shaped CodeExercises. Per the paper, phi-1-base alone = 29% HumanEval; the fine-tune adds ~+22 pp. phi-1-base is not publicly released. |
 | phi-1.5 | `microsoft/phi-1_5` | 1.3 B | ~150 B | ~1.2 × 10²¹ | ~30 B unique (phi-1 mix + ~20 B synthetic NL textbooks) × ~5 epochs | Larger synth-textbook training (external reference). **Base model — no instruction or format fine-tune** (per phi-1.5 paper). The right apples-to-apples reference for our base models on code-gen tasks. |
@@ -288,6 +292,7 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 
 **†** = C5 implements the Aryabumi et al "To Code, or Not To Code?" (2408.10914) two-stage code→text recipe at our scale. Stage 1 is code-only (Aryabumi Tables 3+4 ratios: 80% multi-language StarCoderData + 20% markup); stage 2 reverts to mostly NL (90% DCLM + 10% mixed). C5-stage1 and C5-final share the same wandb run logically but are split across two run-ids (`7mnu0nch` and `vj95091k`) because the original run crashed at step 21,201 when AWS pcluster's auto-scaler (SuspendTime=600s) power-cycled compute node `dy-9` mid-training. The resume reloaded from step-20914 with `WANDB_RUN_ID=7mnu0nch + WANDB_RESUME=allow`, but a new run-id was generated; the optimizer state, LR schedule position, and data position were all restored from the checkpoint — only the wandb log is cosmetically split.
 
+**◊** = C5-v3 implements the **Aryabumi-faithful separate-cosine-per-phase** version of the C5 recipe. Where C5 and C5-v2 used a single continuous cosine across both stages (so stage 2 inherited a half-decayed LR), C5-v3 runs phase 2 as a **separate process** initialized via Levanter's `initialize_from_checkpoint_path` — model weights only, fresh optimizer state, fresh cosine LR (3e-4 → 0) over phase 2's own budget. This matches our reading of Aryabumi et al §3.1 footnote 5; we have an open email to the authors to confirm. Phase 1 (code+markup) and phase 2 (90% DCLM + 10% code+markup) match C5-v2's data mixes exactly — only the LR schedule across the stage boundary differs.
 ---
 
 ## 3. Canonical results — all models
@@ -296,44 +301,44 @@ All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (
 
 See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→text stages + resume forensics), and ‖ (C5-v2 clean-code recipe) for column-definition caveats.
 
-| Task | base (x16) | code25 v2 (x16) | **C5-v2 small stage-1 ‖§** | **C5-v2 small ‖§** | A5 1ep final | B4 1ep final | C5 stage-1 † | C5-v2 stage-1 ‖ | C5 final † | C5-v2 final ‖ | 4B final ª | phi-1 | phi-1.5 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| **Open-book** | | | | | | | | | | | | | |
-| sciq[0] | 0.652 | 0.590 | 0.545 | 0.601 | 0.834 | 0.829 | 0.707 | 0.727 | 0.754 | 0.715 | 0.824 | 0.707 | **0.933** |
-| boolq[0] | 0.502 | 0.567 | 0.617 | 0.614 | 0.563 | 0.599 | 0.619 | 0.593 | 0.623 | 0.580 | 0.552 | 0.451 | **0.746** |
-| piqa[0] | 0.634 | 0.606 | 0.566 | 0.577 | 0.718 | 0.709 | 0.583 | 0.584 | 0.591 | 0.600 | 0.697 | 0.562 | **0.766** |
-| openbookqa_fact[0] | 0.336 | 0.312 | 0.304 | 0.294 | 0.430 | 0.430 | 0.306 | 0.312 | 0.316 | 0.326 | 0.426 | 0.316 | **0.530** |
-| **Closed-book NL** | | | | | | | | | | | | | |
-| arc_easy[25] | 0.401 | 0.388 | 0.312 | 0.335 | 0.629 | 0.607 | 0.362 | 0.395 | 0.385 | 0.418 | 0.612 | 0.378 | **0.805** |
-| arc_challenge[25] | 0.242 | 0.241 | 0.223 | 0.218 | 0.316 | 0.289 | 0.209 | 0.220 | 0.208 | 0.215 | 0.292 | 0.232 | **0.532** |
-| hellaswag[10] | 0.348 | 0.321 | 0.275 | 0.280 | 0.497 | 0.464 | 0.292 | 0.304 | 0.298 | 0.311 | 0.466 | 0.301 | **0.635** |
-| winogrande[5] | 0.504 | 0.500 | 0.505 | 0.507 | 0.541 | 0.515 | 0.513 | 0.507 | 0.517 | 0.484 | 0.511 | 0.498 | **0.710** |
-| mmlu[5] | 0.252 | 0.256 | 0.262 | 0.261 | 0.244 | 0.258 | 0.265 | 0.253 | 0.269 | 0.245 | 0.250 | 0.248 | **0.422** |
-| commonsense_qa[0] | 0.192 | 0.212 | 0.196 | 0.193 | 0.195 | 0.213 | 0.196 | 0.198 | 0.196 | 0.194 | 0.193 | 0.175 | **0.507** |
-| social_iqa[0] | 0.366 | 0.362 | 0.349 | 0.342 | 0.415 | 0.400 | 0.346 | 0.360 | 0.354 | 0.359 | 0.407 | 0.364 | **0.523** |
-| logiqa[0] | 0.218 | 0.210 | 0.280 | 0.278 | **0.320** | 0.270 | 0.295 | 0.286 | 0.287 | 0.270 | 0.269 | 0.214 | 0.240 |
-| lambada_openai[0] | 0.238 | 0.197 | 0.089 | 0.124 | 0.519 | 0.496 | 0.144 | 0.213 | 0.185 | 0.250 | 0.494 | 0.106 | **0.527** |
-| copa[0] | 0.620 | 0.620 | 0.540 | 0.540 | 0.740 | 0.690 | 0.550 | 0.560 | 0.540 | 0.550 | 0.740 | 0.530 | **0.800** |
-| wsc[0] | 0.365 | 0.365 | 0.356 | 0.346 | 0.519 | 0.365 | 0.365 | 0.596 | 0.365 | 0.558 | 0.394 | 0.442 | **0.606** |
-| **Aggregate / multi-domain reasoning** | | | | | | | | | | | | | |
-| agieval_lsat_ar[0] | 0.226 | 0.252 | 0.230 | 0.204 | 0.187 | 0.222 | 0.248 | 0.209 | 0.235 | 0.230 | 0.222 | 0.213 | 0.183 |
-| gpqa_diamond[0] | 0.268 | **0.328** | 0.263 | 0.263 | 0.268 | 0.217 | 0.263 | 0.258 | 0.263 | 0.283 | 0.273 | 0.197 | 0.232 |
-| bbh[3] (limit=0.1) | 0.025 | 0.026 | 0.127 | 0.178 | 0.160 | 0.206 | 0.199 | 0.218 | 0.235 | 0.215 | 0.155 | 0.238 | **0.288** |
-| mmlu_pro[5] (limit=0.1) | 0.050 | 0.047 | 0.063 | 0.064 | **0.116** | 0.073 | 0.051 | 0.071 | 0.065 | 0.080 | 0.069 | n/a (ctx) ™ | n/a (ctx) ™ |
-| **Math (standard)** | | | | | | | | | | | | | |
-| gsm8k[5] | 0.000 | 0.000 | 0.015 | 0.009 | 0.001 | 0.010 | 0.003 | 0.017 | 0.010 | 0.014 | 0.018 | 0.012 | **0.305** |
-| gsm8k_cot[8] | 0.022 | 0.005 | 0.017 | 0.021 | 0.031 | 0.027 | 0.016 | 0.021 | 0.024 | 0.033 | 0.021 | 0.021 | **0.299** |
-| minerva_math[4] | 0.0002 | 0.000 | 0.006 | 0.005 | 0.002 | 0.010 | 0.002 | 0.006 | 0.007 | 0.009 | 0.007 | 0.012 | **0.029** |
-| **Math (perturbation-robust)** ° | | | | | | | | | | | | | |
-| gsm_symbolic_main[8] | — | — | — | — | — | — | — | — | — | — | — | 0.013 | **0.160** |
-| gsm_noop[8] | — | — | — | — | — | — | — | — | — | — | — | 0.000 | **0.034** |
-| **Code** | | | | | | | | | | | | | |
-| humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.189 | 0.159 | 0.006 | 0.104 | 0.037 | 0.268 | 0.061 | 0.281 | 0.000 | **0.494** | 0.342 |
-| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.055 | 0.098 | 0.000 | 0.000 | 0.012 | 0.073 | 0.037 | 0.055 | 0.000 | **0.543** | 0.342 |
-| mbpp[3] | 0.000 | 0.000 | 0.098 | 0.130 | 0.000 | 0.060 | 0.050 | 0.212 | 0.104 | 0.298 | 0.000 | **0.416** | 0.342 |
-| **Perplexity (lower=better)** | | | | | | | | | | | | | |
-| dclm_200m_val (nats) | 4.070 | 4.596 | 4.626 | 4.427 | **2.821** | 2.878 | 4.011 | 3.997 | 3.928 | 3.850 | 2.894 ¶ | — ‡ | — ‡ |
-| paloma_macro (bpb) | 1.631 | 1.824 | 1.587 ¶ | 1.519 ¶ | 1.122 ¶ | **1.097 ¶** | 1.351 ¶ | 1.380 ¶ | 1.325 ¶ | 1.334 ¶ | 1.153 ¶ | 1.738 | 1.174 |
+| Task | base (x16) | code25 v2 (x16) | **C5-v2 small stage-1 ‖§** | **C5-v2 small ‖§** | A5 1ep final | B4 1ep final | C5 stage-1 † | C5-v2 stage-1 ‖ | C5 final † | C5-v2 final ‖ | **C5-v3 phase 1** ◊ | **C5-v3 final** ◊ | **C5-v3-small phase 1** ◊§ | **C5-v3-small final** ◊§ | 4B final ª | phi-1 | phi-1.5 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Open-book** | | | | | | | | | | | | | | | | | |
+| sciq[0] | 0.652 | 0.590 | 0.545 | 0.601 | 0.834 | 0.829 | 0.707 | 0.727 | 0.754 | 0.715 | 0.720 | 0.728 | 0.541 | — | 0.824 | 0.707 | **0.933** |
+| boolq[0] | 0.502 | 0.567 | 0.617 | 0.614 | 0.563 | 0.599 | 0.619 | 0.593 | 0.623 | 0.580 | 0.595 | 0.443 | 0.618 | — | 0.552 | 0.451 | **0.746** |
+| piqa[0] | 0.634 | 0.606 | 0.566 | 0.577 | 0.718 | 0.709 | 0.583 | 0.584 | 0.591 | 0.600 | 0.581 | 0.649 | 0.554 | — | 0.697 | 0.562 | **0.766** |
+| openbookqa_fact[0] | 0.336 | 0.312 | 0.304 | 0.294 | 0.430 | 0.430 | 0.306 | 0.312 | 0.316 | 0.326 | 0.236 | 0.296 | 0.198 | — | 0.426 | 0.316 | **0.530** |
+| **Closed-book NL** | | | | | | | | | | | | | | | | | |
+| arc_easy[25] | 0.401 | 0.388 | 0.312 | 0.335 | 0.629 | 0.607 | 0.362 | 0.395 | 0.385 | 0.418 | 0.397 | 0.536 | 0.322 | — | 0.612 | 0.378 | **0.805** |
+| arc_challenge[25] | 0.242 | 0.241 | 0.223 | 0.218 | 0.316 | 0.289 | 0.209 | 0.220 | 0.208 | 0.215 | 0.183 | 0.214 | 0.181 | — | 0.292 | 0.232 | **0.532** |
+| hellaswag[10] | 0.348 | 0.321 | 0.275 | 0.280 | 0.497 | 0.464 | 0.292 | 0.304 | 0.298 | 0.311 | 0.275 | 0.323 | 0.268 | — | 0.466 | 0.301 | **0.635** |
+| winogrande[5] | 0.504 | 0.500 | 0.505 | 0.507 | 0.541 | 0.515 | 0.513 | 0.507 | 0.517 | 0.484 | 0.515 | 0.508 | 0.503 | — | 0.511 | 0.498 | **0.710** |
+| mmlu[5] | 0.252 | 0.256 | 0.262 | 0.261 | 0.244 | 0.258 | 0.265 | 0.253 | 0.269 | 0.245 | 0.259 | 0.238 | 0.267 | — | 0.250 | 0.248 | **0.422** |
+| commonsense_qa[0] | 0.192 | 0.212 | 0.196 | 0.193 | 0.195 | 0.213 | 0.196 | 0.198 | 0.196 | 0.194 | 0.203 | 0.193 | 0.196 | — | 0.193 | 0.175 | **0.507** |
+| social_iqa[0] | 0.366 | 0.362 | 0.349 | 0.342 | 0.415 | 0.400 | 0.346 | 0.360 | 0.354 | 0.359 | 0.358 | 0.383 | 0.347 | — | 0.407 | 0.364 | **0.523** |
+| logiqa[0] | 0.218 | 0.210 | 0.280 | 0.278 | **0.320** | 0.270 | 0.295 | 0.286 | 0.287 | 0.270 | 0.214 | 0.220 | 0.266 | — | 0.269 | 0.214 | 0.240 |
+| lambada_openai[0] | 0.238 | 0.197 | 0.089 | 0.124 | 0.519 | 0.496 | 0.144 | 0.213 | 0.185 | 0.250 | — | — | — | — | 0.494 | 0.106 | **0.527** |
+| copa[0] | 0.620 | 0.620 | 0.540 | 0.540 | 0.740 | 0.690 | 0.550 | 0.560 | 0.540 | 0.550 | — | — | — | — | 0.740 | 0.530 | **0.800** |
+| wsc[0] | 0.365 | 0.365 | 0.356 | 0.346 | 0.519 | 0.365 | 0.365 | 0.596 | 0.365 | 0.558 | — | — | — | — | 0.394 | 0.442 | **0.606** |
+| **Aggregate / multi-domain reasoning** | | | | | | | | | | | | | | | | | |
+| agieval_lsat_ar[0] | 0.226 | 0.252 | 0.230 | 0.204 | 0.187 | 0.222 | 0.248 | 0.209 | 0.235 | 0.230 | — | — | — | — | 0.222 | 0.213 | 0.183 |
+| gpqa_diamond[0] | 0.268 | **0.328** | 0.263 | 0.263 | 0.268 | 0.217 | 0.263 | 0.258 | 0.263 | 0.283 | — | — | — | — | 0.273 | 0.197 | 0.232 |
+| bbh[3] (limit=0.1) | 0.025 | 0.026 | 0.127 | 0.178 | 0.160 | 0.206 | 0.199 | 0.218 | 0.235 | 0.215 | — | — | — | — | 0.155 | 0.238 | **0.288** |
+| mmlu_pro[5] (limit=0.1) | 0.050 | 0.047 | 0.063 | 0.064 | **0.116** | 0.073 | 0.051 | 0.071 | 0.065 | 0.080 | — | — | — | — | 0.069 | n/a (ctx) ™ | n/a (ctx) ™ |
+| **Math (standard)** | | | | | | | | | | | | | | | | | |
+| gsm8k[5] | 0.000 | 0.000 | 0.015 | 0.009 | 0.001 | 0.010 | 0.003 | 0.017 | 0.010 | 0.014 | 0.008 | 0.002 | 0.009 | — | 0.018 | 0.012 | **0.305** |
+| gsm8k_cot[8] | 0.022 | 0.005 | 0.017 | 0.021 | 0.031 | 0.027 | 0.016 | 0.021 | 0.024 | 0.033 | 0.014 | 0.004 | 0.007 | — | 0.021 | 0.021 | **0.299** |
+| minerva_math[4] | 0.0002 | 0.000 | 0.006 | 0.005 | 0.002 | 0.010 | 0.002 | 0.006 | 0.007 | 0.009 | 0.025 | 0.001 | 0.001 | — | 0.007 | 0.012 | **0.029** |
+| **Math (perturbation-robust)** ° | | | | | | | | | | | | | | | | | |
+| gsm_symbolic_main[8] | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | 0.013 | **0.160** |
+| gsm_noop[8] | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | 0.000 | **0.034** |
+| **Code** | | | | | | | | | | | | | | | | | |
+| humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.189 | 0.159 | 0.006 | 0.104 | 0.037 | 0.268 | 0.061 | 0.281 | 0.250 | 0.128 | 0.110 | — | 0.000 | **0.494** | 0.342 |
+| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.055 | 0.098 | 0.000 | 0.000 | 0.012 | 0.073 | 0.037 | 0.055 | — | — | — | — | 0.000 | **0.543** | 0.342 |
+| mbpp[3] | 0.000 | 0.000 | 0.098 | 0.130 | 0.000 | 0.060 | 0.050 | 0.212 | 0.104 | 0.298 | 0.216 | 0.046 | 0.086 | — | 0.000 | **0.416** | 0.342 |
+| **Perplexity (lower=better)** | | | | | | | | | | | | | | | | | |
+| dclm_200m_val (nats) | 4.070 | 4.596 | 4.626 | 4.427 | **2.821** | 2.878 | 4.011 | 3.997 | 3.928 | 3.850 | — | — | — | — | 2.894 ¶ | — ‡ | — ‡ |
+| paloma_macro (bpb) | 1.631 | 1.824 | 1.587 ¶ | 1.519 ¶ | 1.122 ¶ | **1.097 ¶** | 1.351 ¶ | 1.380 ¶ | 1.325 ¶ | 1.334 ¶ | — | — | — | — | 1.153 ¶ | 1.738 | 1.174 |
 
 **‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
 
@@ -399,49 +404,6 @@ See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→te
 **Cross-table reading (rough only):** A5/B4 final macro values (Table B) of 1.12 / 1.10 are ~0.55 nats LOWER than base Table B (1.68), and ~0.55 lower than code25v2 (1.85). Translating the ~0.55-nat gap into Table A-equivalent terms (base Table A = 1.63), A5/B4 final macros would be ~1.05–1.08 — i.e., still significantly LOWER than phi-1.5's lm-eval value of 1.174. This translation is rough and only works for macro, not per-subset.
 
 </details>
-
-### C5-v3 (Aryabumi-faithful: separate cosine per phase) — phase 1 vs phase 2 hero
-
-C5-v3 is the Aryabumi-faithful version of the C5 recipe: instead of a single continuous cosine LR across both stages (the C5/C5-v2 design), **each phase gets its own fresh cosine LR (3e-4 → 0)** and phase 2 is launched as a separate process via `initialize_from_checkpoint_path` (model weights only, fresh optimizer, step counter restarts at 0). Per-phase budget matches C5/C5-v2 stage budgets: 14,672 steps × 256 batch × 4096 seq ≈ 15.4 B tokens per phase, 30.77 B total. Phase 1 = 80% clean code + 20% Stack-Edu Markdown (same caches as C5-v2 stage-1). Phase 2 = 90% DCLM + 10% (80% clean code + 20% markup), init from phase 1 step-14671.
-
-Both runs evaluated with the same v2 lm-eval-harness pipeline used for the rest of §3. Phase 1 mbpp + humaneval re-run with the single-GPU `code_eval` fix (see footnote on `eval_intermediate.sh`). Phase 2 (hero, run `85ip8s5o`, 8-node, finished 19:38 PDT 2026-06-10).
-
-| Task | C5-v3 phase 1 (code-LM, 15.4 B) | C5-v3 final (hero, +text, 30.77 B) | Δ (phase 2 − phase 1) |
-|---|---:|---:|---:|
-| **Open-book** | | | |
-| sciq[0] | 0.720 | 0.728 | **+0.008** |
-| boolq[0] | **0.595** | 0.443 | **−0.152** |
-| piqa[0] | 0.581 | **0.649** | **+0.068** |
-| openbookqa_fact[0] | 0.236 | **0.296** | **+0.060** |
-| openbookqa[0] | 0.138 | **0.176** | **+0.038** |
-| **Closed-book NL** | | | |
-| arc_easy[25] | 0.397 | **0.536** | **+0.139** |
-| arc_challenge[25] | 0.183 | **0.214** | **+0.031** |
-| hellaswag[10] | 0.275 | **0.323** | **+0.048** |
-| winogrande[5] | **0.515** | 0.508 | −0.007 |
-| mmlu[5] (mean of 61 subjects) | **0.259** | 0.238 | **−0.021** |
-| commonsense_qa[0] | **0.203** | 0.193 | −0.010 |
-| social_iqa[0] | 0.358 | **0.383** | **+0.025** |
-| logiqa[0] | 0.214 | **0.220** | +0.006 |
-| **Math** | | | |
-| gsm8k[5] | **0.008** | 0.002 | −0.006 |
-| gsm8k_cot[8] | **0.014** | 0.004 | −0.010 |
-| minerva_math[4] | **0.025** | 0.001 | **−0.024** |
-| **Code** | | | |
-| humaneval[0] (lm-eval) | **0.250** | 0.128 | **−0.122** |
-| mbpp[3] | **0.216** | 0.046 | **−0.170** |
-
-**Mean Δ on the 13 NL/open-book tasks = +0.019** (about +1.9 pp net NL gain).
-**Mean Δ on the 5 math+code tasks = −0.066** (about −6.6 pp regression).
-
-**Pattern:** phase 2 trades code+math knowledge for NL knowledge. The wins on NL (arc_easy +14 pp, hellaswag +5 pp, piqa +7 pp, openbookqa_fact +6 pp) are accompanied by clear losses on what the code-LM was good at (mbpp −17 pp, humaneval −12 pp) and surprisingly mild-to-negative motion on mmlu (−2 pp mean) and boolq (−15 pp). The boolq regression is the biggest unforced loss — the code-only LM was already at 0.595 there, and phase 2 dropped it to 0.443.
-
-**Comparison to existing §3 columns** (rough — see main table for full numbers):
-- vs C5 final (code → text, single continuous cosine, 30.77 B): C5 final hits arc_easy 0.385, hellaswag 0.298, piqa 0.591, mmlu 0.269, mbpp 0.104. C5-v3 final beats C5 final on arc_easy (+15 pp), hellaswag (+3 pp), piqa (+6 pp), but loses on mmlu (−3 pp), boolq (−18 pp), mbpp (−6 pp).
-- vs C5-v2 final (clean code → text, single continuous cosine, 30.77 B): C5-v2 final hits arc_easy 0.418, hellaswag 0.311, piqa 0.600, mmlu 0.245, mbpp 0.298. C5-v3 final beats C5-v2 final on arc_easy (+12 pp), hellaswag (+1 pp), piqa (+5 pp), but loses on mmlu (−1 pp), boolq (−14 pp), mbpp (−25 pp).
-- The "separate cosine per phase" recipe (C5-v3) gives bigger NL wins than the "single continuous cosine" recipe (C5/C5-v2) on the closed-book NL tasks where it wins, but loses substantially on code retention and shows no mmlu lift.
-
-**Tasks not run for C5-v3:** lambada_openai, copa, wsc, agieval_lsat_ar, gpqa_diamond, bbh, mmlu_pro, gsm_symbolic_main, gsm_noop, humaneval bigcode, dclm_200m_val, paloma_macro. Same tasks should be added if we want full §3-style parity. Levanter in-training validation losses + paloma bpb can be pulled from the offline wandb runs (`8dtdcear` for phase 1, `85ip8s5o` for phase 2) by running `wandb sync` first.
 
 ### Headlines
 
