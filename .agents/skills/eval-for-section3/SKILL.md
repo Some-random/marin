@@ -1,7 +1,20 @@
 ---
 name: eval-for-section3
-description: Run the canonical v2-suite evaluation on a model checkpoint and populate or update a column in §3 of `experiments/data_efficiency/EVALUATION.md`. Use whenever the user asks to evaluate a model for the EVALUATION.md table, fill missing §3 cells, refresh historical mbpp/humaneval, or compute Mean rows. NEVER use `eval_intermediate.sh` for §3 — it skips ~12 tasks. This skill always uses `run_eval_v2.sh`.
+description: Evaluate a model for §3 of `experiments/data_efficiency/EVALUATION.md` and fill its column without breaking the table. Use whenever the user asks to evaluate a model for the EVALUATION.md table, fill missing §3 cells, refresh historical mbpp/humaneval, or compute Mean rows. Always delegate to `experiments/data_efficiency/eval_section3.py` (NOT raw scripts) — that tool has the canonical task config, all metric fallbacks, Mean row computation, and table-structure validation built in.
 ---
+
+# QUICK PATH
+
+```bash
+# Run v2 suite + fill the column + validate:
+.venv/bin/python experiments/data_efficiency/eval_section3.py run <LABEL> <LEVANTER_OR_HF_DIR> [--node NODE]
+# Then when 'ALL DONE' appears in the log:
+.venv/bin/python experiments/data_efficiency/eval_section3.py fill-from-results <RESULTS_DIR> "<COLUMN_LABEL_SUBSTR>"
+# Verify table is well-formed:
+.venv/bin/python experiments/data_efficiency/eval_section3.py validate
+```
+
+The full procedure (only as backup when the tool can't handle a case):
 
 # Skill: Evaluate a model for §3 of EVALUATION.md
 
