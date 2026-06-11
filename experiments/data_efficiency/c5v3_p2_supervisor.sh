@@ -46,7 +46,7 @@ TS=$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M%S)
 EVAL_LOG=$LOG_ROOT/c5v3-p2-a6-eval-${TS}.log
 log "launching c5v3-p2-a6 v2 eval on $EVAL_NODE → $EVAL_LOG"
 
-bash /fsx/users/dongweij/marin/experiments/data_efficiency/eval_intermediate.sh \
+bash /fsx/users/dongweij/marin/experiments/data_efficiency/convert_and_eval_v2.sh \
   --label c5v3-p2-a6-step$P2_FINAL_STEP \
   --src $P2_CKPT \
   --hf-dst /fsx/users/dongweij/marin/checkpoints/c5v3_p2_a6_step${P2_FINAL_STEP}_hf \

@@ -62,7 +62,7 @@ done
 P1_EVAL_LOG=$LOG_ROOT/c5v3-small-phase1-eval-${TS}.log
 log "fanning out: phase 1 eval on $EVAL_NODE + phase 2 train on $TRAIN_NODE"
 
-nohup bash /fsx/users/dongweij/marin/experiments/data_efficiency/eval_intermediate.sh \
+nohup bash /fsx/users/dongweij/marin/experiments/data_efficiency/convert_and_eval_v2.sh \
   --label c5v3-small-phase1-step$P1_STEP \
   --src $P1_CKPT \
   --hf-dst /fsx/users/dongweij/marin/checkpoints/c5v3_small_phase1_step${P1_STEP}_hf \
@@ -104,7 +104,7 @@ done
 TS3=$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M%S)
 P2_EVAL_LOG=$LOG_ROOT/c5v3-small-phase2-eval-${TS3}.log
 log "phase 2 eval launching on $EVAL_NODE → $P2_EVAL_LOG"
-nohup bash /fsx/users/dongweij/marin/experiments/data_efficiency/eval_intermediate.sh \
+nohup bash /fsx/users/dongweij/marin/experiments/data_efficiency/convert_and_eval_v2.sh \
   --label c5v3-small-phase2-step$P2_STEP \
   --src $P2_CKPT \
   --hf-dst /fsx/users/dongweij/marin/checkpoints/c5v3_small_phase2_step${P2_STEP}_hf \
