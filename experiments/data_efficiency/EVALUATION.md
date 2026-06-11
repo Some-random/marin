@@ -1,6 +1,8 @@
 # Evaluation Reference: Tasks, Taxonomy, and Model Results
 
-## 1. Taxonomy by mechanism (with examples)
+<details>
+<summary><h2>1. Taxonomy by mechanism (with examples)</h2></summary>
+
 
 Two-way split for QA: **open-book** (the answer is in the prompt; model attends and extracts) vs. **closed-book** (no passage; model uses weights). Plus four task families that don't fit the QA frame: math (with perturbation-robust variants), code generation, multi-domain aggregates, and continuous PPL.
 
@@ -254,6 +256,9 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 > ```
 > ````
 
+
+</details>
+
 ---
 
 ## 2. Models tracked
@@ -293,11 +298,18 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 **†** = C5 implements the Aryabumi et al "To Code, or Not To Code?" (2408.10914) two-stage code→text recipe at our scale. Stage 1 is code-only (Aryabumi Tables 3+4 ratios: 80% multi-language StarCoderData + 20% markup); stage 2 reverts to mostly NL (90% DCLM + 10% mixed). C5-stage1 and C5-final share the same wandb run logically but are split across two run-ids (`7mnu0nch` and `vj95091k`) because the original run crashed at step 21,201 when AWS pcluster's auto-scaler (SuspendTime=600s) power-cycled compute node `dy-9` mid-training. The resume reloaded from step-20914 with `WANDB_RUN_ID=7mnu0nch + WANDB_RESUME=allow`, but a new run-id was generated; the optimizer state, LR schedule position, and data position were all restored from the checkpoint — only the wandb log is cosmetically split.
 
 **◊** = C5-v3 implements the **Aryabumi-faithful separate-cosine-per-phase** version of the C5 recipe. Where C5 and C5-v2 used a single continuous cosine across both stages (so stage 2 inherited a half-decayed LR), C5-v3 runs phase 2 as a **separate process** initialized via Levanter's `initialize_from_checkpoint_path` — model weights only, fresh optimizer state, fresh cosine LR (3e-4 → 0) over phase 2's own budget. This matches our reading of Aryabumi et al §3.1 footnote 5; we have an open email to the authors to confirm. Phase 1 (code+markup) and phase 2 (90% DCLM + 10% code+markup) match C5-v2's data mixes exactly — only the LR schedule across the stage boundary differs.
+
 ---
 
 ## 3. Canonical results — all models
 
 All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (header format `task[nshot]`). Columns = models. Accuracy metrics use `acc_norm` where reported in §1; `acc` otherwise. PPL is `bits_per_byte` (paloma) or nats (`dclm_200m_val`), lower=better. Bolded = best in row. `—` = not run.
+
+**On remaining `—` cells for the C5-v3 family** (and how to fill them):
+- `gsm_symbolic_main[8]`, `gsm_noop[8]` — perturbation-robust math probes. Require a separate runner (the `probes_arithmetic.py` / GSM-Symbolic + gsm-noop-audited pipeline), not part of `run_eval_v2.sh`. Left `—` for all models that weren't put through that pipeline.
+- `dclm_200m_val (nats)`, `paloma_macro (bpb)` — perplexity-side metrics. `dclm_200m_val` comes from Levanter's in-training eval (only available if the model was trained in Levanter with that validation source). `paloma_macro` requires the separate `paloma_*` per-subset run inside `chain_phase7.sh` (or a future extension of `eval_section3.py`).
+All other `—` cells should be filled by `eval_section3.py fill-from-results`; if any remain after running the tool, that's a bug — file it.
+
 
 See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→text stages + resume forensics), and ‖ (C5-v2 clean-code recipe) for column-definition caveats.
 
@@ -409,30 +421,6 @@ See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→te
 **Cross-table reading (rough only):** A5/B4 final macro values (Table B) of 1.12 / 1.10 are ~0.55 nats LOWER than base Table B (1.68), and ~0.55 lower than code25v2 (1.85). Translating the ~0.55-nat gap into Table A-equivalent terms (base Table A = 1.63), A5/B4 final macros would be ~1.05–1.08 — i.e., still significantly LOWER than phi-1.5's lm-eval value of 1.174. This translation is rough and only works for macro, not per-subset.
 
 </details>
-
-### Headlines
-
-**Phi-1.5** wins on every NL subset (synthetic-textbook-heavy training pays off at 1.3B).
-
-**Phi-1 is WORSE than our 1.4B text-only baseline on Paloma macro** (1.738 vs 1.631) because phi-1 was trained almost exclusively on code. Phi-1 only beats our 1.4B baseline on `programming_languages` and `m2d2_s2orc` (the code/academic subsets).
-
-**Matched-token code-mix (code25 v2) HURTS NL at our scale:**
-- paloma_macro: 1.824 vs baseline 1.631 → **+0.19 nats WORSE**
-- dclm_200m_val (in-domain): 4.596 vs baseline 4.070 → **+0.53 nats WORSE**
-- arc_easy, sciq, hellaswag, openbookqa_fact, piqa, social_iqa, logiqa: code25 v2 loses by 1-7pp on each
-- Only boolq wins for code25 v2 (+6pp) and a couple of tied tasks
-
-This is the **controlled** comparison (same total trained tokens, same unique tokens, only data mix differs). It confirms: at 1.4B / 3.3B-token / 16-epoch repetition, 25% code mix doesn't help NL; it actively hurts. The earlier "v1 wins" interpretation from May 26 was retracted June 1 — v1 had 5× more unique tokens, not a fair comparison.
-
-**1-epoch matched-token study (A5 vs B4 at step 29343 / ~30.77B trained tokens):** A5 (DCLM-only) wins on standard NL benchmarks (~12 tasks); B4 (DCLM + 25% code) wins on code-gen (humaneval lm-eval +9.8 pp, mbpp +6.0 pp) and a small handful of NL tasks (boolq, agieval_lsat_ar, bbh). Same direction as the 16-epoch comparison: matched-token code mix HURTS standard NL while modestly improving code-shaped metrics. In-domain dclm_200m_val: A5 better by 0.06 nats (2.821 vs 2.878). The B4 humaneval bigcode = 0.000 (after retry) reflects HumanEval's stricter unit-test scoring — sample inspection shows B4 produces compilable Python and solves easy mbpp problems; it just rarely passes HumanEval's harder unit tests.
-
-See ‡‡ footnote above for the lm-eval vs bigcode-eval-harness distinction. The two-row split in the §3 table (`humaneval[0] (lm-eval)` and `humaneval[0] (bigcode)`) shows that lm-eval's regex-extraction gives our small models 0-10pp credit on partial generations that bigcode (which runs the unit tests) rejects. For the only model in our suite where this matters in absolute terms, **B4 final lm-eval HumanEval = 0.104** captures real partial capability — sample inspection of B4's mbpp generations shows it solves easy problems like `find_substring`, `min_of_three`, regex-whitespace-strip; just rarely the full HumanEval programs.
-
----
-
-**Arithmetic-notation probe (one-line finding).** A 500-problem synthetic probe (`probes_arithmetic.py`) asks each model to complete `a + b = `, `a * b = `, `a - b = ` at single and two-digit scales. The only signal that comes out: **B4 (DCLM + 25% code) recognizes the `a op b = c` notation and emits answers (83% A1, 84% A4); A5 (DCLM only) much less so (35%, 13%); base/code25v2 essentially floor; phi-1/phi-1.5 score ~0 because they generate Python chain-of-thought or word-problem context instead of bare answers, so the score is a format mismatch not a capability claim.** Full numbers and design in [`counterfactual_probes.md`](counterfactual_probes.md). Read this as "code-textbook data teaches the bare-arithmetic notation format" — NOT as a Wu-style counterfactual or a decomposition into reasoning sub-skills.
-
----
 
 ## Updating this doc
 
