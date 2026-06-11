@@ -168,6 +168,16 @@
 >
 > </details>
 
+---
+
+### [What do Language Models Learn and When? The Implicit Curriculum Hypothesis](https://arxiv.org/abs/2604.08510) (Liu et al., 2026)
+
+**Motivation:** Scaling laws on validation loss tell us how much a model improves with compute but not *what* skills it acquires *when*. The authors propose the "Implicit Curriculum Hypothesis": pretraining follows a compositional and predictable curriculum across models and data mixtures. They ask whether the order in which capabilities emerge is consistent across model families and predictable from internal representations.
+
+**Experiment Setup:** Track emergence points on **91 in-context-learning tasks** (53 elemental: string ops, morphology, en↔fr/es translation, country-to-capital, arithmetic, logic, coreference, psychometric; 38 composite: mechanically chained operations like "gerund then uppercase") across **9 publicly released checkpointed models from 4 families spanning 410M–13B parameters**: OLMo-2 (1B/7B/13B), OLMo-3 (7B), LLM360 Amber (7B, NL-oriented) and Crystal (7B, code-oriented), Pythia (410M/1.4B/12B). Emergence point defined as the first checkpoint where ICL accuracy crosses an absolute threshold (50% or 80%). Use kernel ridge regression in function-vector representation space to predict held-out task trajectories from training-time representations alone.
+
+**Conclusion:** Emergence orderings are strikingly consistent across model pairs — Spearman ρ = .64–.93 (mean .81) across all 45 pairs including cross-family, all p<10⁻⁷. Composite tasks "most often emerge after their component tasks" (19 weak inversions, 3 strong — all 3 strong inversions involve the first_letter component). Function-vector representations during training predict held-out composite-task trajectories with R² = .68–.84 across models (Pythia-410M .681, OLMo-2-13B .838) without ever evaluating those tasks. Caveats the authors raise: consistency holds only under absolute thresholds (relative thresholds drop to mean ρ = .528); trajectory prediction degrades when restricted to simple tasks alone, indicating a "composition bottleneck"; tasks are synthetic ICL chains, not naturalistic composition.
+
 </details>
 
 <details>
