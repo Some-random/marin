@@ -65,7 +65,8 @@ NUM_PROC = int(os.environ.get("JAX_DIST_NUM_PROCESSES", "1"))
 # Effective DP = NUM_PROC. For NUM_PROC=2, DP=2.
 # train_batch_size = per_device_parallelism * DP_size.
 PER_DEVICE_PARALLELISM = 1  # tiny — smoke test
-TRAIN_BATCH_SIZE = 8  # 8 GPUs × 1 per device. Min for clean divisibility.
+# Scale batch size with #nodes. 8 GPUs/node × #nodes × per_device_parallelism.
+TRAIN_BATCH_SIZE = 8 * NUM_PROC * PER_DEVICE_PARALLELISM
 
 data_config = LmDataConfig(
     components={

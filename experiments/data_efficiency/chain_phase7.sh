@@ -13,7 +13,7 @@ echo "=== chain-1 finished at $(TZ='America/Los_Angeles' date '+%H:%M:%S %Z') ==
 # Find wd=1.6/x8 run dir
 WD1_6_X8_RUNDIR=$(ls -d /fsx/users/dongweij/marin/checkpoints/1_4b_wd1_6_x8_nocrossblock/*/ 2>/dev/null | sort | tail -1)
 WD1_6_X8_RUNDIR=${WD1_6_X8_RUNDIR%/}
-WD1_6_X8_SRC=$WD1_6_X8_RUNDIR/step-6400
+WD1_6_X8_SRC=$WD1_6_X8_RUNDIR/step-6399
 WD1_6_X8_HF=/fsx/users/dongweij/marin/checkpoints/wd1_6_x8_final_hf
 echo "  rundir=$WD1_6_X8_RUNDIR src=$WD1_6_X8_SRC dst=$WD1_6_X8_HF"
 

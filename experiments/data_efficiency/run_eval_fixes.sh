@@ -53,8 +53,10 @@ for LABEL in "${!MODELS[@]}"; do
   run_one "$LABEL" "$M" "minerva_math" 4 8 ""
   # openbookqa with-fact (custom yaml)
   run_one "$LABEL" "$M" "openbookqa_fact" 0 16 ""
-  # Paloma 16-subset PPL via lm-eval
-  run_one "$LABEL" "$M" "$PALOMA_TASKS" 0 16 ""
+  # NOTE: paloma_* lm-eval tasks require gated `EleutherAI/paloma` dataset
+  # we don't have access to. For our 1.4B models we already have Levanter
+  # Paloma loss from training. For phi-1/phi-1.5, run through Levanter
+  # separately (TODO).
 done
 
 echo "All eval fixes complete. Results under $OUT_ROOT/"

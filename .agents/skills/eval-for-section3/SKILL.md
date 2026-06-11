@@ -3,18 +3,36 @@ name: eval-for-section3
 description: Evaluate a model for §3 of `experiments/data_efficiency/EVALUATION.md` and fill its column without breaking the table. Use whenever the user asks to evaluate a model for the EVALUATION.md table, fill missing §3 cells, refresh historical mbpp/humaneval, or compute Mean rows. Always delegate to `experiments/data_efficiency/eval_section3.py` (NOT raw scripts) — that tool has the canonical task config, all metric fallbacks, Mean row computation, and table-structure validation built in.
 ---
 
-# QUICK PATH
+# QUICK PATH — ONE COMMAND FOR A NEW MODEL
 
 ```bash
-# Run v2 suite + fill the column + validate:
+# End-to-end: pick 3 free nodes, insert §3 column + §2 row, run v2-suite + paloma + gsm in parallel,
+# extract dclm_200m_val from training log, fill every fillable cell, strict-validate.
+.venv/bin/python experiments/data_efficiency/eval_section3.py add-model \
+  --label <LABEL> \
+  --src <LEVANTER_OR_HF_DIR> \
+  --train-log <PATH/TO/levanter_stdout.log> \
+  --footnote-marker '◊' \
+  --insert-before "4B final" \
+  --params "1.4 B" --tokens "30.77 B" --flops "2.6 × 10²⁰" \
+  --unique "..." --notes "..."
+```
+
+Flags: `--no-v2`, `--no-paloma`, `--no-gsm` skip individual sub-evals.
+`--background` launches everything then exits without waiting (re-run `fill-from-results` later).
+
+# QUICK PATH — sub-commands (when add-model can't handle a case)
+
+```bash
+# v2-suite only (no paloma / gsm / column insert):
 .venv/bin/python experiments/data_efficiency/eval_section3.py run <LABEL> <LEVANTER_OR_HF_DIR> [--node NODE]
 # Then when 'ALL DONE' appears in the log:
 .venv/bin/python experiments/data_efficiency/eval_section3.py fill-from-results <RESULTS_DIR> "<COLUMN_LABEL_SUBSTR>"
-# Verify table is well-formed:
+# Manual cell fill (e.g. from grepped training log):
+.venv/bin/python experiments/data_efficiency/eval_section3.py fill-cell --row "<ROW_LABEL>" --col "<COL_SUBSTR>" --value 1.234
+# Validate after manual edits:
 .venv/bin/python experiments/data_efficiency/eval_section3.py validate
-# Strict mode — fails if any (model, task) cell is missing a value
-# (excluding documented blanks like gsm_symbolic, dclm_200m_val, paloma_macro
-# which are tracked in §3 but not run by the v2 suite):
+# Strict — fails on any (model, task) cell missing a value (excluding documented blanks):
 .venv/bin/python experiments/data_efficiency/eval_section3.py validate --strict
 ```
 
@@ -121,6 +139,8 @@ git push origin main
 - Patching a running supervisor with `sed -i` — bash caches the script; you must kill + relaunch.
 - Reporting `mbpp` or `humaneval` as `FAILED-CONTINUE` without re-running with `--num_processes 1` (or `convert_and_eval_v2.sh`, which has the per-rank metrics cache fix).
 - Updating §3 without recomputing Mean rows.
+- **Running paloma with `HF_DATASETS_OFFLINE=1` / `HF_HUB_OFFLINE=1`.** `allenai/paloma` uses a legacy builder-script that lives on the Hub and is fetched on every `load_dataset` call; offline mode breaks this with `ConnectionError: Couldn't reach 'allenai/paloma' on the Hub (OfflineModeIsEnabled)`. `run_paloma_for_model.sh` now defaults to `OFFLINE=0`. Other tasks (gsm, v2-suite) are fine offline because their datasets ship as plain parquet/json.
+- **Trusting `ALL DONE` markers** from runner scripts that swallow per-task failures with `||`. The runner can print `ALL DONE` even when all subsets failed. Always check at least one `<results_dir>/<subset>/*results*.json` exists before extracting; if the dir is empty, grep the `.log` for `Traceback|ConnectionError|FAILED`.
 
 ## Why this skill exists
 
