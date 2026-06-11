@@ -50,7 +50,7 @@ _TOKENIZED_BASE = Path(BASE_TOKENIZED)
 # === Phase 1 final checkpoint to initialize from ===
 # Levanter's `initialize_from_checkpoint_path` loads JUST the model weights
 # (fresh optimizer state, step counter = 0).
-PHASE1_INIT_FROM = "checkpoints/1_4b_c5v3_phase1/u23atfbm/step-14672"  # placeholder run-id, updated post-launch
+PHASE1_INIT_FROM = "checkpoints/1_4b_c5v3_phase1/8dtdcear/step-14671"  # set after phase 1 completed 2026-06-09
 
 
 def _resolve_cache(prefix: str) -> str:
@@ -203,6 +203,7 @@ train_config = TrainLmConfig(
             project="dongwei-data-efficiency",
             entity="dongwei_jiang",
             tags=["1.4b", "c5v3", "phase2-text-continued", "clean-code", "wd-0.1", f"nodes-{NUM_PROC}"],
+            save_code=False,  # disables ArtifactSaver upload — wandb-core 0.24.0 segfaults here on multi-node, crashed rank 2 in v2/v3 on 2026-06-10
         ),
         mp=jmp.get_policy("p=f32,c=bfloat16"),
         train_batch_size=TRAIN_BATCH_SIZE,

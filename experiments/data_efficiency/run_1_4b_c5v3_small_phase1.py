@@ -1,24 +1,20 @@
 # Copyright The Marin Authors
 # SPDX-License-Identifier: Apache-2.0
 
-# 1.4B C5-v3 PHASE 1: code-LM from scratch.
+# 1.4B C5-v3-SMALL PHASE 1: code-LM from scratch (matched-budget small variant).
 #
-# Faithful to Aryabumi et al "To Code, or Not To Code?" (2408.10914) §3.1:
-#   - Phase 1 trains a code-LM from random init on 80% code + 20% markup
-#     for the FULL token budget with its OWN cosine LR schedule
-#     (warmup → 3e-4 → 0).
+# Same recipe as C5-v3 phase 1 (separate cosine LR per phase, faithful to
+# Aryabumi §3.1) but at the SMALL token budget that matches C5-v2-small
+# (6,400 steps per phase, 6.71 B trained tokens per phase, 13.42 B total
+# across both phases).
 #
-# Differences from C5 / C5-v2 (which used a single continuous cosine across
-# both stages and gave stage 2 only the bottom half of LR):
-#   - Phase 1 here uses ITS OWN full cosine. The model gets full peak-LR
-#     learning on code+markup.
-#   - Token budget per phase here matches half of A5/B4/C5/C5-v2 total budget
-#     so that phase 1 + phase 2 = 30.77 B trained tokens (matched compute).
+# Comparison to C5-v2-small:
+#   - C5-v2-small: SINGLE continuous cosine across both stages, staged
+#     data weights inside one process. Stage 2 inherited a half-decayed LR.
+#   - C5-v3-small: SEPARATE cosines per phase, fork via
+#     initialize_from_checkpoint_path. Phase 2 gets a FRESH peak LR.
 #
-# Data sources are the CLEAN code+markup caches (same as C5-v2).
-#
-# Phase 2 follows in run_1_4b_c5v3_phase2.py, which initializes from this
-# phase 1's end-step checkpoint and starts a FRESH cosine.
+# This isolates the LR-schedule effect at small scale.
 
 import os
 from datetime import timedelta
@@ -68,10 +64,10 @@ except FileNotFoundError as _e:
     SE_MARKDOWN_CACHE = ""
     NEMOTRON_CC_CACHE = ""
     NEMOTRON_UA_CACHE = ""
-    print(f"[c5v3-p1] WARN: {_e}")
+    print(f"[c5v3-small-p1] WARN: {_e}")
 
 
-# === Eval-only components (no training weight) — required for Levanter eval ===
+# === Eval-only components (no training weight) ===
 DCLM_VAL = f"{BASE_TOKENIZED}/data_efficiency/dclm_200m_val-415aea"
 PALOMA_SUBSETS = [
     "4chan", "c4_100_domains", "c4_en", "dolma-v1_5",
@@ -96,7 +92,6 @@ def _paloma_components() -> dict[str, DatasetComponent]:
 paloma_components = _paloma_components()
 
 
-# === Code mix proportions within the 80% code slot (same as C5-v2) ===
 CODE_RATIOS = {
     "se_python": 8.8 / 16.3,
     "nemotron_cc": 7.3 / 16.3,
@@ -117,14 +112,15 @@ def _distributed_from_env() -> DistributedConfig:
     )
 
 
-# === Batch and step layout — same as C5-v2; HALF the total step count ===
+# === Batch and step layout — same per-step config; SMALL token budget ===
 NUM_PROC = int(os.environ.get("JAX_DIST_NUM_PROCESSES", "1"))
 TOTAL_GPUS = NUM_PROC * 8
-TRAIN_BATCH_SIZE = 256  # same as A5/B4/C5/C5-v2
+TRAIN_BATCH_SIZE = 64  # matches base x16 / code25 v2 / C5-v2-small exactly; do NOT change without re-deriving total tokens
 PER_DEVICE_PARALLELISM = max(1, TRAIN_BATCH_SIZE // TOTAL_GPUS)
-TOKENS_PER_STEP = TRAIN_BATCH_SIZE * 4096  # 1,048,576
-# Phase 1 = half of A5/B4/C5/C5-v2 total = 14,672 steps = 15.39 B trained
-NUM_TRAIN_STEPS = 14_672
+TOKENS_PER_STEP = TRAIN_BATCH_SIZE * 4096  # 262,144
+# Small variant: each phase = 6,400 steps. Phase 1 + phase 2 = 12,800 steps × 64 × 4096 ≈ 3.36 B tokens total
+# (matches C5-v2-small total exactly: 12,800 × 64 × 4096 = 3.36 B)
+NUM_TRAIN_STEPS = 6_400
 
 
 _code_key_to_cache = {
@@ -180,7 +176,8 @@ train_config = TrainLmConfig(
         tracker=WandbConfig(
             project="dongwei-data-efficiency",
             entity="dongwei_jiang",
-            tags=["1.4b", "c5v3", "phase1-code-only", "clean-code", "wd-0.1", f"nodes-{NUM_PROC}"],
+            tags=["1.4b", "c5v3", "small", "phase1-code-only", "clean-code", "wd-0.1", f"nodes-{NUM_PROC}"],
+            save_code=False,  # see lib/levanter/src/levanter/tracker/wandb.py — wandb-core 0.24.0 segfaults in ArtifactSaver on multi-node
         ),
         mp=jmp.get_policy("p=f32,c=bfloat16"),
         train_batch_size=TRAIN_BATCH_SIZE,
@@ -189,7 +186,7 @@ train_config = TrainLmConfig(
         per_device_parallelism=PER_DEVICE_PARALLELISM,
         per_device_eval_parallelism=PER_DEVICE_PARALLELISM,
         checkpointer=CheckpointerConfig(
-            base_path="checkpoints/1_4b_c5v3_phase1/",
+            base_path="checkpoints/1_4b_c5v3_small_phase1/",
             save_interval=timedelta(minutes=30),
             keep=[{"every": NUM_TRAIN_STEPS // 4}],
         ),
@@ -213,11 +210,11 @@ train_config = TrainLmConfig(
 )
 
 if __name__ == "__main__":
-    print("=== 1.4B C5-v3 PHASE 1 (code-LM from scratch) ===")
+    print("=== 1.4B C5-v3-SMALL PHASE 1 (code-LM from scratch, small budget) ===")
     print(f"  num_processes (nodes): {NUM_PROC}  total GPUs: {TOTAL_GPUS}")
     print(f"  train_batch_size: {TRAIN_BATCH_SIZE}  per-device: {PER_DEVICE_PARALLELISM}")
     print(f"  num_train_steps: {NUM_TRAIN_STEPS:,}  total trained tokens: {NUM_TRAIN_STEPS * TOKENS_PER_STEP / 1e9:.2f}B")
-    print(f"  LR=3e-4, WD=0.1, cosine to 0 (warmup 1% = ~147 steps)")
+    print(f"  LR=3e-4, WD=0.1, cosine to 0 (warmup 1% = ~{int(NUM_TRAIN_STEPS * 0.01)} steps)")
     print(f"  data: 80% code + 20% markup (clean sources)")
     print()
     print("  caches:")

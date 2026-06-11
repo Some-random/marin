@@ -304,14 +304,17 @@ class WandbConfig(TrackerConfig):
 
             logger.info(f"Synced wandb run information from process 0: {r.name} {r.id}")
 
-        # generate a pip freeze
-        with tempfile.TemporaryDirectory() as tmpdir:
-            requirements_path = os.path.join(tmpdir, "requirements.txt")
-            requirements = generate_pip_freeze()
-            with open(requirements_path, "w") as f:
-                f.write(requirements)
-            if wandb.run is not None:
-                wandb.run.log_artifact(str(requirements_path), name="requirements.txt", type="requirements")
+        # generate a pip freeze — gated by save_code because wandb-core 0.24.0's ArtifactSaver.createArtifact
+        # segfaults in GetGraphQLInputFields on multi-node, killing one or more ranks and deadlocking the
+        # JAX rendezvous (observed 2026-06-10 across c5v3 phase 2 attempts).
+        if self.save_code:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                requirements_path = os.path.join(tmpdir, "requirements.txt")
+                requirements = generate_pip_freeze()
+                with open(requirements_path, "w") as f:
+                    f.write(requirements)
+                if wandb.run is not None:
+                    wandb.run.log_artifact(str(requirements_path), name="requirements.txt", type="requirements")
 
         wandb.summary["num_devices"] = jax.device_count()  # type: ignore
         wandb.summary["num_hosts"] = jax.process_count()  # type: ignore

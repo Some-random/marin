@@ -1,24 +1,20 @@
 # Copyright The Marin Authors
 # SPDX-License-Identifier: Apache-2.0
 
-# 1.4B C5-v3 PHASE 1: code-LM from scratch.
+# 1.4B C5-v3-SMALL PHASE 2: continued text pretraining at small budget.
 #
-# Faithful to Aryabumi et al "To Code, or Not To Code?" (2408.10914) §3.1:
-#   - Phase 1 trains a code-LM from random init on 80% code + 20% markup
-#     for the FULL token budget with its OWN cosine LR schedule
-#     (warmup → 3e-4 → 0).
+# Same recipe as C5-v3 phase 2 (FRESH cosine from 3e-4 → 0, init from phase 1
+# checkpoint via initialize_from_checkpoint_path, faithful to Aryabumi §3.1
+# footnote 5) but at the SMALL token budget (6,400 steps).
 #
-# Differences from C5 / C5-v2 (which used a single continuous cosine across
-# both stages and gave stage 2 only the bottom half of LR):
-#   - Phase 1 here uses ITS OWN full cosine. The model gets full peak-LR
-#     learning on code+markup.
-#   - Token budget per phase here matches half of A5/B4/C5/C5-v2 total budget
-#     so that phase 1 + phase 2 = 30.77 B trained tokens (matched compute).
+# Comparison vs C5-v2-small:
+#   - C5-v2-small: stage 2 inherited the bottom half of a single continuous
+#     cosine (~1.5e-4 → 0).
+#   - C5-v3-small: stage 2 gets a FRESH peak LR (3e-4 → 0) over its own budget.
 #
-# Data sources are the CLEAN code+markup caches (same as C5-v2).
-#
-# Phase 2 follows in run_1_4b_c5v3_phase2.py, which initializes from this
-# phase 1's end-step checkpoint and starts a FRESH cosine.
+# Total compute = phase 1 (6,400 steps) + phase 2 (6,400 steps)
+#              = 12,800 steps × 256 × 4096 ≈ 13.42 B tokens
+# matches C5-v2-small budget exactly.
 
 import os
 from datetime import timedelta
@@ -47,6 +43,15 @@ BASE_TOKENIZED = "/fsx/users/dongweij/marin/outputs/tokenized"
 _TOKENIZED_BASE = Path(BASE_TOKENIZED)
 
 
+# === Phase 1 final checkpoint to initialize from ===
+# Set after phase 1 completes (run-id will be filled by the supervisor script
+# or manually before launching phase 2).
+PHASE1_INIT_FROM = os.environ.get(
+    "C5V3_SMALL_PHASE1_CKPT",
+    "checkpoints/1_4b_c5v3_small_phase1/PLACEHOLDER_RUN_ID/step-6399",
+)
+
+
 def _resolve_cache(prefix: str) -> str:
     matches = sorted(_TOKENIZED_BASE.glob(f"{prefix}-*"))
     if not matches:
@@ -68,11 +73,31 @@ except FileNotFoundError as _e:
     SE_MARKDOWN_CACHE = ""
     NEMOTRON_CC_CACHE = ""
     NEMOTRON_UA_CACHE = ""
-    print(f"[c5v3-p1] WARN: {_e}")
+    print(f"[c5v3-small-p2] WARN: {_e}")
 
 
-# === Eval-only components (no training weight) — required for Levanter eval ===
+# === DCLM (text) — same 7 shards as A5/B4/C5/C5-v2/C5-v3 ===
+DCLM_SHARDS = [
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00006",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00020",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00026",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00035",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00042",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00047",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00071",
+]
 DCLM_VAL = f"{BASE_TOKENIZED}/data_efficiency/dclm_200m_val-415aea"
+
+
+# === Code mix proportions within the 10% slot (same as C5-v2/C5-v3 stage 2) ===
+CODE_RATIOS = {
+    "se_python": 8.8 / 16.3,
+    "nemotron_cc": 7.3 / 16.3,
+    "nemotron_ua": 0.2 / 16.3,
+}
+MARKUP_RATIOS = {"se_markdown": 1.0}
+
+
 PALOMA_SUBSETS = [
     "4chan", "c4_100_domains", "c4_en", "dolma-v1_5",
     "dolma_100_programing_languages", "dolma_100_subreddits",
@@ -96,15 +121,6 @@ def _paloma_components() -> dict[str, DatasetComponent]:
 paloma_components = _paloma_components()
 
 
-# === Code mix proportions within the 80% code slot (same as C5-v2) ===
-CODE_RATIOS = {
-    "se_python": 8.8 / 16.3,
-    "nemotron_cc": 7.3 / 16.3,
-    "nemotron_ua": 0.2 / 16.3,
-}
-MARKUP_RATIOS = {"se_markdown": 1.0}
-
-
 def _distributed_from_env() -> DistributedConfig:
     num_proc = os.environ.get("JAX_DIST_NUM_PROCESSES")
     if num_proc is None:
@@ -117,14 +133,12 @@ def _distributed_from_env() -> DistributedConfig:
     )
 
 
-# === Batch and step layout — same as C5-v2; HALF the total step count ===
 NUM_PROC = int(os.environ.get("JAX_DIST_NUM_PROCESSES", "1"))
 TOTAL_GPUS = NUM_PROC * 8
-TRAIN_BATCH_SIZE = 256  # same as A5/B4/C5/C5-v2
+TRAIN_BATCH_SIZE = 64  # matches C5-v2-small exactly; do NOT change without re-deriving total tokens
 PER_DEVICE_PARALLELISM = max(1, TRAIN_BATCH_SIZE // TOTAL_GPUS)
-TOKENS_PER_STEP = TRAIN_BATCH_SIZE * 4096  # 1,048,576
-# Phase 1 = half of A5/B4/C5/C5-v2 total = 14,672 steps = 15.39 B trained
-NUM_TRAIN_STEPS = 14_672
+TOKENS_PER_STEP = TRAIN_BATCH_SIZE * 4096
+NUM_TRAIN_STEPS = 6_400  # small variant: phase 1 + phase 2 = 12,800 × 64 × 4096 ≈ 3.36 B total
 
 
 _code_key_to_cache = {
@@ -137,31 +151,36 @@ _markup_key_to_cache = {
 }
 
 
-def _phase1_weights() -> dict[str, float]:
-    """100% code + markup, 80/20 split. Eval-only components get weight 0."""
+def _phase2_weights() -> dict[str, float]:
+    """90% DCLM (7 shards equal) + 10% (80% code + 20% markup) — matches Aryabumi footnote 5."""
     w: dict[str, float] = {}
+    dclm_share = 0.90 / len(DCLM_SHARDS)
+    for i in range(len(DCLM_SHARDS)):
+        w[f"dclm_shard{i}"] = dclm_share
     for k, r in CODE_RATIOS.items():
-        w[f"code_{k}"] = 0.80 * r
+        w[f"code_{k}"] = 0.10 * 0.80 * r
     for k, r in MARKUP_RATIOS.items():
-        w[f"markup_{k}"] = 0.20 * r
+        w[f"markup_{k}"] = 0.10 * 0.20 * r
     for k in ["dclm_200m_val", *[f"paloma_{s}" for s in PALOMA_SUBSETS]]:
         w[k] = 0.0
     return w
 
 
+_dclm_components = {f"dclm_shard{i}": DatasetComponent(cache_dir=p) for i, p in enumerate(DCLM_SHARDS)}
 _code_components = {f"code_{k}": DatasetComponent(cache_dir=v) for k, v in _code_key_to_cache.items() if v}
 _markup_components = {f"markup_{k}": DatasetComponent(cache_dir=v) for k, v in _markup_key_to_cache.items() if v}
 
-_shard_val_sizes = {k: 0 for k in {**_code_components, **_markup_components}}
+_shard_val_sizes = {k: 0 for k in {**_dclm_components, **_code_components, **_markup_components}}
 
 data_config = LmDataConfig(
     components={
+        **_dclm_components,
         **_code_components,
         **_markup_components,
         "dclm_200m_val": DatasetComponent(cache_dir=DCLM_VAL),
         **paloma_components,
     },
-    train_weights=_phase1_weights(),
+    train_weights=_phase2_weights(),
     num_validation_sequences=_shard_val_sizes,
     tokenizer="meta-llama/Meta-Llama-3.1-8B",
     shuffle=True,
@@ -175,12 +194,14 @@ model_config = model_dict["1_4b4k"]
 
 train_config = TrainLmConfig(
     data=data_config,
+    initialize_from_checkpoint_path=PHASE1_INIT_FROM,
     trainer=TrainerConfig(
         seed=0,
         tracker=WandbConfig(
             project="dongwei-data-efficiency",
             entity="dongwei_jiang",
-            tags=["1.4b", "c5v3", "phase1-code-only", "clean-code", "wd-0.1", f"nodes-{NUM_PROC}"],
+            tags=["1.4b", "c5v3", "small", "phase2-text-continued", "clean-code", "wd-0.1", f"nodes-{NUM_PROC}"],
+            save_code=False,  # see lib/levanter/src/levanter/tracker/wandb.py
         ),
         mp=jmp.get_policy("p=f32,c=bfloat16"),
         train_batch_size=TRAIN_BATCH_SIZE,
@@ -189,7 +210,7 @@ train_config = TrainLmConfig(
         per_device_parallelism=PER_DEVICE_PARALLELISM,
         per_device_eval_parallelism=PER_DEVICE_PARALLELISM,
         checkpointer=CheckpointerConfig(
-            base_path="checkpoints/1_4b_c5v3_phase1/",
+            base_path="checkpoints/1_4b_c5v3_small_phase2/",
             save_interval=timedelta(minutes=30),
             keep=[{"every": NUM_TRAIN_STEPS // 4}],
         ),
@@ -200,7 +221,7 @@ train_config = TrainLmConfig(
     model=model_config,
     train_seq_len=4096,
     optimizer=AdamConfig(
-        learning_rate=3e-4,
+        learning_rate=3e-4,  # FRESH peak — same as phase 1
         weight_decay=0.1,
         lr_schedule="cosine",
         min_lr_ratio=0.0,
@@ -213,20 +234,18 @@ train_config = TrainLmConfig(
 )
 
 if __name__ == "__main__":
-    print("=== 1.4B C5-v3 PHASE 1 (code-LM from scratch) ===")
+    print("=== 1.4B C5-v3-SMALL PHASE 2 (continued text from code-LM, small budget) ===")
     print(f"  num_processes (nodes): {NUM_PROC}  total GPUs: {TOTAL_GPUS}")
+    print(f"  initialize_from_checkpoint_path: {train_config.initialize_from_checkpoint_path}")
     print(f"  train_batch_size: {TRAIN_BATCH_SIZE}  per-device: {PER_DEVICE_PARALLELISM}")
     print(f"  num_train_steps: {NUM_TRAIN_STEPS:,}  total trained tokens: {NUM_TRAIN_STEPS * TOKENS_PER_STEP / 1e9:.2f}B")
-    print(f"  LR=3e-4, WD=0.1, cosine to 0 (warmup 1% = ~147 steps)")
-    print(f"  data: 80% code + 20% markup (clean sources)")
-    print()
-    print("  caches:")
-    print(f"    SE_PYTHON   : {SE_PYTHON_CACHE or '(MISSING)'}")
-    print(f"    SE_MARKDOWN : {SE_MARKDOWN_CACHE or '(MISSING)'}")
-    print(f"    NEMOTRON_CC : {NEMOTRON_CC_CACHE or '(MISSING)'}")
-    print(f"    NEMOTRON_UA : {NEMOTRON_UA_CACHE or '(MISSING)'}")
+    print(f"  LR=3e-4 (FRESH), WD=0.1, cosine to 0 (warmup 1% ≈ {int(NUM_TRAIN_STEPS * 0.01)} steps)")
+    print(f"  data: 90% DCLM + 10% (80% code + 20% markup)")
     if not SE_PYTHON_CACHE or not SE_MARKDOWN_CACHE or not NEMOTRON_CC_CACHE or not NEMOTRON_UA_CACHE:
         print("\nERROR: caches missing.")
+        raise SystemExit(1)
+    if "PLACEHOLDER_RUN_ID" in train_config.initialize_from_checkpoint_path:
+        print("\nERROR: PHASE1_INIT_FROM still contains PLACEHOLDER_RUN_ID — set via C5V3_SMALL_PHASE1_CKPT env or edit script.")
         raise SystemExit(1)
     from levanter.main import train_lm
     train_lm.main(train_config)
