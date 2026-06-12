@@ -18,6 +18,8 @@ import os
 from collections import Counter
 from pathlib import Path
 
+# os imported above so the env-driven SRC/DST below works
+
 import pyarrow.parquet as pq
 
 NL_SOURCES = {
@@ -27,8 +29,9 @@ NL_SOURCES = {
 DROP_SOURCES = {"RedPajamaGithub", "RedPajamaStackExchange"}
 
 REPO = Path("/fsx/users/dongweij/marin")
-SRC = REPO / "data" / "slimpajama_raw_chunk1" / "data"
-DST = REPO / "outputs" / "raw" / "slimpajama_nl"
+# Use env vars so the script is reusable across chunks (1, 2, 3, ...).
+SRC = Path(os.environ.get("SLIMPAJAMA_SRC", str(REPO / "data" / "slimpajama_raw_chunk1" / "data")))
+DST = Path(os.environ.get("SLIMPAJAMA_DST", str(REPO / "outputs" / "raw" / "slimpajama_nl")))
 DST.mkdir(parents=True, exist_ok=True)
 
 
