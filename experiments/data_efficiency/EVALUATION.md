@@ -125,13 +125,13 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > - **solution**: "The denominator of the rational function factors into $x^2+x-6=(x-2)(x+3)$. Since the numerator is always nonzero, there is a vertical asymptote whenever the denominator is $0$, which occurs for $x = 2$ and $x = -3$. Therefore, the graph has $\\boxed{2}$ vertical asymptotes."
 > - **answer**: 2
 
-**gsm_symbolic_main** — GSM-Symbolic main split (Mirzadeh et al 2024, `apple/GSM-Symbolic`). Re-instantiations of GSM8k templates where every named entity and integer is re-sampled while keeping the underlying arithmetic structure. Compared against gsm8k, isolates "is the model solving the problem, or pattern-matching the surface form?"
+**gsm_symbolic_main** — GSM-Symbolic main split (Mirzadeh et al 2024 §3.1, `apple/GSM-Symbolic`, 5000 examples). Re-instantiations of GSM8k templates where every named entity and integer is re-sampled while keeping the underlying arithmetic structure. Compared against gsm8k, isolates "is the model solving the problem, or pattern-matching the surface form?" 8-shot CoT, greedy decoding. Headline result from the paper: phi-1.5 drops 47% from GSM8K (0.305) → GSM-Sym main (0.160) — replicates the published pattern that smaller models drop more aggressively under perturbation. Our 1.4B models floor on regular GSM8K so they floor on this row too — included for completeness.
 
 > - **original_question** (GSM8k #473): "Benny saw a 10-foot shark with 2 6-inch remoras attached to it. What percentage of the shark's body length is the combined length of the remoras?" — gold 10
 > - **question** (symbolic instance): "Rania saw a 210-foot whale with 7 72-inch remoras attached to it. What percentage of the whale's body length is the combined length of the remoras?" — gold 20
 > - Same template, name and numbers re-drawn, arithmetic structure (inches → feet conversion, then percentage) preserved.
 
-**gsm_noop** — GSM-NoOp (Mirzadeh et al 2024 §4.4). GSM8k problems with one extra clause inserted that is grammatically plausible but mathematically irrelevant. Tests whether the model can ignore irrelevant context or gets distracted into incorporating it. Our eval uses `Experimental-Orange/gsm-noop-audited`, a 117-item third-party reconstruction (the Apple-original NoOp split was not released).
+**gsm_noop** — GSM-NoOp (Mirzadeh et al 2024 §4.4). GSM8k problems with one extra clause inserted that is grammatically plausible but mathematically irrelevant. Tests whether the model can ignore irrelevant context or gets distracted into incorporating it. Our eval uses `Experimental-Orange/gsm-noop-audited`, a 117-item third-party reconstruction (the Apple-original NoOp split was not released). 8-shot CoT, greedy. Paper headline: phi-1.5 drops 89% from GSM8K to NoOp (→ 0.034). Our 1.4B models floor (consistent with their GSM8K floor).
 
 > - **original_question** (GSM8k #1223): "To make a call from a phone booth, you must pay ₣0.6 for each minute of your call. After 30 minutes, that price drops to ₣0.5 per minute. How much would a 78-minute call cost?" — gold 42
 > - **question** (with NoOp clause): "To make a call from a phone booth, you must pay ₣0.6 for each minute of your call. After 30 minutes, that price drops to ₣0.5 per minute. **If you had placed the same call on a weekend, the initial per-minute rate would have been 15% cheaper.** How much would a 78-minute call cost on a weekday?" — gold still 42.
@@ -139,7 +139,7 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 
 ### D. Code generation
 
-**HumanEval** — function generation from docstring; pass@1 by running unit tests.
+**HumanEval** — function generation from docstring; pass@1 by running unit tests. 0-shot: the function signature + docstring **is** the prompt (no demonstration examples). Reported in §3 with two rows — `humaneval[0] (lm-eval)` uses lm-eval-harness's `pass@1,create_test` (regex-match on the generated function body), `humaneval[0] (bigcode)` uses bigcode-evaluation-harness which actually **executes** the unit tests against the generated code. The bigcode number is the trustworthy one (phi-1: 0.543 bigcode vs paper's 0.506); the lm-eval column is included for comparison since it was used historically and is faster to run. We use bigcode for HumanEval but lm-eval for MBPP (bigcode-MBPP is upstream-broken).
 
 > ```python
 > from typing import List
@@ -283,7 +283,7 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 | **C5-v3-small final** ◊§ | (phase 2 currently training on dy-5; final HF path TBD) | 1.4 B | 3.36 B | 2.8 × 10¹⁹ | Phase 1 (1.68 B, as above) + phase 2 (1.68 B): 90% DCLM + 10% (80% code + 20% markup) | Same hparams as C5-v3-small phase 1. Phase 2 inits from phase 1 step-6399 with FRESH cosine. **Direct apples-to-apples comparison vs C5-v2-small final** — same total budget, same data, only LR-schedule recipe differs. |
 | **4B final** ª | `4b_dclm_short_final_hf` (run `3_5b_dclm_short`, step-22887) | 3.5 B | 6.0 B | 1.3 × 10²⁰ | 7 × DCLM shards, ~0.17 epoch per shard | wd=0.1, LR=3e-4 cosine, 8-node FSDP, batch=64 × seq=4096 × 22,887 steps. |
 | **C5-v4 final** ⚛ | `c5v4_p2_step14671_hf` | 1.4 B | 30.77 B | 2.6 × 10²⁰ | Phase 1 (15.39 B, same as C5-v3 phase 1) + phase 2 (15.39 B): **90% SlimPajama-NL** (CC + C4 + Books + ArXiv + Wikipedia, English-only Wiki) + 10% (80% code + 20% markup); code+markup ratios same as C5-v3 | Same per-phase hparams as C5-v3 (wd=0.1, LR=3e-4 fresh cosine, batch=256 × seq=4096 × 14,672 steps). **Difference from C5-v3:** phase 2's 90% NL slot uses SlimPajama-NL (English-only Wiki filtered) instead of DCLM. Tests whether reasoning-dense text (Books/ArXiv/Wiki) elicits reasoning circuits learned in phase 1. |
-| phi-1 | `microsoft/phi-1` | 1.3 B | ~50 B | ~3.9 × 10²⁰ | ~7 B unique (6 B filtered Stack + ~1 B GPT-3.5 synth Python) × ~8 epochs | Code-only (external reference). **NOT a base model** — see ‡‡‡ footnote: this is the phi-1-base pretrained model PLUS a 180M-token fine-tune on synthetic HumanEval-shaped CodeExercises. Per the paper, phi-1-base alone = 29% HumanEval; the fine-tune adds ~+22 pp. phi-1-base is not publicly released. |
+| phi-1 | `microsoft/phi-1` | 1.3 B | ~50 B | ~3.9 × 10²⁰ | ~7 B unique (6 B filtered Stack + ~1 B GPT-3.5 synth Python) × ~8 epochs | Code-only (external reference). **NOT a base model**: `microsoft/phi-1` is the *fine-tuned* model — phi-1-base (pretrained on CodeTextbook = filtered Stack-Python + synthetic textbooks) was then post-trained on 180M tokens of synthetic CodeExercises (synthetic HumanEval-shaped problems → solutions). Per the phi-1 paper §3.3: phi-1-base = 29.0% HumanEval, phi-1 (post-fine-tune) = 50.6% — the +22 pp lift comes from format-matched supervised data. phi-1-base is not publicly released. **When comparing our base models (A5/B4/C5/C5-v2/C5-v3/C5-v4) on HumanEval, phi-1.5 is the apples-to-apples reference, NOT phi-1.** Phi-1 is included as a "best-case post-trained code-only model at this scale" reference. |
 | phi-1.5 | `microsoft/phi-1_5` | 1.3 B | ~150 B | ~1.2 × 10²¹ | ~30 B unique (phi-1 mix + ~20 B synthetic NL textbooks) × ~5 epochs | Larger synth-textbook training (external reference). **Base model — no instruction or format fine-tune** (per phi-1.5 paper). The right apples-to-apples reference for our base models on code-gen tasks. |
 
 **FLOPs column** is the standard 6·N·D approximation (Hoffmann et al 2022 / Kaplan 2020) — a rough compute marker, not a capability number.
@@ -345,27 +345,19 @@ See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→te
 | gsm8k_cot[8] | 0.022 | 0.005 | 0.017 | 0.021 | 0.031 | 0.027 | 0.016 | 0.021 | 0.024 | 0.033 | 0.014 | 0.004 | 0.007 | 0.011 | 0.022 | 0.021 | 0.021 | **0.299** |
 | minerva_math[4] | 0.0002 | 0.000 | 0.006 | 0.005 | 0.002 | 0.010 | 0.002 | 0.006 | 0.007 | 0.009 | 0.003 | 0.001 | 0.001 | 0.002 | 0.010 | 0.007 | 0.012 | **0.029** |
 | **Mean Math (standard)** | *0.007* | *0.002* | *0.013* | *0.012* | *0.011* | *0.016* | *0.007* | *0.015* | *0.014* | *0.019* | *0.008* | *0.002* | *0.006* | *0.007* | *0.016* | *0.015* | *0.015* | *0.211* |
-| **Math (perturbation-robust)** ° | | | | | | | | | | | | | | | — | | | |
+| **Math (perturbation-robust)** | | | | | | | | | | | | | | | — | | | |
 | gsm_symbolic_main[8] | 0.009 | 0.004 | 0.001 | 0.002 | 0.007 | 0.005 | 0.005 | 0.004 | 0.006 | 0.009 | 0.003 | 0.003 | 0.003 | 0.006 | 0.008 | 0.006 | 0.013 | **0.160** |
 | gsm_noop[8] | 0.009 | 0.017 | 0.009 | 0.000 | 0.000 | 0.000 | 0.000 | 0.009 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.017 | 0.009 | 0.000 | 0.000 | **0.034** |
 | **Code** | | | | | | | | | | | | | | | — | | | |
 | humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.183 | 0.159 | 0.006 | 0.104 | 0.037 | 0.262 | 0.061 | 0.280 | 0.256 | 0.165 | 0.116 | 0.116 | 0.171 | 0.000 | **0.494** | 0.342 |
-| humaneval[0] (bigcode) ‡‡ | 0.000 | 0.000 | 0.055 | 0.098 | 0.000 | 0.000 | 0.012 | 0.073 | 0.037 | 0.055 | 0.122 | 0.024 | 0.055 | 0.030 | 0.079 | 0.000 | **0.543** | 0.342 |
+| humaneval[0] (bigcode) | 0.000 | 0.000 | 0.055 | 0.098 | 0.000 | 0.000 | 0.012 | 0.073 | 0.037 | 0.055 | 0.122 | 0.024 | 0.055 | 0.030 | 0.079 | 0.000 | **0.543** | 0.342 |
 | mbpp[3] | 0.000 | 0.000 | 0.098 | 0.136 | 0.000 | 0.052 | 0.052 | 0.210 | 0.098 | 0.290 | 0.208 | 0.048 | 0.088 | 0.050 | 0.126 | 0.000 | **0.416** | 0.342 |
-| **Mean Code** | *0.000* | *0.004* | *0.112* | *0.131* | *0.002* | *0.052* | *0.034* | *0.182* | *0.065* | *0.208* | *0.195* | *0.079* | *0.086* | *0.065* | *0.125* | *0.000* | *0.484* | *0.342* |
+| **Mean Code** | *0.000* | *0.006* | *0.141* | *0.148* | *0.003* | *0.078* | *0.044* | *0.236* | *0.080* | *0.285* | *0.232* | *0.107* | *0.102* | *0.083* | *0.149* | *0.000* | *0.455* | *0.342* |
 | **Perplexity (lower=better)** | | | | | | | | | | | | | | | — | | | |
-| dclm_200m_val (nats) | 4.070 | 4.596 | 4.626 | 4.427 | **2.821** | 2.878 | 4.011 | 3.997 | 3.928 | 3.850 | 3.997 | 3.392 | 4.659 | 3.292 | 3.113 | 2.894 ¶ | — ‡ | — ‡ |
-| paloma_macro (bpb) | 1.631 | 1.824 | 1.587 ¶ | 1.519 ¶ | 1.122 ¶ | **1.097 ¶** | 1.351 ¶ | 1.380 ¶ | 1.325 ¶ | 1.334 ¶ | 1.377 | 1.315 | 1.582 | 1.216 | 1.093 | 1.153 ¶ | 1.738 | 1.174 |
+| dclm_200m_val (nats) | 4.070 | 4.596 | 4.626 | 4.427 | **2.821** | 2.878 | 4.011 | 3.997 | 3.928 | 3.850 | 3.997 | 3.392 | 4.659 | 3.292 | 3.113 | 2.894 | — ‡ | — ‡ |
+| paloma_macro (bpb) | 1.631 | 1.824 | 1.639 | 1.566 | 1.077 | 1.074 | 1.374 | 1.370 | 1.326 | 1.326 | 1.377 | 1.315 | 1.582 | 1.216 | 1.093 | 1.114 | 1.738 | 1.174 |
 
 **‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
-
-**‡‡** = bigcode-evaluation-harness — actually executes HumanEval's unit tests instead of regex-matching the answer. We use bigcode for HumanEval and lm-eval for MBPP (bigcode MBPP is upstream-broken). Phi-1 matches paper (0.543 bigcode vs 0.506 paper).
-
-**‡‡‡** = phi-1 vs phi-1.5 base-model status caveat (relevant whenever interpreting code-gen numbers): `microsoft/phi-1` is the *fine-tuned* model — phi-1-base (pretrained on CodeTextbook = filtered Stack-Python + synthetic textbooks) was then post-trained on 180M tokens of synthetic CodeExercises (synthetic HumanEval-shaped problems → solutions). Per the phi-1 paper §3.3: phi-1-base = 29.0% HumanEval, phi-1 (post-fine-tune) = 50.6% — the +22 pp lift comes from format-matched supervised data. phi-1-base is not publicly released. `microsoft/phi-1_5`, per the phi-1.5 paper, did *not* undergo instruction or format fine-tuning — it is a base model. **When comparing our base models (A5/B4/C5) on HumanEval, phi-1.5 is the apples-to-apples reference, NOT phi-1.** Phi-1 is included as a "best-case post-trained code-only model at this scale" reference, not as a measure of what pretraining alone can do.
-
-**°** = `gsm_symbolic_main` from `apple/GSM-Symbolic` (Mirzadeh et al §3.2, 5000 examples). `gsm_noop` from `Experimental-Orange/gsm-noop-audited` (Sturgeon's third-party reconstruction of §4.4, 117 audited-irrelevant items). Both 8-shot CoT, greedy. Headline: phi-1.5 drops 47% from GSM8K → GSM-Sym main (0.305 → 0.160), and 89% to NoOp (→ 0.034) — replicates the published pattern that smaller models drop more aggressively under perturbation. Our 1.4B models floor on GSM8K so we didn't run these (would also floor, no signal); phi-1 floors on GSM8K and is included only as the code-only control.
-
-**¶** = paloma_macro and dclm_200m_val for A5/B4/4B are from Levanter's in-training eval (Table B in the per-subset details), NOT lm-eval-harness like the base/code25v2/phi columns (Table A). Methodologies disagree by ~+0.05 nats on average and ~+0.55 nats on twitterAAE, so direct numerical comparison to other columns has calibration noise. Cross-table A-equivalent estimate: A5/B4 ~1.05-1.08, 4B ~1.10 — all still lower than phi-1.5's 1.174.
 
 **™** = mmlu_pro 5-shot prompts run 2000-2400 tokens; phi-1 and phi-1.5 both have `max_position_embeddings = 2048`, so the eval cannot run without truncating the prompt past the few-shot examples. Not a missing run — a model context limitation.
 

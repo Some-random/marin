@@ -13,6 +13,8 @@ export HF_HUB_OFFLINE=0
 
 LABEL="${1:?LABEL required}"
 HF_DST="${2:?HF_DST required}"
+# Smaller batch for larger models (4B OOMs at 16 on 8x40GB).
+BATCH_SIZE="${BATCH_SIZE:-16}"
 
 OUT_ROOT=/fsx/users/dongweij/marin/outputs/eval_results/paloma_${LABEL}_$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M)
 mkdir -p "$OUT_ROOT"
@@ -40,7 +42,7 @@ for T in "${PALOMA_SUBSETS[@]}"; do
   echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T start"
   "${LAUNCH[@]}" --model hf \
     --model_args "pretrained=$HF_DST,dtype=bfloat16,trust_remote_code=True" \
-    --tasks "$T" --batch_size 16 --output_path "$OUT" \
+    --tasks "$T" --batch_size "$BATCH_SIZE" --output_path "$OUT" \
     --trust_remote_code > "$OUT.log" 2>&1 \
     && echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T DONE" \
     || echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T FAILED"

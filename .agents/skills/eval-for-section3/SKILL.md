@@ -141,6 +141,8 @@ git push origin main
 - Updating §3 without recomputing Mean rows.
 - **Running paloma with `HF_DATASETS_OFFLINE=1` / `HF_HUB_OFFLINE=1`.** `allenai/paloma` uses a legacy builder-script that lives on the Hub and is fetched on every `load_dataset` call; offline mode breaks this with `ConnectionError: Couldn't reach 'allenai/paloma' on the Hub (OfflineModeIsEnabled)`. `run_paloma_for_model.sh` now defaults to `OFFLINE=0`. Other tasks (gsm, v2-suite) are fine offline because their datasets ship as plain parquet/json.
 - **Trusting `ALL DONE` markers** from runner scripts that swallow per-task failures with `||`. The runner can print `ALL DONE` even when all subsets failed. Always check at least one `<results_dir>/<subset>/*results*.json` exists before extracting; if the dir is empty, grep the `.log` for `Traceback|ConnectionError|FAILED`.
+- **Mixing paloma_macro values from Levanter in-training eval and lm-eval-harness.** They disagree by up to +0.05 bpb on average (and +0.55 on twitterAAE). All paloma_macro values in §3 must come from `run_paloma_for_model.sh` (lm-eval-harness), NOT from a wandb-logged Levanter in-training value. If you discover a value that was sourced from Levanter, re-run paloma via `run_paloma_for_model.sh` to get the apples-to-apples number. Discovered 2026-06-12 after C5-v4 paloma 1.093 looked like it beat A5's 1.122 (Levanter-sourced); the apples-to-apples A5 value via lm-eval was actually 1.077 — C5-v4 is close but doesn't beat A5.
+- **Running paloma on models bigger than 1.4B at default `batch_size=16`.** 4B model OOMs on 8×40GB GPUs. Set `BATCH_SIZE=4` env var when running `run_paloma_for_model.sh` for the 4B model (the script honors `BATCH_SIZE` since 2026-06-12).
 
 ## Why this skill exists
 
