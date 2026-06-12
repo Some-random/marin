@@ -216,7 +216,7 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 > Learning music, dance or any other art form not only soothes your inner being, but it has also been proven that people who systematically learn music have better strategizing and planning skills than other people. The world today is very competitive and every individual has to be active not only in academics or any one field but in all possible areas.
 > ```
 
-**dclm_200m_val** — held-out NL within the DCLM training distribution. Sensitive to overfitting on the 209M-token slice.
+**dclm_200m_val** — held-out NL within the DCLM training distribution. Sensitive to overfitting on the 209M-token slice. Reported in `bits_per_byte` (tokenizer-independent) via lm-eval's `loglikelihood_rolling` on a fixed 5000-document DCLM slice (`outputs/raw/dclm_5000docs.jsonl`); the in-training Levanter `eval/dclm_200m_val/loss` values (logged in nats per Llama-3.1 token during training) were converted to bpb via the factor measured on the same dclm text (Llama-3.1 ≈ 4.408 bytes/token → bpb = nats × 0.3273). Sanity check: A5 via direct lm-eval bpb = 0.906 vs A5 via converted nats = 0.923 — agreement within 0.017 bpb.
 
 > ```
 > Take the 2-minute tour ×
@@ -309,7 +309,7 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 
 ## 3. Canonical results — all models
 
-All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (header format `task[nshot]`). Columns = models. Accuracy metrics use `acc_norm` where reported in §1; `acc` otherwise. PPL is `bits_per_byte` (paloma) or nats (`dclm_200m_val`), lower=better. Bolded = best in row. `—` = not run.
+All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (header format `task[nshot]`). Columns = models. Accuracy metrics use `acc_norm` where reported in §1; `acc` otherwise. PPL is `bits_per_byte` (lower=better) for both paloma_macro and dclm_200m_val. Bolded = best in row. `—` = not run.
 
 See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→text stages + resume forensics), and ‖ (C5-v2 clean-code recipe) for column-definition caveats.
 
@@ -354,10 +354,8 @@ See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→te
 | mbpp[3] | 0.000 | 0.000 | 0.098 | 0.136 | 0.000 | 0.052 | 0.052 | 0.210 | 0.098 | 0.290 | 0.208 | 0.048 | 0.088 | 0.050 | 0.126 | 0.000 | **0.416** | 0.342 |
 | **Mean Code** | *0.000* | *0.006* | *0.141* | *0.148* | *0.003* | *0.078* | *0.044* | *0.236* | *0.080* | *0.285* | *0.232* | *0.107* | *0.102* | *0.083* | *0.149* | *0.000* | *0.455* | *0.342* |
 | **Perplexity (lower=better)** | | | | | | | | | | | | | | | — | | | |
-| dclm_200m_val (nats) | 4.070 | 4.596 | 4.626 | 4.427 | **2.821** | 2.878 | 4.011 | 3.997 | 3.928 | 3.850 | 3.997 | 3.392 | 4.659 | 3.292 | 3.113 | 2.894 | — ‡ | — ‡ |
+| dclm_200m_val (bpb) | 1.332 | 1.504 | 1.514 | 1.449 | **0.923** | 0.942 | 1.313 | 1.308 | 1.286 | 1.260 | 1.308 | 1.110 | 1.525 | 1.077 | 1.019 | 0.947 | 1.636 | 1.041 |
 | paloma_macro (bpb) | 1.631 | 1.824 | 1.639 | 1.566 | 1.077 | 1.074 | 1.374 | 1.370 | 1.326 | 1.326 | 1.377 | 1.315 | 1.582 | 1.216 | 1.093 | 1.114 | 1.738 | 1.174 |
-
-**‡** = dclm_200m_val is logged by training (Levanter in-training eval) on our runs only. phi-1/phi-1.5 are external models we never re-ran in-training eval against; their values could be computed post-hoc via bits-per-byte on raw text (tokenizer-independent) but we haven't.
 
 **™** = mmlu_pro 5-shot prompts run 2000-2400 tokens; phi-1 and phi-1.5 both have `max_position_embeddings = 2048`, so the eval cannot run without truncating the prompt past the few-shot examples. Not a missing run — a model context limitation.
 
