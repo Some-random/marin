@@ -55,6 +55,187 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## June 12: A5-SP + C5-v4 launched, paloma re-runs (lm-eval), dclm_200m_val → bpb, Mean Math (perturbation-robust)
+
+### A5-SP + C5-v4 training launched (4 nodes each, parallel)
+
+Two new runs targeting the "code-LM circuits elicited by reasoning-dense text" hypothesis (user's framing, June 11):
+
+- **A5-SP** (`run_1_4b_a5_sp.py`): A5 recipe (single-phase, 30.77 B tokens) but with SlimPajama-NL (English-only Wiki filtered) replacing DCLM. Pure data-axis control vs A5. 4-node, batch=256 × seq=4096 × 29,343 steps, LR=3e-4 cosine, wd=0.1, fresh init.
+- **C5-v4** (`run_1_4b_c5v4_phase2.py`): C5-v3 phase-2 recipe (15.39 B, fresh cosine from `c5v3_phase1` step-14671) but with SlimPajama-NL replacing DCLM in the 90% slot. Same per-phase hparams as C5-v3.
+
+Both launched ~20:23 PDT June 11. Both crashed on first attempt with `FileNotFoundError: Cache ledger not found at .../part-N/train/shard_ledger.json` — our SP-NL tokenize cache had no `train -> .` symlink that DCLM caches have. Fix: added `train -> .` and `validation -> .` symlinks to all 228 part dirs (128 chunk_1 + 100 chunk_2). Both runs healthy after relaunch.
+
+### C5-v4 finished, eval ALL DONE 09:33 PDT
+
+C5-v4 step-14671 saved 08:08 PDT. v2-suite + paloma + gsm fanned out in parallel on free dy nodes:
+
+| Category | C5-v3 | **C5-v4** | Δ |
+|---|---|---|---|
+| Mean Open-book | 0.529 | **0.595** | **+6.6 pp** |
+| Mean Closed-book NL | 0.391 | 0.381 | -1.0 |
+| Mean Aggregate | 0.168 | 0.201 | +3.3 |
+| Mean Math (standard) | 0.002 | 0.016 | +1.4 |
+| Mean Code | 0.079 | **0.125** | **+4.6** |
+| paloma_macro (bpb, lower=better) | 1.315 | 1.093 | -0.222 |
+| dclm_200m_val (bpb) | 1.110 | 1.019 | -0.091 |
+
+C5-v4 is column 16 (between c5v3_small_final and 4B final). All cells filled via `eval_section3.py add-model` programmatic helpers + `fill-cell`. Note: at first comparison C5-v4 paloma 1.093 looked like it BEAT A5 (1.122), but A5's value was Levanter-in-training; under matched methodology (lm-eval) A5 = 1.077, so C5-v4 actually still lags A5 + B4 slightly on paloma.
+
+**vs A5/B4 (the NL ceilings, no code phase 1):**
+| Category | A5 | B4 | C5-v4 | Δ vs A5 |
+|---|---|---|---|---|
+| Open-book | 0.636 | 0.642 | 0.595 | **-4.1 pp** (was -10.7 for C5-v3) |
+| Closed-book NL | 0.449 | 0.415 | 0.381 | -6.8 pp |
+| Aggregate | 0.183 | 0.179 | 0.201 | +1.8 |
+| Code | 0.003 | 0.078 | 0.149 | **+14.6 pp** |
+
+The data swap closed most of the Open-book gap (was -10.7 pp for C5-v3 → -4.1 pp for C5-v4) and C5-v4 dominates A5/B4 on Code by huge margins. Closed-book NL gap is smaller than before but still real (-6.8 pp). Hypothesis still being tested by A5-SP (in progress as of write).
+
+### Paloma re-runs on 9 ¶ models (unify methodology)
+
+`paloma_macro` for A5, B4, C5_stage1, C5v2_stage1, C5_final, C5v2_final, C5v2_small_stage1, C5v2_small_final, 4B were originally from Levanter in-training eval (¶ marker). Re-ran via lm-eval-harness (`run_paloma_for_model.sh`) on free dy nodes (6 in R1, 3 in R2). Methodology bias is real and not unidirectional:
+
+| Model | Old (Levanter) | New (lm-eval) | Δ |
+|---|---|---|---|
+| A5 | 1.122 ¶ | 1.077 | -0.045 |
+| B4 | 1.097 ¶ | 1.074 | -0.023 |
+| C5_stage1 | 1.351 ¶ | 1.374 | +0.023 |
+| C5v2_stage1 | 1.380 ¶ | 1.370 | -0.010 |
+| C5_final | 1.325 ¶ | 1.326 | +0.001 |
+| C5v2_final | 1.334 ¶ | 1.326 | -0.008 |
+| C5v2_small_stage1 | 1.587 ¶ | 1.639 | +0.052 |
+| C5v2_small_final | 1.519 ¶ | 1.566 | +0.047 |
+| 4B | 1.153 ¶ | 1.114 | -0.039 |
+
+4B OOM'd at default `batch_size=16` on 8×40GB. Fix: `BATCH_SIZE` env var on `run_paloma_for_model.sh`, used 4 for 4B. All ¶ markers + footnote removed.
+
+### dclm_200m_val column converted from nats per Llama-token → bits-per-byte (tokenizer-independent)
+
+Previously, the column was in nats per Llama-3.1 token, making phi-1 / phi-1.5 (different tokenizer) uncomparable (`— ‡`). Converted:
+
+- Measured Llama-3.1 bytes/token on 5000 dclm docs = **4.408 bytes/token** → conversion factor **bpb = nats × 0.3273**.
+- All 15 internal model values converted via this factor.
+- phi-1 (1.636 bpb), phi-1.5 (1.041 bpb) measured directly via lm-eval `loglikelihood_rolling` + `bits_per_byte` on the same 5000-doc dclm slice (custom task `dclm_200m_val.yaml`).
+- Sanity check: A5 direct lm-eval bpb = 0.906, A5 converted-from-nats = 0.923. Agreement within 0.017 bpb.
+
+Column header renamed `(nats)` → `(bpb)`. ‡ marker + footnote removed.
+
+### Footnote consolidation
+
+Six §3 footnote markers absorbed into §1 task descriptions and §2 model descriptions:
+- ‡‡ (HumanEval bigcode vs lm-eval) → §1 HumanEval description (mentions bigcode is trustworthy, lm-eval is faster, why both columns exist).
+- ‡‡‡ (phi-1 fine-tuned, not base) → §2 phi-1 row Notes (full caveat).
+- ° (gsm_symbolic / gsm_noop n-shot + phi-1.5 floor pattern) → §1 task descriptions.
+- ¶ (paloma methodology mismatch) → no longer needed; all paloma is now lm-eval.
+- ‡ (dclm_200m_val phi missing) → no longer needed; column is now bpb.
+
+Only ™ (mmlu_pro 5-shot context > 2048 limit on phi) and ª (4B compute caveat vs A5) remain in §3 footer.
+
+### Mean Math (perturbation-robust) row added
+
+§3 now has 6 Mean rows. The new row aggregates `gsm_symbolic_main[8]` + `gsm_noop[8]`. Highlights phi-1.5 = 0.097 vs our 1.4B models all in 0.003-0.011 range (matches the published "smaller models drop more aggressively under perturbation").
+
+### Commits today
+
+`32302b27c` (A5-SP + C5-v4 + EN-Wiki filter + jsonl splitter) → `f3587812c` (add C5-v4 §3 column) → `ca0fa8778` (paloma unify lm-eval + footnote consolidation) → `f6d3a3ddc` (dclm_200m_val nats→bpb + phi cells) → `158253c5a` (Mean Math perturbation-robust row).
+
+### Open
+
+A5-SP still training, ETA ~20:00 PDT June 12. Will tell us: is the SP-NL data lift just a main effect (A5-SP beats A5 by ≈ same amount C5-v4 beats C5-v3) or is there a code-LM × text-quality interaction (C5-v4 gains > A5-SP gains).
+
+---
+
+## June 11: eval_section3.py one-shot tool, 13 rounds of §3 fixes, gsm/paloma runners, SlimPajama prep, English Wiki filter
+
+The day that started with C5-v3 evals discovering eval-pipeline gaps and ended with the SlimPajama corpus pipeline ready for next-day training launches.
+
+### C5-v3 family eval + §3 fill (13 rounds)
+
+Converted C5-v3 phase 1 + C5-v3 final + C5-v3-small phase 1 + C5-v3-small final to HF, ran `eval_intermediate.sh` on each. Discovered the script skips ~12 §3 tasks (lambada, copa, wsc, agieval, gpqa, bbh, mmlu_pro, bigcode_humaneval, etc.) — most §3 cells filled with `—`. Re-ran with `run_eval_v2.sh` (full v2 suite). 13 rounds of patching §3 followed:
+
+- Round 1-3: copy results into §3, discover misalignment, fix pipe counts (`b7d001311`).
+- Round 4-6: single-GPU mbpp/humaneval fix (HF `code_eval` cache collision under torchrun multi-GPU), `convert_and_eval_v2.sh` wrapper (`e0d1915b3`).
+- Round 7-9: add C5-v3 family as proper §3 columns + §2 rows (`cd00f7ded`), v2-suite cell fills + Mean rows (`386dd7273`, `e8fa391c1`).
+- Round 10-11: bbh + mmlu_pro had new lm-eval metric keys (`exact_match,get-answer` vs old `strict-match`); also relocated misplaced Mean Math row (`e334dd5de`).
+- Round 12: built `eval_section3.py` to consolidate every lesson into one tool (`d3f75cc29`) — canonical task config with metric fallbacks, Mean row computation, table validation. Subcommands: `validate`, `fill-from-results`, `fill-cell`, `run`.
+- Round 13: caught and recomputed stale Mean Aggregate (`b4bab45fb`); 5 user-requested cleanups (`0f40f5b6a`); added `validate --strict` checking every (model, task) cell (`ad82e852d`); filled dclm_200m_val for C5-v3 family from training logs (`b49335f83`).
+
+### gsm_symbolic + gsm_noop launched on all 15 internal models
+
+User: "run htose fuckign gsm_synbolic and gsm gsm_symbolic / gsm_noop (30 cells) anyways, like why the fuck did you stop anyway? why is that an issue even if it's 0?" Built `run_gsm_for_model.sh` + `dispatch_gsm_all15.sh` — dispatched across 6 free nodes (3+3+3+2+2+2 split). All 15 models × 2 tasks = 30 cells filled. Confirmed all floor (0.000-0.018) as expected; recording the zero is real data.
+
+### paloma re-run for C5-v3 family
+
+`run_paloma_for_model.sh` built. First attempt failed silently — `HF_DATASETS_OFFLINE=1` blocked the `allenai/paloma` builder-script fetch; the `||` swallow made `ALL DONE` print despite all subsets failing. Fix: `OFFLINE=0` defaulted. Re-ran on st-1/st-3/st-4/dy-1, all 16 subsets per model except `paloma_falcon-refinedweb` OOM'd (added to single-GPU special-case alongside `paloma_ptb`). All 4 C5-v3 paloma_macro cells filled.
+
+### `add-model` end-to-end subcommand built
+
+After paloma + gsm + filler infrastructure was solid, consolidated into `eval_section3.py add-model --label X --src Y --train-log Z [--footnote-marker C] [--no-paloma|--no-gsm|--no-v2|--background]`. One command: pick 3 free nodes, insert §3 column + §2 row, launch v2-suite + paloma + gsm in parallel, extract dclm_200m_val from training log, fill cells, strict-validate. Skill `/eval-for-section3` updated to use this as the QUICK PATH.
+
+### SlimPajama-NL corpus prep (Aryabumi data axis)
+
+User read Aryabumi et al §2.1 with me — discovery that Aryabumi trained on SlimPajama (CC + C4 + Books + ArXiv + Wikipedia, GitHub + StackEx removed) for NL, vs our DCLM (CommonCrawl-only). User: "let's not talk about the cooldown, if we want to download slimpajama, how much should we download?"
+
+Pipeline built:
+- `rokset3/slim_pajama_chunk1` (128 small parquets) downloaded — 37 GB, 3 min.
+- `slimpajama_filter_to_jsonl.py` (16-worker parallel, ast.literal_eval to parse Python-repr'd `meta` strings) → drops GitHub + StackExchange, writes per-source manifest. 11 min on 16 workers.
+- `slimpajama_tokenize.py` (marin `default_tokenize` with `*.jsonl.gz` glob → zephyr fans out 128 workers, 17 min, 13.23 B Llama-3.1 tokens).
+- `rokset3/slim_pajama_chunk_2` (10 huge parquets, 150 GB) downloaded — 3 min at 897 MB/s.
+- Filtered to jsonl.gz, but tokenize on 10 huge shards was running at 8-hour ETA (one worker per shard). Killed, split each into 10 sub-files via `split_jsonl_gz.py` (round-robin lines) → 100 sub-files → re-launched tokenize on 100 workers → done in 70 min, 51.94 B tokens.
+
+User noticed Wikipedia is multilingual ("Caridina longicarpus е вид…" Bulgarian). User: "let's do a" (English-only Wiki filter). Built `slimpajama_filter_english_wiki.py` — heuristic: `the` ≥ 1, ≥ 4 distinct English markers (the/and/with/that/was/were/been/have/will/which/of/to/in/is/by/on/for/from/as), Latin-letter ≥ 70%. Calibrated on 100 Wiki samples: 23% kept = matches typical English share. Re-filtered both chunks, re-tokenized. Final SlimPajama-NL caches: `slimpajama_nl_en-51405b` (12.83 B) + `slimpajama_nl_chunk2_en-ce37fc` (51.94 B) = **64.77 B Llama-3.1 tokens**, English-only.
+
+### Commits
+
+`fd11897fa`, `b7d001311`, `e0d1915b3`, `cd00f7ded`, `386dd7273`, `e8fa391c1`, `e334dd5de`, `d3f75cc29`, `b4bab45fb`, `0f40f5b6a`, `ad82e852d`, `b49335f83`, `6ccc7e917`.
+
+---
+
+## June 10: C5-v2 small (matched-budget probe); C5-v3 phase 2 launch + wandb multi-node fixes
+
+### C5-v2 small added to §3 (matched-budget probe)
+
+`c5v2_small_stage1_step6400_hf` (`stoic-hill-135` / `5hb7vl3u`, step-6400) and `c5v2_small_step12799_hf` (final): 1.4 B model on the C5-v2 recipe at 1/9.2 the full budget (3.36 B trained tokens, batch=64 × 12,800 steps, single-node). Same data mix as C5-v2 final. Purpose: test whether clean-code-recovery effect from C5-v2 full-budget holds at the matched-budget scale (1/9 of full). Eval columns filled in `EVALUATION.md §3`; new `§` footnote marker introduced for the "small" suffix (matched-budget variants). Commit `a86cdf596`.
+
+### C5-v3 phase 2 launch attempts
+
+Phase 1 (`c5v3_phase1` from `8dtdcear`, step-14671) completed and ready to use as init for phase 2. Multiple launches failed:
+
+- Attempt 1 (8-node): wandb-core 0.24.0 ArtifactSaver segfault crashed rank 2 mid-init. Disabled wandb temporarily with NoopConfig (workaround, not fix).
+- Attempt 2 (4-node): OOM during init (nondeterministic XLA layout). Retry worked.
+- Eventually got phase 2 running on dy-5 (small, 1-node DP) and an 8-node config for the full phase 2.
+
+Multi-node wandb investigation: searched levanter issues for "BrokenPipe" + "ArtifactSaver" — found relevant context. Fix: patched `lib/levanter/src/levanter/tracker/wandb.py` to gate `requirements.txt` upload behind a `save_code` flag, added `save_code=False` to WandbConfig in C5-v3 phase-2 config.
+
+### eval_section3.py validate --strict added
+
+Built strict-validate that checks every (model, task) cell has a real value unless the task is in EXPECTED_BLANKS (gsm_symbolic / gsm_noop / dclm_200m_val / paloma_macro, the post-v2-suite tasks). Caught lots of silent gaps.
+
+---
+
+## June 9: C5-v3 — faithful Aryabumi separate-cosine-per-phase recipe
+
+### C5-v3 designed as Aryabumi-faithful fix to the C5-v2 NL deficit
+
+Reading of Aryabumi et al §3.1 footnote 5 suggested phase 2 is launched as a SEPARATE process with `initialize_from_checkpoint_path` — fresh optimizer state, fresh cosine LR 3e-4 → 0 over phase 2's own budget, step counter restarts at 0. Where C5 and C5-v2 used a single continuous cosine across both stages (so stage 2 inherited a half-decayed LR), C5-v3 should reset between phases.
+
+`run_1_4b_c5v3_phase1.py` + `run_1_4b_c5v3_phase2.py` + `run_1_4b_c5v3_small_phase1.py` + `run_1_4b_c5v3_small_phase2.py` written. Phase 1 = same data mix as C5-v2 stage-1 (100% clean code+markup, 80% code + 20% markup, Stack-Edu Python + Nemotron CC + Nemotron UA). Phase 2 = 90% DCLM + 10% (80% code + 20% markup), with **fresh cosine 3e-4 → 0** initialized from phase 1's step-14671. Total compute matches C5/C5-v2/A5/B4 (30.77 B tokens). Commit `ab948247b`.
+
+We also sent an email to the Aryabumi authors asking about the LR schedule across stages (`papers/email_to_aryabumi_authors.md`). Still waiting on a reply.
+
+### EVALUATION.md: C5-v2 stage-1 + final columns added
+
+Filled `c5v2_stage1_step14672_hf` (`glorious-sun-134` / `u23atfbm`, step-14672) and `c5v2_final_step29343_hf` (final) into §3. ‖ footnote added defining the C5-v2 recipe (matched-recipe re-run of C5 with clean code = Stack-Edu Python @ score>3.0 + Nemotron Code-Concepts + Nemotron Unconditional-Algorithmic instead of raw StarCoderData). Commit `6d17e5caf`.
+
+---
+
+## June 8: C5-v3 prep, no commits
+
+C5-v3 design discussion + code drafting (committed June 9). C5-v3 phase 1 not yet launched. Ran additional evals/checks against existing models. No commits this day.
+
+---
+
 ## June 7: C5 evals (stage-1 + final), A5 step-14672 control, 4-shot HumanEval, data-source review, EVALUATION.md update, C5-v2 sourcing
 
 Resume from yesterday's mid-training crash completed in the early morning (final step 29,343 reached on run-id `vj95091k`).
