@@ -80,9 +80,7 @@
 **Experiment Setup:** 35B-active / 1T-total sparse MoE (78 layers, hidden 6656, FFN 13312, 8 of 512 experts per token via LatentMoE compressed-latent routing, periodic local/global attention with 5:1 ratio + sliding window 512, RoPE on local layers, NoPE on global, GQA with 8 KV heads / 80 Q heads / 128 per-head dim, dropless MoE, o200k_base 200,019-vocab tokenizer). Pretrained on 8K GB200 GPUs on Azure. Pretrain corpus: 30T tokens over 29.2T unique tokens (avg 1.03 epochs). Final mix (Tab. 5): Code 54.6% (16.4T train / 7.4T unique, 2.22× epochs), STEM 15.8%, Web text 14.9% (0.55× epochs — undersampled), Math 5.4% (1.6T / 0.3T, 5.28× epochs — heavily upsampled), PDFs 4.7%, Books 3.1%, Multilingual 1.6%. Hard cap of 8 epochs on any source. Mid-training (3.55T tokens, two stages): re-weight pretraining corpus toward STEM/math 35%, code 55%, background 10%; add long-context extension to 256K. RL climb on three specialist domains (STEM reasoning, agentic coding/tool use, helpfulness+safety) consolidated into one model via self-distillation. Architecture decisions validated on a scaling ladder L12 (3.9B total) → L78 (1T total) using "efficiency gain" (EG) ratio against fitted Chinchilla scaling laws.
 
 **Conclusion:** 52.8% SWE-Bench Pro, 97.0% AIME 2025, 94.5% AIME 2026, 87.7% LiveCodeBench v6 — competitive with Claude Sonnet 4.6 on a broad benchmark sweep. Methodologically important finding (Fig. 6): **rank non-invariance in data-mixture scaling** — a stem-heavy mix beat code-heavy on held-out STEM NLL at 5B-active, but code-heavy overtook stem-heavy at 23B-active, contradicting the small-scale-ablation assumption underlying RegMix-style methods. Two STEM sources with high quality but heavy fuzzy duplication helped small models and hurt large ones, suggesting diversity becomes the binding constraint as scale grows. Practical takeaway: small-scale data ablations cannot be trusted as the sole signal; scaling-ladder validation across multiple model sizes is required.
-
 </details>
-
 
 <details>
 <summary><h2>Reasoning in Pretraining</h2></summary>
@@ -125,59 +123,7 @@
 > * **The Helper Mechanism (Positive Influence):** Code documents that demonstrate step-by-step logic, variable tracking, or implementation of the targeted mathematical logic provide a structural layout that aligns perfectly with the target query's gradient requirements.
 > * **The Distractor Mechanism (Negative Influence):** When a code document mirrors the syntax, variable naming conventions, or formatting of a query prompt but executes a *conflicting or entirely different algorithmic rule* (e.g., computing a distance formula instead of a line slope using identical variable names), it induces localized gradient conflict. This structural overlap pulls the parameter subspace *away* from the correct target reasoning chain, making it a high-magnitude logical inhibitor.
 >
-> </details>
-
----
-
-### [How Does Code Pretraining Affect Language Model Task Performance?](https://arxiv.org/abs/2409.04556) (Petty et al., 2025)
-
-**Motivation:** Code is increasingly included in pretraining corpora and anecdotal evidence suggests it improves non-code tasks, but no prior work has established a causal connection by controlling code proportions as a continuous variable.
-
-**Experiment Setup:** Construct datasets mixing C4 (natural language) and The Pile's code at code mixtures m in [0, 0.9] in two settings: competitive (132B total, code displaces language) and additive (132B language fixed, code added on top up to 264B). Pretrain 374M-parameter transformers (5 seeds each). Evaluation has two parts:
-
-*Compositional generalization* (finetuned 10K steps, full-sequence accuracy):
-- **COGS** — semantic parsing into logical form. "A hedgehog ate the cake." → `*cake(x4); hedgehog(x1) AND eat.agent(x2,x1) AND eat.theme(x2,x4)`. Code **helps** (output is formal/structured, resembles code syntax).
-- **COGS-vf** — simplified COGS format. "A hedgehog ate the cake on the bed." → `eat(agent=hedgehog, theme=cake(nmod.on=bed))`. Code **helps**.
-- **English Passivization** — active→passive. "our vultures admired her walrus above some zebra" → "her walrus above some zebra was admired by our vultures." Code **hurts** (output is natural language, requires linguistic structure).
-
-*BigBench* (204 tasks, zero-shot). Code helps arithmetic (e.g., "What is 68824 times 42716?") but hurts linguistic/factual tasks like common morpheme ("What morpheme connects pyre, empyrean, antipyretic?" → fire), general knowledge ("How many legs do horses have?" → four), fantasy reasoning (hypothetical scenarios), and implicatures (pragmatic inference from dialogue).
-
-**Conclusion:** Higher code proportions improve compositional tasks (semantic parsing, arithmetic/math). Conversely, code harms tasks requiring linguistic structure (syntax, morphology) and factual knowledge. Code increases variance across tasks while raising the upper quartile, revealing a fundamental trade-off between structured reasoning and linguistic/factual capabilities.
-
-> <details>
-> <summary><b>Dongwei's comment</b></summary>
->
-> The "code harms NL" framing overstates the disagreement with Aryabumi et al. (2408.10914). Aryabumi also finds code hurts at high proportions — world knowledge drops 86% at 100% code, and the optimal is only 25%. Petty's competitive setting tests up to 90% code, well past what even Aryabumi shows is harmful. The two papers actually agree on the shape of the curve (moderate code helps, too much hurts); they differ on (1) where the sweet spot is, because of code quality (Aryabumi uses synthetic code, Petty uses web-scraped Pile), and (2) what tasks they emphasize (Petty: COGS/passivization, narrow structural; Aryabumi: ARC/HellaSwag/PIQA, broad NL reasoning). The additive setting here is more informative than the competitive one but gets less discussion. Follow-ups (Waheed et al. 2509.21499, Twist et al. 2601.21894) show code complexity profile and programming language choice modulate the effect further.
->
-> </details>
-
----
-
-### [To Code, or Not To Code? Exploring Impact of Code in Pre-training](https://arxiv.org/abs/2408.10914) (Aryabumi et al., Meta, 2024)
-
-**Motivation:** Including code in pretraining is standard but there has been no exhaustive study measuring its impact on non-code tasks across varying proportions, code quality types, model scales, and training stages.
-
-**Experiment Setup:** Pretrain 470M and 2.8B parameter transformers on SlimPajama (503B text tokens) mixed with code from The Stack (139B), markup (180B), synthetic code (3.2B), and code-adjacent data (21.4B) at varying proportions, using 200B-token training budgets plus 40B-token cooldown on TPU v5e. 64 total models evaluated on NL reasoning (11 benchmarks), world knowledge (TriviaQA, NaturalQuestions), code (HumanEval, MBPP), and LLM-as-judge win-rates.
-
-**Conclusion:** Best config yields +8.2% NL reasoning, +4.2% world knowledge, +6.6% generative win-rates, 12x code boost vs text-only. Optimal code proportion is 25% — NL reasoning is maintained up to 75% code but world knowledge degrades steadily (−3.4% at 25%, −31% at 75%, −86% at 100% vs text-only). Zero code hurts NL reasoning by 3.4% relative to 25% code. Code performance scales linearly with proportion (2.6x from 25%→100%). Code quality matters significantly — synthetic code (just 10% of code tokens) yields +9% NL reasoning and +44.9% code over web-scraped alone. Including code during cooldown provides additional gains. The Pareto-best recipe is balanced initialization (50% code + 50% text) followed by continued text pretraining — it matches or beats pure code-init on NL reasoning and substantially wins on world knowledge (+21% at 470M). Pure code-only pretraining never beats mixed.
-
-> <details>
-> <summary><b>Dongwei's comment</b></summary>
->
-> The headline finding is simpler than the abstract suggests: always mix code with text, never go code-only. `balanced→text` (50/50 init, then text) is the Pareto-best recipe — it matches `code→text` on NL reasoning and beats it by 21% on world knowledge at 470M. At 2.8B, `balanced→text` actually *wins* on NL reasoning too (57.9 vs 55.8). Section 3.3's proportion results converge with Petty et al. (2409.04556) — both papers agree too much code hurts, they just tested different ranges. The apparent contradiction dissolves: at moderate proportions (25%) with quality code, NL reasoning improves; at high proportions or with low-quality code, it degrades. The remaining gap comes from code quality (synthetic >> web-scraped Pile) and evaluation scope (COGS/passivization vs ARC/HellaSwag). Neither paper isolates what property of code helps — later work (Waheed et al., Twist et al.) shows it's hierarchical/procedural structure, not syntax, and that complexity profiles matter more than raw proportion.
->
-> </details>
-
----
-
-### [What do Language Models Learn and When? The Implicit Curriculum Hypothesis](https://arxiv.org/abs/2604.08510) (Liu et al., 2026)
-
-**Motivation:** Scaling laws on validation loss tell us how much a model improves with compute but not *what* skills it acquires *when*. The authors propose the "Implicit Curriculum Hypothesis": pretraining follows a compositional and predictable curriculum across models and data mixtures. They ask whether the order in which capabilities emerge is consistent across model families and predictable from internal representations.
-
-**Experiment Setup:** Track emergence points on **91 in-context-learning tasks** (53 elemental: string ops, morphology, en↔fr/es translation, country-to-capital, arithmetic, logic, coreference, psychometric; 38 composite: mechanically chained operations like "gerund then uppercase") across **9 publicly released checkpointed models from 4 families spanning 410M–13B parameters**: OLMo-2 (1B/7B/13B), OLMo-3 (7B), LLM360 Amber (7B, NL-oriented) and Crystal (7B, code-oriented), Pythia (410M/1.4B/12B). Emergence point defined as the first checkpoint where ICL accuracy crosses an absolute threshold (50% or 80%). Use kernel ridge regression in function-vector representation space to predict held-out task trajectories from training-time representations alone.
-
-**Conclusion:** Emergence orderings are strikingly consistent across model pairs — Spearman ρ = .64–.93 (mean .81) across all 45 pairs including cross-family, all p<10⁻⁷. Composite tasks "most often emerge after their component tasks" (19 weak inversions, 3 strong — all 3 strong inversions involve the first_letter component). Function-vector representations during training predict held-out composite-task trajectories with R² = .68–.84 across models (Pythia-410M .681, OLMo-2-13B .838) without ever evaluating those tasks. Caveats the authors raise: consistency holds only under absolute thresholds (relative thresholds drop to mean ρ = .528); trajectory prediction degrades when restricted to simple tasks alone, indicating a "composition bottleneck"; tasks are synthetic ICL chains, not naturalistic composition.
-
+> 
 </details>
 
 <details>
@@ -216,57 +162,31 @@
 >
 > All 1,000+ ablation experiments use a single student model (Qwen2.5-7B-Instruct). The only validation on a second model is one Llama-3.1-8B-Instruct run (Appendix G.1) — not a full ablation sweep. This means every pipeline recommendation (top 1-2 sources > mixing 8-16, difficulty filtering > fastText, QwQ-32B > DeepSeek-R1 as teacher) could be Qwen-specific. Given what we've seen in Twist et al. (optimal code complexity is model-specific) and Waheed et al. (optimal programming language is model-specific), there's reason to suspect the optimal question source, filtering strategy, and teacher model may also be model-dependent. The paper acknowledges this implicitly by noting the Llama model shows "more significant performance gains" on some benchmarks, but doesn't test whether the *relative rankings* of pipeline choices change across models. The final question sources — CodeGolf, OpenCodeReasoning (code), OpenMath-2-Math (math), StackExchange Physics + OrganicChemistry PDFs (science) — were selected by average score across domains on Qwen, not validated cross-model.
 >
-> </details>
-
----
-
-### [Not All Code Is Equal: A Data-Centric Study of Code Complexity and LLM Reasoning](https://arxiv.org/abs/2601.21894) (Twist, Yang, Yan et al., King's College London & KAUST, 2026)
-
-**Motivation:** Prior work shows code exposure improves reasoning, but treats code as an undifferentiated signal. This paper asks whether the structural complexity of code — measured by cyclomatic complexity (CC, number of independent execution paths) and logical lines of code (LLOC) — systematically affects reasoning gains during fine-tuning.
-
-**Experiment Setup:** Two dataset constructions controlling complexity: (1) Solution-driven (CodeNet) — multiple solutions to the same programming problems, split into 5 complexity levels (MIN/LOW/MID/HIGH/MAX) + a mixed control (CTRL), 8,087 samples each, in Python/JavaScript/Java. (2) Problem-driven (Instruct) — from Magicoder, Evol-Instruct, WizardLM, where problems naturally vary in difficulty, same 5 splits + CTRL. Fine-tune 6 models with LoRA (2 epochs, LR 2e-5): Qwen 2.5 3B/7B/14B, Llama 3 3B/8B, Mistral 7B. Evaluate on GSM8K, MATH401, MATH500, GPQA, BBEH-mini, HLE.
-
-**Conclusion:** Code fine-tuning does not uniformly improve reasoning — gains depend strongly on structural complexity. The relationship is non-monotonic: accuracy peaks at intermediate complexity (~CC≈10) and degrades for both very simple and very complex code. In 20 of 24 model-dataset combinations (83%), restricting to a specific complexity range outperforms the mixed-complexity control. High complexity can actively harm reasoning — Llama models show near-perfect negative correlations (ρ ≈ −1.00) with CC. Cyclomatic complexity is a more reliable signal than LLOC. Problem-driven complexity (Instruct) shows stronger effects than solution-driven (CodeNet). The absolute CC value matters more than whether complexity comes from solution variation or problem difficulty.
-
-> <details>
-> <summary><b>Dongwei's comment</b></summary>
->
-> The optimal complexity range is post-hoc and model-specific. Figure 3 shows the peak split differs across models (Qwen peaks at LOW/MID on CodeNet CC, Llama declines near-monotonically, Mistral shows the opposite U-shaped curve). The paper says "the effective complexity range itself appears to be model-specific." So the "83%" finding means: for any given model, there exists some restricted split that beats the mixed control — but you can't know which one without trying them all. The CC≈10 heuristic is an average across models, not a reliable predictor for a specific model. This limits practical applicability — you'd need to do the full complexity sweep for your model, which isn't cheaper than just trying different code datasets.
->
-> </details>
-
----
-
-### [On Code-Induced Reasoning in LLMs](https://arxiv.org/abs/2509.21499) (Waheed, Wu, Rosé & Ippolito, CMU, 2025)
-
-**Motivation:** Code fine-tuning improves reasoning, but which aspects of code are responsible — syntactic regularity, structural scaffolding, or semantic content — remains unclear. Prior work treats code as a monolithic signal.
-
-**Experiment Setup:** Construct parallel datasets of 120K code instructions (solutions generated by GPT-4o-mini in 10 languages: Java, JavaScript, PHP, Python, C#, TypeScript, C, C++, Go, Rust) and 120K NL instructions (from OpenHermes 2.5). Apply controlled perturbations in two categories: rule-based (whitespace removal, variable renaming, keyword replacement with nonsense/non-English tokens, comment removal/swapping) and generative (pseudocode, flowcharts in Mermaid, step-by-step NL procedures, imaginary language, comment enhancement/obfuscation). Fine-tune models from 5 families (Qwen3, Llama3, Gemma3, OLMo2, SmolLM2) at scales from 0.6B to 8B using SFT. Evaluate on NL & general knowledge, math (GSM8K, HRM8K, MMLU math/arithmetic), and code (understanding + generation via LLM-as-judge). 3,331 total experiments.
-
-**Conclusion:** Baseline: code fine-tuning consistently outperforms NL-only fine-tuning on math and code tasks across all 5 model families, while matching or slightly improving NL & general performance (Figures 17-22). Four main findings on *why*: (1) Structural perturbations (whitespace removal, pseudocode, flowcharts) hurt more than semantic ones (variable renaming, keyword replacement), especially on math and code (Figure 3). (2) Pseudocode and flowcharts — which preserve algorithmic structure but remove syntax — can match or surpass unperturbed code on NL and math tasks (Figure 4). Reduced-token variants also perform comparably, meaning models don't need verbose code, just preserved core structure (Figure 5). (3) Even corrupted code with deliberately misleading comments retains competitive performance — models exploit surface-level statistical regularities that persist despite distortion (Figure 6). (4) Programming language matters at the group level: high-scripting languages (Python, PHP, JavaScript, TypeScript) consistently underperform intermediate (Java, C#) and low-system (C, C++, Rust, Go) languages on math tasks. Python leads on NL tasks, likely due to surface similarity to natural language. Individual language rankings are noisier — the paper says lower-level languages "often rank among the top" for math (Figure 7, shown for Qwen3-1.7B; appendix has other models).
-
-> <details>
-> <summary><b>Dongwei's comment</b></summary>
->
-> The main text presents programming language effects using only Qwen3-1.7B (Figure 7), which happens to show the cleanest group-level separation. The appendix (Figures 48-51) tells a different story. Per-language math rankings are highly inconsistent across model families:
->
-> | Model | Top 3 for Math | Java's rank |
-> |-------|---------------|-------------|
-> | SmolLM2-1.7B | Java (0.142), C (0.139), Rust (0.138) | #1 |
-> | Qwen3-0.6B-Base | Go (0.518), Rust (0.515), Java (0.513) | #3 |
-> | Qwen3-0.6B | Python (0.473), C (0.473), Java (0.468) | #3 |
-> | Qwen3-1.7B | Rust (0.625), Python (0.625), C (0.625) | #10 (last) |
-> | Llama-3.2-1B | Go (0.210), Rust (0.209), CSharp (0.209) | #7 |
->
-> The abstract's "Java and Rust favor math" is supported for exactly one model (SmolLM2-1.7B). On Qwen3-1.7B, Java is dead last for math and the entire 10-language spread is 0.011 points. The group-level finding (high-scripting < intermediate/low-system) is weakly supported in aggregate, but effect sizes are small enough that individual language choice within groups matters more than group membership. This parallels the model-specificity problem in Twist et al. — just as optimal complexity is model-dependent, optimal language is too.
->
-> </details>
-
+> 
 </details>
 
 <details>
-<summary><h2>Synthetic Data & Tasks</h2></summary>
+<summary><h2>Training (Synthetic) Data and Tasks</h2></summary>
 
+### [DataComp-LM: In search of the next generation of training sets for language models](https://arxiv.org/abs/2406.11794) (Li, Fang, Smyrnis, Ivgi et al., 2024-2025)
+
+**Motivation:** Two challenges in data-curation research: (1) lack of controlled comparisons — proposals often compare models trained with different architectures, compute, or hyperparameters, so it's unclear whether a dataset-A vs dataset-B difference is actually due to the data; (2) state-of-the-art training sets are increasingly proprietary (Llama, Mistral, Gemma do not release training data), so the ingredients of a SOTA training set are largely unknown.
+
+**Experiment Setup:** Build **DCLM-POOL**, a 240 trillion-token corpus from Common Crawl (largest public LM corpus). Define 5 compute scales spanning ~600× of compute (400M-1×, 1B-1×, 3B-1×, 7B-1×, 7B-2×); participants train at a fixed recipe per scale and vary only the training data. Evaluate on 53 downstream tasks. Authors run **416 baseline experiments** across scales testing different filters, dedup strategies, and source mixes.
+
+**Conclusion:** Model-based filtering is the most consequential lever (different filter models yield 35–44% MMLU at 7B/280B). A surprisingly simple **bigram classifier with a carefully selected positive/negative set** performs best among the classifiers tested. Human quality judgments alone (without a learned filter) have limited value. The released **DCLM-BASELINE** dataset reaches 64% MMLU 5-shot at 7B with 2.6T tokens — SOTA among open-data models, close to Mistral-7B-v0.3 (63%) and Llama 3 8B (66%) but with 6.6× less compute. Releases the benchmark, framework, and curated datasets at datacomp.ai/dclm.
+
+---
+
+### [SlimPajama-DC: Understanding Data Combinations for LLM Training](https://arxiv.org/abs/2309.10818) (Shen, Tao, Ma, Neiswanger et al., MBZUAI/UIUC/Stanford/CMU/Cerebras, 2024)
+
+**Motivation:** SlimPajama is a 627B-token deduplicated version of the 1.2T-token RedPajama corpus (CommonCrawl + C4 + GitHub + Books + ArXiv + Wikipedia + StackExchange). Two open questions: (1) does **global deduplication** across all sources matter more than **local deduplication** within each source (most prior open-source LM data does only local)? (2) Once data is heavily deduplicated, how should the **proportions** across sources be chosen?
+
+**Experiment Setup:** 6 SlimPajama mix configurations, each trained at 1.3B (Cerebras-GPT with Alibi + SwiGLU) in bf16 on a Cerebras 16× CS-2 cluster (80 PFLOP/s). Compare against RedPajama at matched token count. Extension to 7B with large-batch training in the appendix.
+
+**Conclusion:** (1) **Global deduplication** (across all sources combined) is preferable to local — it produces a more balanced representation and avoids the cross-source redundancy that local-only methods miss. (2) After heavy global dedup, **increasing data diversity** (across multiple sources) becomes crucial — the best mix configuration beats RedPajama by a meaningful margin at matched compute. (3) These findings transfer to the 7B scale with large-batch training. Releases SlimPajama-DC dataset variants.
+
+---
 ### [Demystifying Synthetic Data in LLM Pre-training](https://arxiv.org/abs/2510.01631) (Kang et al., 2025)
 
 **Motivation:** Synthetic data is well-established for post-training but its role during foundational pre-training remains poorly understood, with inconsistent findings and unresolved concerns about model collapse.
@@ -300,119 +220,11 @@
 >
 > The paper conflates implicit, closed-system pattern matching with genuine, open-ended reasoning. By focusing strictly on synthetic pretraining environments, it entirely ignores the inference-time scaling, tool use, and test-time compute where actual agentic AI and reasoning breakthroughs are currently happening.
 >
-> </details>
-
----
-
-### [Procedural Pretraining: Warming Up Language Models with Abstract Data](https://arxiv.org/abs/2601.21725) (Jiang, Shinnick et al., 2026)
-
-**Motivation:** Standard pretraining entangles knowledge acquisition and reasoning skill learning. This paper proposes using an initial stage on abstract procedural data (formal languages, sorting, cellular automata) to build algorithmic scaffolding before semantic data.
-
-**Experiment Setup:** Train GPT-2-style transformers (up to 1.3B) from scratch in two stages: first on procedural tokens (SET/UNION/SORT, k-DYCK, ECA Rule 110, STACK operations), then on standard semantic tokens from C4 (655M-1.6B), CodeParrot (1B), or DeepMind-Math. Test both additive (extra procedural tokens) and substitutive (replacing semantic tokens) settings, plus selective layer transfer.
-
-**Conclusion:** As little as 0.1% extra procedural tokens significantly improves downstream performance across NL, code, and math. In substitutive setting, procedural pretraining reaches same loss with only 55% (C4), 67% (CodeParrot), 86% (DeepMind-Math) of original semantic data. Benefits persist through fine-tuning and scale to 1.3B/10.5B tokens. Attention layers carry skills for structured domains (code), MLPs benefit natural language.
-
----
-
-### [Content-Free Synthetic Tasks](https://arxiv.org/abs/2206.10139) (Percy Liang et al., 2022)
-
-**Motivation:** Understanding which aspects of pretraining data (content vs structure) drive downstream capabilities.
-
-**Experiment Setup:** Pretrain language models on content-free synthetic tasks that preserve structural patterns of natural language without semantic content.
-
-**Conclusion:** Content-free synthetic pretraining closes ~65% of the gap to natural pretraining, demonstrating that structural patterns matter even without semantic content.
-
----
-
-### [Modeling Rapid Language Learning by Distilling Bayesian Priors into Neural Networks](https://arxiv.org/abs/2305.14701) (McCoy & Griffiths, Princeton, 2023)
-
-**Motivation:** Humans learn language from remarkably little data. Bayesian models explain this via strong inductive biases but can't scale to naturalistic data; neural networks scale but are data-hungry. The authors ask whether you can get both: strong inductive biases with flexible neural representations.
-
-**Experiment Setup:** Three-step "inductive bias distillation" pipeline: (1) Define a target inductive bias as a Bayesian prior over formal languages, using probabilistic context-free grammar primitives (concat, plus/recursion, or, synchrony) to generate a distribution over languages. (2) Sample 25,000 formal languages from this prior. (3) Meta-learn (MAML) a 2-layer LSTM on these sampled languages — each meta-episode trains on one language, then the outer loop updates initialization weights to learn new languages faster. The resulting "prior-trained" LSTM is then evaluated on: (a) 56 held-out formal languages (1-10K examples each), comparing against a Bayesian learner and a standard LSTM; (b) natural language (8.5M-word CHILDES corpus of child-directed speech), measuring perplexity; (c) targeted linguistic evaluations — BLiMP grammaticality, recursion depth (intensifiers, possessives, prepositional phrases up to 10 levels), and priming. Also tested Transformers but found LSTMs captured the formal language primitives better.
-
-**Conclusion:** On formal languages, the prior-trained LSTM matches the Bayesian learner's data efficiency (standard LSTM needs ~10x more examples for the same F-score). On natural language, prior-trained network achieves perplexity 19.67 vs standard LSTM's 19.75 — small overall, but the benefit concentrates where inductive biases matter most: (1) low-data regimes — at 1/32 of CHILDES with hidden size 64, prior-trained gets 51.2 perplexity vs standard's 57.4 (10.8% improvement); (2) deep recursion — prior-trained handles 6+ levels of nesting better than standard (Figure 4C); (3) priming — shows stronger syntactic priming effects. Benefit pattern follows a diagonal in model-size × data-size space: helps most in small-model-small-data and large-model-large-data regimes, less in between. Key distinction from pre-training: prior-training is "learning to learn" (acquiring inductive biases as initialization), not "learning" (acquiring content). The entire prior-training distribution was generated from a 21KB Python file, vs hundreds of GB for standard pre-training.
-
-> <details>
-> <summary><b>Dongwei comment — how MAML works and why the prior transfers</b></summary>
->
-> **How MAML actually works here (the two-loop process).** The data for meta-learning isn't a static dataset — it's a continuous stream of synthetic language *tasks* sampled from the Bayesian prior. Each meta-episode goes like this:
->
-> 1. Sample a language L from the prior (e.g., `concat(A, plus(C), or(F, B))` which generates strings like ACF, ACCB, ACCCF...).
-> 2. **Inner loop (adaptation):** Sample a small *support set* of strings from L (e.g., just ACF and ACCF). Do a standard gradient update on the current weights M_t to get temporary task-specific weights M'. This is the model "learning" one specific language.
-> 3. **Outer loop (meta-update):** Sample a separate *query set* from the same language L. Evaluate how well M' does on this query set. Compute the gradient of *that* error with respect to the *original* M_t (not M'), and update M_t → M_{t+1}.
->
-> The outer loop is what makes this different from just training on many languages sequentially (standard multi-task learning). Without it, you'd find one set of weights that's okay at the *average* of all tasks — a compromise solution. The outer loop explicitly optimizes the *starting point* so that after just a few gradient steps on any new language, the model is already high-performing. It's optimizing the learning process itself, not direct performance on the tasks.
->
-> **Why the prior is useful for human language.** The Bayesian prior assigns high probability to languages built from few simple primitives (concat, plus/recursion, or) and low probability to complex/random ones. This "simplicity bias" is useful for language because human languages actually do exhibit these structural regularities — recursion (nested prepositional phrases), concatenation (subject-verb-object ordering), alternation (grammatical choices). When MAML sees thousands of languages drawn from this prior, the network's initialization gets tuned to be maximally sensitive to exactly these kinds of rule-based patterns. So when it encounters actual English, it doesn't search the infinite space of all possible patterns — it's already primed to look for the simple, recursive, compositional structures that human grammar actually uses. This is the paper's answer to the "poverty of the stimulus" problem: the model arrives at language learning with a prior that constrains the hypothesis space to structurally plausible grammars.
->
-> </details>
-
----
-
-### [Between Circuits and Chomsky: Pre-pretraining on Formal Languages](https://arxiv.org/abs/2502.19249) (Hu, Petty, Shi, Merrill & Linzen, NYU, 2025)
-
-**Motivation:** Language models require 5-6 orders of magnitude more data than humans. The authors ask whether pre-pretraining on formal languages can impart inductive biases that improve natural language learning efficiency, and which formal language properties (hierarchical structure, transformer-expressibility) drive transfer.
-
-**Experiment Setup:** Test 4 formal languages -- 1-Dyck (nested brackets), k-Dyck (k bracket types), k-Shuffle Dyck (cross-serial dependencies), and ww (copy language) -- positioned along the Chomsky hierarchy and C-RASP circuit complexity hierarchy. Pre-pretrain Pythia 160M for 500-4000 steps on formal language tokens, then train on C4 for 10K steps (~665M tokens). Scale-up: Pythia 1B on 1.63B C4 tokens. Baselines: no pre-pretraining, random strings, extra C4 data. Evaluate on C4 validation loss, BLiMP grammaticality, and verbatim retrieval.
-
-**Conclusion:** k-Shuffle Dyck (context-sensitive, hierarchical, in C-RASP) is the best formal language -- at 1B scale it yields a 33% token efficiency gain (MRS=17.3), meaning each formal token replaces ~17 natural language tokens. Hierarchical structure is necessary: the copy language ww (context-sensitive but non-hierarchical) actively hurts performance (negative MRS), and random strings provide no benefit. Notably, extra C4 pre-pretraining does NOT improve grammaticality (BLiMP), while all four formal languages do -- suggesting formal languages teach something qualitatively different from more natural language. The benefit comes from global hierarchical dependencies, not local n-gram statistics (verified via n-gram metamer controls). Mechanistically, a sparse subnetwork of attention heads learned during formal pre-pretraining transfers to and drives natural language performance. Limitations: only tested blocked training (formal then NL) -- mixing formal tokens into NL training might work differently; only English downstream; only decoder-only transformers.
-
-> <details>
-> <summary><b>Dongwei comment — background theory and implications</b></summary>
->
-> **The Chomsky hierarchy.** Formal languages are classified by generative power: Regular (Type 3) < Context-Free (Type 2) < Context-Sensitive (Type 1) < Unrestricted (Type 0). Most of natural language syntax looks Context-Free — nested dependencies like "The cat [that the dogs [which the man fed] chased] is sleeping" follow a stack-based (  [  ]  ) pattern. But in the 1980s, linguists proved natural language is actually Context-Sensitive using cross-serial dependencies in Swiss German: dependencies that *cross* each other in an A-B-A-B pattern rather than nesting A-B-B-A. English has these too — "Alice and Bob love apples and oranges, respectively" maps Alice→apples and Bob→oranges in a crossing pattern. This places human language in the "mildly context-sensitive" zone.
->
-> **The four formal languages tested.** The paper picks one language from each cell of a 2×2 grid (hierarchical vs non-hierarchical) × (in C-RASP vs not in C-RASP):
-> - **1-Dyck**: nested brackets `( ( ) )` — Context-Free, in C-RASP. Too simple, only nesting.
-> - **k-Dyck**: multiple bracket types, strictly nested `( [ ] )` — Context-Free, NOT in C-RASP. Requires a stack.
-> - **k-Shuffle Dyck**: multiple bracket types, allowed to cross `( [ ) ]` — Context-Sensitive, in C-RASP. Each bracket type tracked independently.
-> - **ww** (copy language): first half repeats exactly, e.g. `abcabc` — Context-Sensitive, NOT in C-RASP. Requires dynamic index comparison.
->
-> **What is C-RASP and why it matters.** RASP is a programming language whose primitives map directly to Transformer operations: "column operations" (MLPs processing each position independently) and "matrix cross-referencing" (attention heads connecting positions). C-RASP (Constant-depth RASP) adds the constraint that the program must work in a *fixed number of steps regardless of sequence length* — no loops allowed. If a task can be written in C-RASP, a Transformer can physically wire its attention heads to solve it. If not, the Transformer will struggle to generalize to longer sequences.
->
-> k-Shuffle Dyck is in C-RASP because it reduces to *parallel counting*: for each bracket type independently, maintain a running sum (+1 for open, -1 for close), reject if the sum ever goes negative or doesn't end at zero. A Transformer does this in ~2 layers with attention summing over past positions. In contrast, standard k-Dyck requires a *stack* (checking that the most recent open bracket matches the current close bracket), and ww requires comparing tokens at two dynamically shifting indices (position i vs position i+N) — neither expressible in constant-depth parallel operations.
->
-> **Why k-Shuffle Dyck transfers to natural language.** The crossing dependencies in k-Shuffle Dyck `( [ ) ]` are structurally identical to the cross-serial dependencies in human grammar. When a Transformer learns k-Shuffle Dyck, it builds parallel tracking circuits — separate attention heads for each bracket type, running independent counters. When subsequently trained on English, the model *reuses those exact same attention heads* to track subjects, verbs, and pronouns across long overlapping sentences. The paper proves this isn't just "the model got smarter" — it's structural isomorphism between the formal language and human syntax.
->
-> **How the mechanistic interpretability proof works.** Three steps:
-> 1. **Identify the formal subnetwork (pruning).** After pre-pretraining on k-Shuffle Dyck, introduce a binary mask z_i ∈ {0,1} for each attention head. Freeze model weights, train only the masks with a sparsity penalty — the model must solve k-Shuffle Dyck using as few heads as possible. Heads with z_i=0 are "removed" (output multiplied by zero, no contribution to residual stream). The surviving heads form the "core subnetwork."
-> 2. **Train on natural language.** Continue training the full model (all heads active) on C4.
-> 3. **Targeted ablation (knockout test).** After NL training, zero out the specific heads identified in step 1 and measure English grammaticality (BLiMP). Compare against a control where the *same number* of randomly selected heads are ablated. Result: ablating the k-Shuffle Dyck heads damages English syntax *far more* than ablating random heads — proving the model reused those specific circuits for human grammar.
->
-> The control languages make this proof airtight: 1-Dyck and ww also produce "heavy-lifting heads" for their respective tasks, but ablating those heads after NL training does NOT damage English syntax. Only k-Shuffle Dyck's heads transfer, because only k-Shuffle Dyck has the right mathematical structure (hierarchical + crossing + C-RASP expressible) to match human language.
->
-> **Why ww fails despite being Context-Sensitive.** ww requires comparing token at index i with token at index i+N, which requires dynamic indexing across two positions — not expressible in C-RASP. The Transformer can't build a general circuit for it; it memorizes position-specific mappings that don't generalize to longer strings. More fundamentally, ww's dependency structure (literal block-copying) doesn't match human grammar's overlapping hierarchical dependencies. So even if a Transformer could learn ww perfectly, those circuits would be useless for English.
->
-> **Implications for our data efficiency work.** The key insight: *hierarchy* is what matters for transfer, not just complexity class. ww and k-Shuffle Dyck are both Context-Sensitive, but only k-Shuffle Dyck helps because it has hierarchical, crossing structure that matches human syntax. For reasoning curricula, this suggests we should look for data with nested/recursive/crossing structure rather than just "hard" sequences. Also notable: they only test blocked training (all formal tokens first, then NL). Our setup mixes reasoning data with NL data, which might transfer differently — the paper explicitly flags this as an open question (Section 9).
->
-> **Daniel Khashabi's note.** The Chomsky hierarchy + C-RASP conditions may be sufficient but not necessary. Genomics and NCA data (which don't obviously satisfy these conditions) have also shown transfer benefits for language models. The theoretical framework here explains *why* k-Shuffle Dyck works, but doesn't rule out other mechanisms of transfer.
->
-> </details>
-
----
-
-### [Synthetic Data for any Differentiable Target](https://arxiv.org/abs/2604.08423) (Thrush, Park, Brunborg, Bailey, Roed, Band, Potts & Hashimoto, 2026)
-
-**Motivation:** Synthetic-data pipelines for LLM training are typically hand-designed to push a vaguely-stated objective ("more reasoning", "better code"). The authors ask whether you can instead make the *data generator itself* the optimization target: write down any differentiable target on model behavior, then let the generator be trained to produce data that — when used for SFT — moves the model toward that target.
-
-**Experiment Setup:** Introduce **Dataset Policy Gradient (DPG)**, an RL method that treats the synthetic-data generator as a policy and uses "exact data attribution via higher-order gradients" as the reward — the gradient of (final model loss on the target ↘) with respect to (generator output ↗) backed all the way through the SFT process. Train the generator with PG against this reward. Demonstrate by SFT-ing models on the DPG-produced data to hit five different targets: (1) embedding QR codes in the LM-head weights, (2) embedding a specific number (67) in weights, (3) reducing total weight norm via data alone, (4) rephrasing inputs into a new language with no explicit instruction, (5) emitting specific UUIDs.
-
-**Conclusion:** Across all five targets, DPG-generated synthetic data — used only as SFT — successfully moves the model to the differentiable target. The QR-code-in-weights and weight-norm-reduction demos are the most striking: they show that data alone has very fine-grained control over model internals, including non-behavioral targets. The authors frame DPG as a unification framework — many existing techniques (rephrasing, distillation) are special cases. Limitation: demos are small-scale; the authors don't show DPG produces useful pretraining-corpus-scale data.
-
----
-
-### [The Synthetic Data Playbook: Generating Trillions of the Finest Tokens (FinePhrase)](https://huggingface.co/spaces/HuggingFaceFW/finephrase) (HuggingFaceFW, 2026)
-
-**Motivation:** Existing pretraining corpora (FineWeb, etc.) are noisy and have inconsistent structure; phi-style "rewrite each document as a textbook" pipelines are expensive at trillion-token scale because they typically use a large teacher model. HuggingFaceFW asks whether a small, cheap rewriter can produce useful trillion-token-scale synthetic data.
-
-**Experiment Setup:** Use **SmolLM2-1.7B-Instruct** as the rewriter (small + cheap) to transform each document from `HuggingFaceFW/fineweb-edu` (sample-350BT split, 339.3M source documents) into 4 different rewritten outputs: (1) **FAQ** (rewrite as comprehensive Q&A pairs), (2) **Math word problem** (turn content into a math problem with step-by-step solution), (3) **Table** (organize as structured table + Q&A), (4) **Tutorial** (rewrite as a step-by-step instructional guide). Generation config: `temperature=1.0, top_p=1.0, top_k=50, max_tokens=2048`. Result: **1,354,044,711 output samples / 486.4 B completion tokens** (~336M samples per rewrite family, mean 273-437 tokens/sample depending on family). Released under ODC-BY.
-
-**Conclusion:** Working dataset rather than a paper — no controlled before/after benchmark numbers are published in the dataset card. The artifact itself (486B tokens of small-rewriter synthetic data over 4 prompt families) is the contribution; an open question to the community is whether it improves data efficiency vs the original FineWeb-Edu slice at matched token budget.
-
+> 
 </details>
 
 <details>
-<summary><h2>Curriculum & Data Selection</h2></summary>
+<summary><h2>Analysis of Training Mechanism, Scaling Laws, and Mech Interp</h2></summary>
 
 ### [Scaling Data-Constrained Language Models](https://arxiv.org/abs/2305.16264) (Muennighoff, Rush, Barak, Le Scao, Tazi, Piktus, Pyysalo, Wolf, Raffel, 2023)
 
@@ -446,49 +258,25 @@
 >
 > **DSIR comparison.** DSIR (Data Selection with Importance Resampling) selects data by matching n-gram statistics to a human-chosen target corpus. It requires knowing what "good data" looks like in advance. This paper's method doesn't — it discovers what data matters by looking at what existing models actually find useful, which is why it outperforms DSIR on every benchmark tested.
 >
-> </details>
+>
+
+### [Tracr: Compiled Transformers as a Laboratory for Interpretability](https://arxiv.org/abs/2301.05062) (Lindner, Kramár, Farquhar, Rahtz, McGrath & Mikulik, NeurIPS 2023 Spotlight)
+
+**Motivation:** Mechanistic interpretability methods are typically evaluated on transformers whose learned computation is itself opaque — so when a method finds (or fails to find) a circuit, you can't tell whether the method is right or wrong. The authors want a transformer where the ground-truth computation is known by construction, so interpretability methods can be calibrated.
+
+**Experiment Setup:** Build **Tracr**, a compiler that takes a program written in a RASP-like DSL and emits a standard decoder-only transformer (weights + architecture) that provably executes that program. Implement and compile several test programs: token frequency computation, sorting, parenthesis validation. Use the resulting compiled transformers to study superposition in multi-step algorithms — since the "correct" representation is known, you can measure how much the compiled model packs distinct features into shared dimensions.
+
+**Conclusion:** Tracr produces transformers whose internal computation is fully specified, providing ground truth for evaluating any circuit-discovery or attribution method. The superposition study demonstrates the framework's utility: you can measure how interpretable a method is by checking whether it recovers the structure the compiler put there. Open-source code released. Limitation: compiled transformers are small (toy-scale) and execute hand-written programs, not learned ones — so the framework is methodological rather than directly applicable to interpreting frontier models.
 
 ---
 
-### [Curriculum Learning for LLM Pretraining: An Analysis of Learning Dynamics](https://arxiv.org/abs/2601.21698) (Elgaar & Amiri, 2026)
+### [Progress measures for grokking via mechanistic interpretability](https://arxiv.org/abs/2301.05217) (Nanda, Chan, Lieberum, Smith & Steinhardt, ICLR 2023)
 
-**Motivation:** Curriculum learning reorders data from easy to hard, but it remains unclear whether this changes the learning trajectory or merely reshuffles data within the same latent training phases.
+**Motivation:** Grokking — the phenomenon where a small transformer trained on a synthetic task (here modular addition) suddenly transitions from memorization to perfect generalization long after training loss reaches zero — looks like an abrupt phase change in behavior. The authors ask whether the underlying mechanism is actually continuous and whether mech-interp can expose a smooth progress measure that predicts when grokking will occur.
 
-**Experiment Setup:** Train Pythia models (14M, 31M, 70M, 160M, 410M) for 300B tokens on The Pile under three linguistically motivated curricula (Age-of-Acquisition, word frequency, Verb Variation) plus random ordering. Additional 1B runs for random and VV. Analyze via Hidden Markov Models, gradient noise scale, and singular entropy of the output head.
+**Experiment Setup:** Train 1-layer transformers on modular addition (a + b mod p). Reverse-engineer the learned circuit via weight inspection, activation patching, and Fourier-space ablations. Identify that the network learns to compute addition via discrete Fourier transforms — encoding inputs as a sum of sines/cosines at a small set of "key frequencies", combining them via trigonometric identities, then reading off the answer. Track per-frequency contributions over training.
 
-**Conclusion:** All orderings share the same latent training phases; curricula primarily change within-phase data exposure. For smaller models (14M-160M), curricula reduce gradient noise and prevent late-stage spectral collapse of the output head, improving accuracy. At 410M+, differences diminish, suggesting curricula are most valuable when model capacity is constrained.
-
-> <details>
-> <summary><b>Dongwei comment — HMM methodology, softmax bottleneck, and scale dependence</b></summary>
->
-> **How the HMM analysis actually works.** The paper doesn't just track loss or accuracy over time — it extracts structural metrics from model checkpoints: "layer-function summaries through trace and singular-value statistics" of the weight matrices. These capture how the model's internal representations are changing structurally, not just how well it predicts. Each metric trajectory is standardized so large-scale quantities don't dominate. Then they fit an HMM to convert these continuous trajectories into discrete states. The critical methodological choice: they don't fit separate HMMs per curriculum. They use BIC and AIC to find a single optimal state count (K=5) across all runs, then "hold the fitted state space fixed across orderings." This means any difference between curricula can only show up as different *time spent* in each of the 5 shared states, not as different states entirely. That's how they prove curricula don't create new learning phases — by construction, the 5-state model is the universal yardstick, and all curricula map onto it.
->
-> **Softmax bottleneck and why model size matters.** The bottleneck isn't about vocabulary size (the "exit door" is the same ~50K tokens for all models). It's about the effective rank of the hidden state — the "width of the hallway" leading to that exit. Small models have narrow hidden states that can't represent the high-rank distributions needed for complex language. When random, noisy text hits a small model late in training, its output head saturates (singular entropy spikes) because it can't push complex distributions through its narrow hidden representation. Large models have wide hidden states with high effective rank, so they process complex text without bottlenecking. That's why curriculum ordering (easy-to-hard) helps small models — it delays the point where complexity overwhelms the output head — but barely matters for large ones whose "highway" is wide enough to handle anything.
->
-> **Gradient Noise Scale.** Measures how noisy stochastic gradients are relative to their signal. Random ordering produces much higher gradient noise in small models (14M-70M), meaning the model gets contradictory, noisy corrections. Curricula calm this down by presenting coherent, progressively complex data. At larger scales, the model has enough capacity to average out the noise regardless of ordering.
->
-> </details>
-
----
-
-### [Beyond Random Sampling: Efficient Language Model Pretraining via Curriculum Learning](https://arxiv.org/abs/2506.11300) (Zhang, Mohamed, Abdine, Shang & Vazirgiannis, Ecole Polytechnique & MBZUAI, 2026)
-
-**Motivation:** LLMs train on randomly sampled data, ignoring the easy-to-hard progression that benefits human learning. Curriculum learning (CL) has improved efficiency in vision and NLP fine-tuning, but remains underexplored for LLM *pretraining* — partly because defining "difficulty" for raw text and designing scalable curricula is hard.
-
-**Experiment Setup:** Over 200 models trained, 0.5B parameter LLaMA 3.2 architecture (also 1B and 3B for scaling), on CulturaX English subset with up to 100B tokens. Select 6 difficulty metrics from 15 candidates via Spearman correlation analysis to ensure orthogonality: Compression Ratio (information density), Fertility (tokenization complexity), Flesch Reading Ease (readability), MTLD (lexical diversity), Number of Tokens (sequence length), and Perplexity (model-perceived difficulty). Test three curriculum strategies: (i) vanilla CL — strict easy-to-hard ordering on a fixed 10B-token dataset; (ii) pacing-based sampling — linear, quadratic, or inverse quadratic pacing functions controlling difficulty group exposure over time from a large pool; (iii) interleaved curricula — mix difficulty levels within each training segment while maintaining progressive structure. Three training scenarios: S1 (limited fixed data, 10B), S2 (unlimited data with pacing, 10B), S3 (continual training — CL warmup then random sampling). Evaluate 0-shot on 8 benchmarks: PIQA, COPA, OpenBookQA (commonsense), HellaSwag, WinoGrande, xwinograd_en (language understanding), BoolQ (reading comprehension), ArcChallenge (world knowledge).
-
-**Conclusion:** CL consistently accelerates convergence, reducing training steps by 18-45% to reach baseline performance. Best difficulty metrics: Compression Ratio, MTLD, and Flesch Reading Ease — all linked to linguistic diversity and information density. Perplexity is *less* effective: high-perplexity samples tend to be noisy, causing instability in later training. For pacing, linear works best for linguistic metrics (Compression Ratio reaches baseline in 39.5% fewer steps); quadratic best for Flesch Reading Ease (+1.6% above baseline at end) and Number of Tokens. Interleaving only consistently helps for Compression Ratio and Number of Tokens. Most practical finding: **CL as warmup** — train with curriculum ordering first, then continue with random sampling — yields sustained improvements up to +3.5% that persist even when the random baseline trains on 2x the data. This warmup benefit holds across 0.5B, 1B, and 3B model sizes and scales to 100B tokens (+3.1%). The early convergence is partly data filtering (easy = higher quality first) but ordering provides additional benefit beyond filtering alone (Appendix E: shuffling the same early-stage subset beats random baseline but still loses to the ordered version). Computational overhead is negligible (~$1-2 to compute metrics for 10B tokens vs ~84 GPU-hours of A100 for training). Limitations: only decoder-only LLaMA 3.2, only English, static difficulty scores (no adaptive/dynamic curricula), only pretraining (no fine-tuning evaluation), perplexity conflates difficulty with noise.
-
----
-
-### [General Intelligence Requires Reward-based Pretraining](https://arxiv.org/abs/2502.19402) (Han, Pari, Gershman & Agrawal, 2025)
-
-**Motivation:** LLM reasoning is fragile and overfits to training data patterns rather than learning generalizable algorithms. Drawing an analogy to AlphaGo vs AlphaZero: supervised pretraining on demonstrations constrains subsequent RL to local minima, while RL from scratch discovers superior strategies.
-
-**Experiment Setup:** Evaluate state-of-the-art LLMs (Llama 3.1 8B/70B, Qwen2.5 Coder 7B/32B, GPT-4o, o1) on algorithmic tasks in Brainf**k and Befunge programming languages to isolate reasoning from memorization. Compare RPT (reward-based pretraining) vs SPT-then-RFT in simplified 9x9 Go.
-
-**Conclusion:** All models perform poorly on esoteric language tasks (~12% Brainf**k, ~29% Befunge), with o1 the notable outlier due to RL post-training. In Go, pure RPT achieves 100% win rate against SPT-then-RFT, confirming supervised pretraining constrains RL's exploration. The authors argue transitioning from supervised to reward-based pretraining is critical for robust, generalizable reasoning.
-
+**Conclusion:** Grokking is NOT abrupt at the mechanism level. Three continuous phases of training: (1) memorization, (2) circuit formation — the Fourier components are gradually strengthened while memorization persists, (3) cleanup — memorization components are removed, leaving only the generalizing circuit. The "sudden" generalization in standard metrics is the moment cleanup completes; the structured circuit had been forming gradually. The paper proposes per-frequency excluded loss and restricted loss as continuous progress measures that track grokking ahead of the test-accuracy jump. Demonstrates a concrete case where mech-interp converts a seemingly emergent phenomenon into a measurable continuous trajectory.
 </details>
 
 <details>
@@ -561,28 +349,4 @@
 **Experiment Setup:** Five synthetic pretrain tasks targeting distinct capabilities: Depo (reasoning depth via k-hop permutation traversal, K up to 16), Brevo (reasoning breadth via DAG traversal), Capo (knowledge capacity via N=50K-2M synthetic biographies), Mano (knowledge manipulation via modular arithmetic, length up to 16), and Lano (hierarchical structure via CFG parsing). Compare Llama(RoPE), Llama(NoPE), GLA, Mamba2, and GDN at GPT2-small scale, validated at 1.3B/100B tokens.
 
 **Conclusion:** Canon layers -- lightweight 1-d convolutions of kernel size 4 adding horizontal token-to-token information flow -- improve Transformer reasoning depth by 200-400%, breadth by 30%, revive NoPE to match RoPE, and lift GLA to rival Mamba2/GDN. Transformers with Canon maintain 2-4x greater reasoning depth than linear models and ~40% higher knowledge capacity. Findings confirmed at 1.3B real-world pretraining scale.
-
-</details>
-
-<details>
-<summary><h2>Mechanistic Interpretability</h2></summary>
-
-### [Tracr: Compiled Transformers as a Laboratory for Interpretability](https://arxiv.org/abs/2301.05062) (Lindner, Kramár, Farquhar, Rahtz, McGrath & Mikulik, NeurIPS 2023 Spotlight)
-
-**Motivation:** Mechanistic interpretability methods are typically evaluated on transformers whose learned computation is itself opaque — so when a method finds (or fails to find) a circuit, you can't tell whether the method is right or wrong. The authors want a transformer where the ground-truth computation is known by construction, so interpretability methods can be calibrated.
-
-**Experiment Setup:** Build **Tracr**, a compiler that takes a program written in a RASP-like DSL and emits a standard decoder-only transformer (weights + architecture) that provably executes that program. Implement and compile several test programs: token frequency computation, sorting, parenthesis validation. Use the resulting compiled transformers to study superposition in multi-step algorithms — since the "correct" representation is known, you can measure how much the compiled model packs distinct features into shared dimensions.
-
-**Conclusion:** Tracr produces transformers whose internal computation is fully specified, providing ground truth for evaluating any circuit-discovery or attribution method. The superposition study demonstrates the framework's utility: you can measure how interpretable a method is by checking whether it recovers the structure the compiler put there. Open-source code released. Limitation: compiled transformers are small (toy-scale) and execute hand-written programs, not learned ones — so the framework is methodological rather than directly applicable to interpreting frontier models.
-
----
-
-### [Progress measures for grokking via mechanistic interpretability](https://arxiv.org/abs/2301.05217) (Nanda, Chan, Lieberum, Smith & Steinhardt, ICLR 2023)
-
-**Motivation:** Grokking — the phenomenon where a small transformer trained on a synthetic task (here modular addition) suddenly transitions from memorization to perfect generalization long after training loss reaches zero — looks like an abrupt phase change in behavior. The authors ask whether the underlying mechanism is actually continuous and whether mech-interp can expose a smooth progress measure that predicts when grokking will occur.
-
-**Experiment Setup:** Train 1-layer transformers on modular addition (a + b mod p). Reverse-engineer the learned circuit via weight inspection, activation patching, and Fourier-space ablations. Identify that the network learns to compute addition via discrete Fourier transforms — encoding inputs as a sum of sines/cosines at a small set of "key frequencies", combining them via trigonometric identities, then reading off the answer. Track per-frequency contributions over training.
-
-**Conclusion:** Grokking is NOT abrupt at the mechanism level. Three continuous phases of training: (1) memorization, (2) circuit formation — the Fourier components are gradually strengthened while memorization persists, (3) cleanup — memorization components are removed, leaving only the generalizing circuit. The "sudden" generalization in standard metrics is the moment cleanup completes; the structured circuit had been forming gradually. The paper proposes per-frequency excluded loss and restricted loss as continuous progress measures that track grokking ahead of the test-accuracy jump. Demonstrates a concrete case where mech-interp converts a seemingly emergent phenomenon into a measurable continuous trajectory.
-
 </details>
