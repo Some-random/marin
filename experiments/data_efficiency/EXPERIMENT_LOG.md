@@ -55,7 +55,7 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
-## June 12: A5-SP + C5-v4 launched, paloma re-runs (lm-eval), dclm_200m_val → bpb, Mean Math (perturbation-robust)
+## June 12: A5-SP completes — code-circuit elicitation hypothesis CONFIRMED; +StoryCloze/CB/QUAC; C5-v5 launched; papers restructured
 
 ### A5-SP + C5-v4 training launched (4 nodes each, parallel)
 
@@ -136,13 +136,98 @@ Only ™ (mmlu_pro 5-shot context > 2048 limit on phi) and ª (4B compute caveat
 
 §3 now has 6 Mean rows. The new row aggregates `gsm_symbolic_main[8]` + `gsm_noop[8]`. Highlights phi-1.5 = 0.097 vs our 1.4B models all in 0.003-0.011 range (matches the published "smaller models drop more aggressively under perturbation").
 
+### Aryabumi-NL extras (StoryCloze + CB + QUAC) added across all 18 models
+
+User noticed our existing §3 covered 8 of Aryabumi's 11 NL Reasoning tasks. Built the missing three:
+
+- **StoryCloze**: had local YAML + cached data from June 5-7 runs on A5/B4/C5_final/A5-step14672. Ran `run_aryabumi_nl_extras.sh storycloze_2018_local + cb` on 16 internal models across 6 dy nodes in parallel (~10 min). Then ran on phi-1 + phi-1.5 separately (~3 min).
+- **SuperGLUE-CB**: bundled into the same runner. Tiny dataset (250 train, 56 dev) but informative.
+- **QUAC**: built custom `quac_first_turn.yaml` + `quac_utils.py` (first-turn-only adaptation: 1000 single-shot QA examples per dialogue's Q0, F1+EM via SQuAD metrics). Dispatched on dy-1 + dy-8 (9 models each, ~18 min total).
+
+All 3 rows added to §3 under "Closed-book NL" category. Mean Closed-book NL re-aggregated to include them. §1 dataset descriptions written for all three with examples.
+
+**Aryabumi-NL Reasoning Mean (10/11 then 11/11 tasks)**:
+
+| | 8 tasks | + StoryCloze + CB | + QUAC = 11 tasks |
+|---|---|---|---|
+| A5 | 0.617 | 0.592 | 0.554 |
+| B4 | 0.602 | 0.568 | 0.533 |
+| C5-v4 | 0.571 | 0.562 | 0.528 |
+| A5 − C5-v4 | -0.046 | -0.030 | -0.027 |
+
+Gap closes monotonically as we add more tasks because C5-v4 wins on CB (+9 pp), QUAC (+0.9 pp), and BoolQ (+4.4 pp). The classic web-style tasks (HellaSwag, ARC) where C5-v4 loses biggest are diluted in the larger task average.
+
+### C5-v5 launched — continuous cosine + SP-NL on dy-2..5 (14:00 PDT)
+
+Wrote `run_1_4b_c5v5.py`: C5-v2 recipe (single continuous cosine across both stages) but with SlimPajama-NL replacing DCLM in the 90% text slot. Tests whether combining "good data" (SP-NL, established by C5-v4) with "smooth LR" (no fresh-cosine-per-phase reset, established by C5-v2's code retention) beats either alone.
+
+First launch on dy-1..4 hung at NCCL rendezvous ("leader has not marked the rendezvous as completed"). Killed and re-launched on dy-2..5 with a different coordinator port (33336 instead of 33335). Likely cause: dy-1 + dy-2 had residual EFA state from the immediately-prior phi-1 / phi-1.5 lm-eval runs that confused JAX's clique init. Second launch worked: 121 s compile, then steady-state 2.8 s/step. ~24h ETA.
+
+Phase 1 (steps 0-14,671): 100% clean code+markup, same caches as C5-v2/C5-v3/C5-v4 (Stack-Edu Python + Nemotron CC + Nemotron UA + Stack-Edu Markdown).
+Phase 2 (steps 14,672-29,343): 90% SP-NL (228 shards) + 10% (80% code + 20% markup).
+LR schedule: SINGLE continuous cosine 3e-4 → 0 across 29,344 steps, warmup 1%.
+
+### A5-SP COMPLETE — interaction hypothesis CONFIRMED
+
+A5-SP step-29,343 saved at 19:56 PDT. Fanned out all 5 eval suites in parallel on freed st-1..4 + dy-1:
+
+- st-1: convert + v2-suite (~45 min)
+- st-2: paloma_macro (lm-eval)
+- st-3: gsm_symbolic + gsm_noop
+- st-4: storycloze + cb (aryabumi-extras)
+- dy-1: quac_first_turn
+
+dclm_200m_val from training log: 3.219 nats per Llama-token → 1.054 bpb. All cells filled via `eval_section3.py` programmatic helpers + `fill-cell`. A5-SP added as §3 column 17 (between C5-v4 final and 4B final) with `⚛⚛` footnote marker.
+
+**The headline interaction test** (A5-SP vs A5 = pure data effect; C5-v4 vs C5-v3 = data effect when code-init present):
+
+| Mean | A5 | A5-SP | Δa | C5-v3 | C5-v4 | Δc | **Δc - Δa** |
+|---|---|---|---|---|---|---|---|
+| Open-book | 0.636 | 0.581 | **-0.055** | 0.529 | 0.595 | **+0.066** | **+0.121** |
+| Closed-book NL | 0.435 | 0.396 | -0.039 | 0.388 | 0.388 | +0.000 | +0.039 |
+| Aggregate | 0.183 | 0.182 | -0.001 | 0.168 | 0.201 | +0.033 | +0.034 |
+| Math (standard) | 0.011 | 0.010 | -0.001 | 0.002 | 0.016 | +0.014 | +0.015 |
+| Math (perturb-robust) | 0.004 | 0.005 | +0.001 | 0.002 | 0.009 | +0.007 | +0.006 |
+| Code | 0.003 | 0.000 | -0.003 | 0.107 | 0.149 | +0.042 | +0.045 |
+| paloma_macro (bpb) | 1.077 | 1.142 | +0.065 | 1.315 | 1.093 | -0.222 | **-0.287** |
+| dclm_200m_val (bpb) | 0.923 | 1.054 | +0.131 | 1.110 | 1.019 | -0.091 | -0.222 |
+
+**A5-SP got WORSE than A5 on most metrics** (Open-book -5.5 pp, paloma +0.065, dclm +0.131). **C5-v4 got BETTER than C5-v3 on the same metrics.** Strong positive interaction across the board, with **+12.1 pp on Open-book** being the headline.
+
+C5-v4 also beats A5-SP on the Aryabumi NL Reasoning Mean (0.528 vs 0.516 = +1.2 pp): under Aryabumi's own protocol, code-init + SP-NL > no-code + SP-NL.
+
+### Why does A5-SP underperform A5? Quality-vs-diversity hypothesis
+
+User asked the right diagnostic question: does A5-SP use the same amount of unique tokens as A5? Verified yes — both saw 30.77 B unique tokens at 1ep (A5: 88% of 34.85 B DCLM pool; A5-SP: 47% of 64.77 B SP-NL pool; same train batch, same steps, same compute). So this isn't a training bug.
+
+Working hypothesis after reading DCLM (2406.11794) + SlimPajama-DC (2309.10818) papers:
+
+- **DCLM-baseline** = aggressively ML-quality-filtered Common Crawl (learned bigram classifier trained to keep ELI5/Reddit-best-of / instructional content; ~10% keep rate). High-quality web text concentrated in the style of the eval benchmarks (HellaSwag, LAMBADA, ARC).
+- **SlimPajama-NL** = deduped multi-source mix (CC + C4 + Books + ArXiv + Wikipedia). Dedup is the heavy lift; quality filtering on CC/C4 is light. More diverse but with lower-average-quality web tokens than DCLM.
+
+For from-scratch 1-pass training, **filter quality > source diversity** on web-style benchmarks. DCLM is closer-to-eval-distribution. A5 wins because its web text is denser in HellaSwag-like content.
+
+For a code-pretrained foundation (C5-v3 phase 1), the model already has procedural-reasoning circuits. What it then needs is text where those circuits *apply*. SP-NL's ArXiv (math/physics LaTeX, formal derivations) and Books (analytical writing) trigger this elicitation; DCLM-CC is high-quality web but doesn't have enough reasoning structure to fire those circuits.
+
+User refined the framing: A5-SP did see ArXiv content (~4% byte-share, ~1.2 B tokens), so "ArXiv → reasoning circuits" can't be right — A5-SP didn't get those circuits. Updated mechanism: **installation** of reasoning circuits requires concentrated symbolic exposure (only the code phase 1 has enough density at our scale); **elicitation** requires NL with reasoning structure (SP-NL's ArXiv/Books). Either alone is insufficient.
+
+### Reordered & expanded `papers/reasoning_curriculum.md`
+
+Per user request:
+- Renamed "Synthetic Data & Tasks" → "Training (Synthetic) Data and Tasks"
+- Prepended new entries for **DCLM** (Li, Fang, Smyrnis, Ivgi et al. 2024-2025; 240T-token CC benchmark + DCLM-BASELINE filtering recipe) and **SlimPajama-DC** (Shen, Tao, Ma et al. 2024; global-vs-local dedup analysis + diversity-matters-after-dedup result).
+- Merged "Curriculum & Data Selection" + "Mechanistic Interpretability" → "Analysis of Training Mechanism, Scaling Laws, and Mech Interp".
+- Moved "Physics of Language Models" to the LAST section (deepest theory, reads best at end).
+
 ### Commits today
 
-`32302b27c` (A5-SP + C5-v4 + EN-Wiki filter + jsonl splitter) → `f3587812c` (add C5-v4 §3 column) → `ca0fa8778` (paloma unify lm-eval + footnote consolidation) → `f6d3a3ddc` (dclm_200m_val nats→bpb + phi cells) → `158253c5a` (Mean Math perturbation-robust row).
+Morning: `32302b27c` `f3587812c` `ca0fa8778` `f6d3a3ddc` `158253c5a` (training launch + C5-v4 evals + paloma unify + dclm→bpb + Mean Math perturb).
+
+Afternoon/evening: `3157ffb97` (StoryCloze + CB on 16 models + Aryabumi-NL mean reset) → `d83d9dbca` (QUAC + C5-v5 config) → `203dbf901` (§1 descriptions for storycloze/cb/quac) → `e2253b0fc` (cleanup C5-v4 category-header — cells + skill aux-runners list) → `3a0245067` (A5-SP §3 column + interaction test) → `71e494c33` (papers .md restructure + DCLM/SlimPajama-DC entries) → `88820299b` (EXPERIMENT_LOG backfill June 8-12) — plus this very entry.
 
 ### Open
 
-A5-SP still training, ETA ~20:00 PDT June 12. Will tell us: is the SP-NL data lift just a main effect (A5-SP beats A5 by ≈ same amount C5-v4 beats C5-v3) or is there a code-LM × text-quality interaction (C5-v4 gains > A5-SP gains).
+A5-SP and C5-v4 + interaction test resolves the data-axis × code-init question (interaction confirmed). C5-v5 (continuous cosine + SP-NL, 4-node, ETA ~16:00 PDT June 13) tests whether the C5-v3-style separate-cosine recipe was the wrong choice — if C5-v5 beats C5-v4, the answer is yes. Predicted next experiment if elicitation holds: even denser reasoning content for phase 2 (pure ArXiv, or phi-1.5-style textbook-only NL) should beat C5-v4 further.
 
 ---
 
