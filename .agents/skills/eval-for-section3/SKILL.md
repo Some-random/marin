@@ -85,11 +85,36 @@ disown
 - `run_aryabumi_nl_extras.sh <LABEL> <HF_DIR>` — storycloze_2018_local + cb (super_glue/CB).
 - `run_quac_for_model.sh <LABEL> <HF_DIR>` — quac_first_turn (F1, 1000 single-shot QA).
 
+**ALWAYS use the absolute path to the script when ssh-invoking on a remote node.** SSH starts you in `$HOME` on the remote, not in the marin checkout — `bash experiments/data_efficiency/run_xxx.sh` will fail with `No such file or directory` because it looks for `$HOME/experiments/...`. The script itself does `cd /fsx/users/dongweij/marin` internally on line 7, but bash never finds the script in the first place. Canonical copy-paste snippet for ALL aux runners:
+
+```bash
+LABEL=<LABEL>
+HF=/fsx/users/dongweij/marin/checkpoints/${LABEL}_hf
+TS=$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M%S)
+MARIN=/fsx/users/dongweij/marin
+
+# paloma (set BATCH_SIZE=4 inline before "bash" for 4B+ models)
+nohup ssh <NODE_A> "bash $MARIN/experiments/data_efficiency/run_paloma_for_model.sh $LABEL $HF" \
+  > $MARIN/logs/paloma_${LABEL}_${TS}.log 2>&1 < /dev/null & disown
+
+# gsm
+nohup ssh <NODE_B> "bash $MARIN/experiments/data_efficiency/run_gsm_for_model.sh $LABEL $HF" \
+  > $MARIN/logs/gsm_${LABEL}_${TS}.log 2>&1 < /dev/null & disown
+
+# aryabumi-nl-extras (storycloze + cb)
+nohup ssh <NODE_C> "bash $MARIN/experiments/data_efficiency/run_aryabumi_nl_extras.sh $LABEL $HF" \
+  > $MARIN/logs/aryabumi_nl_extras_${LABEL}_${TS}.log 2>&1 < /dev/null & disown
+
+# quac (single task)
+nohup ssh <NODE_D> "bash $MARIN/experiments/data_efficiency/run_quac_for_model.sh $LABEL $HF" \
+  > $MARIN/logs/quac_${LABEL}_${TS}.log 2>&1 < /dev/null & disown
+```
+
 For dclm_200m_val (bpb): if you have a fresh-trained model with a Levanter wandb log, grep `eval/dclm_200m_val/loss` and convert via `bpb = nats × 0.3273` (4.408 bytes/Llama-token on dclm). For external models (no in-training eval), use the custom `dclm_200m_val.yaml` lm-eval task on the same 5000-doc dclm slice.
 
 For phi-1/phi-1.5 specifically: also run `run_aryabumi_nl_extras.sh` and `run_quac_for_model.sh` using `microsoft/phi-1` and `microsoft/phi-1_5` as the HF_DIR (no local checkpoint dir needed).
 
-The `add-model` subcommand orchestrates v2-suite + paloma + gsm. The aryabumi-nl-extras and QUAC runners are not yet integrated into `add-model` — call them manually after add-model completes. TODO: extend `add-model` to fan these out too.
+The `add-model` subcommand orchestrates v2-suite + paloma + gsm. The aryabumi-nl-extras and QUAC runners are not yet integrated into `add-model` — call them manually after add-model completes (use the canonical snippet above with absolute paths). TODO: extend `add-model` to fan these out too.
 
 ### Step 3: Arm a Monitor
 
