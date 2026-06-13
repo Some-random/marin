@@ -76,6 +76,21 @@ disown
 
 `convert_and_eval_v2.sh` handles both the Levanter→HF conversion (skip if HF dir already exists) and the FULL `run_eval_v2.sh` invocation on the eval node. The first line of its output must be `=== convert + v2 eval ===` — if it says `=== Intermediate eval ===`, the wrong script is being called.
 
+### Step 2b: ALSO run the auxiliary task runners (NOT in run_eval_v2.sh)
+
+`run_eval_v2.sh` does not cover the full §3 row set. After the v2 suite, ALSO dispatch these on the same (or another) node:
+
+- `run_paloma_for_model.sh <LABEL> <HF_DIR>` — paloma_macro (16 subsets via lm-eval). For 4B+ models, set `BATCH_SIZE=4`.
+- `run_gsm_for_model.sh <LABEL> <HF_DIR>` — gsm_symbolic_main + gsm_noop.
+- `run_aryabumi_nl_extras.sh <LABEL> <HF_DIR>` — storycloze_2018_local + cb (super_glue/CB).
+- `run_quac_for_model.sh <LABEL> <HF_DIR>` — quac_first_turn (F1, 1000 single-shot QA).
+
+For dclm_200m_val (bpb): if you have a fresh-trained model with a Levanter wandb log, grep `eval/dclm_200m_val/loss` and convert via `bpb = nats × 0.3273` (4.408 bytes/Llama-token on dclm). For external models (no in-training eval), use the custom `dclm_200m_val.yaml` lm-eval task on the same 5000-doc dclm slice.
+
+For phi-1/phi-1.5 specifically: also run `run_aryabumi_nl_extras.sh` and `run_quac_for_model.sh` using `microsoft/phi-1` and `microsoft/phi-1_5` as the HF_DIR (no local checkpoint dir needed).
+
+The `add-model` subcommand orchestrates v2-suite + paloma + gsm. The aryabumi-nl-extras and QUAC runners are not yet integrated into `add-model` — call them manually after add-model completes. TODO: extend `add-model` to fan these out too.
+
 ### Step 3: Arm a Monitor
 
 ```python

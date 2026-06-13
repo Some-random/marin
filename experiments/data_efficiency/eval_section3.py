@@ -684,7 +684,13 @@ def add_column_to_section3(lines, col_label_md: str, before_substr: str) -> int:
         if ln.startswith("|---|") or set(c.strip() for c in row_cells if c.strip()).issubset({"---"}):
             row_cells.insert(insert_at, "---")
         else:
-            row_cells.insert(insert_at, " — ")
+            row_label = parse_row_label(row_cells)
+            # Category-header rows (e.g. **Open-book**, **Math (standard)**) have empty cells
+            # in every column — match that. Task rows get a real placeholder for later filling.
+            if row_label and is_category_header_label(row_label):
+                row_cells.insert(insert_at, " ")
+            else:
+                row_cells.insert(insert_at, " — ")
         lines[i] = "|".join(row_cells)
 
     return insert_at
