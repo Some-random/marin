@@ -102,6 +102,28 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > - **span1_text**: "anyone"  • **span2_text**: "him"
 > - **label**: 0 (the pronoun "him" does NOT refer to "anyone")
 
+**storycloze_2018_local** — Story Cloze Test (Mostafazadeh et al 2016, 2018 split). 2-way MC: given the first 4 sentences of a 5-sentence story, pick the more plausible ending. Tests narrative coherence and commonsense expectations. We use a local custom YAML (`storycloze_2018_local.yaml`) because the canonical lm-eval `storycloze_2018` task requires manual dataset acceptance terms.
+
+> - **input_sentence_1**: "Karen was assigned a roommate her first year of college."
+> - **input_sentence_2**: "Her roommate asked her to go to a nearby city for a concert."
+> - **input_sentence_3**: "Karen agreed happily."
+> - **input_sentence_4**: "The show was absolutely exhilarating."
+> - **ending_1**: "Karen became good friends with her roommate."
+> - **ending_2**: "Karen hated her roommate."
+> - **answer_right_ending**: 1
+
+**cb** — CommitmentBank (super_glue config `cb`). 3-way NLI: given a premise (typically a complex sentence with an embedded clause) and a hypothesis (the embedded clause taken at face value), classify entailment / contradiction / neutral. The premise often contains a presupposition trigger that may or may not project; the task tests whether the model can identify when an embedded proposition is being asserted vs hedged. Small dataset (250 train, 56 dev).
+
+> - **premise**: "He thought that one prick was enough. Now he wasn't so sure."
+> - **hypothesis**: "One prick was enough."
+> - **label**: 2 (neutral)
+
+**quac_first_turn** — Question Answering in Context (Choi et al 2018, `allenai/quac`), first-turn-only adaptation: 1000 single-shot examples (Q0 of each dialogue). Format: background + section title + context passage, then "Q: ... A:". Model generates a free-form span. Scored by token-level F1 (and EM) against ≤ 4 annotators' gold answers via transformers' `squad_metrics`. We report F1 as the canonical "Acc."-equivalent (Aryabumi et al 2024 list QUAC under their NL Reasoning suite with Acc.; F1 is the standard QUAC metric). Custom YAML at `quac_first_turn.yaml` + utility functions at `quac_utils.py`.
+
+> - **context** (first 200 chars): "In May 1983, she married Nikos Karvelas, a composer, with whom she collaborated in 1975 and in November she gave birth to her daughter Sofia. After their marriage, she started a close collaboration wi…"
+> - **question** (Q0): "what happened in 1983?"
+> - **gold answers**: ["In May 1983, she married Nikos Karvelas,", "In May 1983, she married Nikos Karvelas, a composer,"]
+
 **lambada_openai** — last-word prediction from a narrative passage. The model sees the full passage minus its final word and is scored by whether the most-likely next token matches the gold word. Tests long-range narrative coherence and discourse continuation, not QA.
 
 > Passage end (final word elided):
