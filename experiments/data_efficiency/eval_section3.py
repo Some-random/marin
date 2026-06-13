@@ -87,6 +87,7 @@ TASKS: list[TaskRow] = [
     TaskRow("wsc[0]", "wsc", ("acc,none",)),
     TaskRow("storycloze_2018_local[0]", "storycloze_2018_local", ("acc,none",)),
     TaskRow("cb[0]", "cb", ("acc,none",)),
+    TaskRow("quac_first_turn[0]", "quac_first_turn", ("f1,none",)),
     TaskRow("agieval_lsat_ar[0]", "agieval_lsat_ar", ("acc,none",)),
     TaskRow("gpqa_diamond[0]", "gpqa_diamond_zeroshot", ("acc,none",)),
     TaskRow("bbh[3] (limit=0.1)", "bbh", (
@@ -130,7 +131,7 @@ MEAN_ROWS = [
      "Closed-book NL",
      ["arc_easy[25]", "arc_challenge[25]", "hellaswag[10]", "winogrande[5]", "mmlu[5]",
       "commonsense_qa[0]", "social_iqa[0]", "logiqa[0]", "lambada_openai[0]", "copa[0]", "wsc[0]",
-      "storycloze_2018_local[0]", "cb[0]"]),
+      "storycloze_2018_local[0]", "cb[0]", "quac_first_turn[0]"]),
     ("Mean Aggregate",
      "Aggregate",
      ["agieval_lsat_ar[0]", "gpqa_diamond[0]", "bbh[3] (limit=0.1)", "mmlu_pro[5] (limit=0.1)"]),
