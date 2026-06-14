@@ -350,3 +350,106 @@
 
 **Conclusion:** Canon layers -- lightweight 1-d convolutions of kernel size 4 adding horizontal token-to-token information flow -- improve Transformer reasoning depth by 200-400%, breadth by 30%, revive NoPE to match RoPE, and lift GLA to rival Mamba2/GDN. Transformers with Canon maintain 2-4x greater reasoning depth than linear models and ~40% higher knowledge capacity. Findings confirmed at 1.3B real-world pretraining scale.
 </details>
+
+<details>
+<summary><h2>Continual Learning / Continued Pretraining</h2></summary>
+
+### [Don't Stop Pretraining: Adapt Language Models to Domains and Tasks](https://arxiv.org/abs/2004.10964) (Gururangan, Marasović, Swayamdipta, Lo, Beltagy, Downey, Smith, ACL 2020)
+
+**Motivation:** General pretrained LMs like RoBERTa may not be optimal for specialized domains. The authors ask whether continued pretraining on domain- or task-specific text improves downstream task performance, even after large-scale general pretraining.
+
+**Experiment Setup:** Take RoBERTa-base and run a second phase of MLM pretraining under two regimes — Domain-Adaptive Pretraining (DAPT) on large in-domain corpora and Task-Adaptive Pretraining (TAPT) on the unlabeled portion of the task corpus. Tested across four domains (biomedical, computer-science publications, news, reviews) and eight classification tasks; both DAPT-then-finetune and TAPT-then-finetune pipelines are evaluated.
+
+**Conclusion:** DAPT yields consistent gains in both high- and low-resource settings across all four domains; TAPT provides additional improvements on top of DAPT. Curated data-selection methods that augment small task corpora are effective when domain-scale data is unavailable. Establishes that "second-phase" pretraining on relevant data is a generally useful complement to broad pretraining.
+
+---
+
+### [Continual Pre-Training of Large Language Models: How to (re)warm your model?](https://arxiv.org/abs/2308.04014) (Gupta, Thérien, Ibrahim, Richter, Anthony, Belilovsky, Rish, Lesort, 2023)
+
+**Motivation:** When restarting training on a new dataset, the LR is typically reset and re-warmed before decay. The authors investigate whether and how this LR re-warming affects continual pretraining performance.
+
+**Experiment Setup:** Pythia 410M continually pretrained from a 300B-token Pile checkpoint onto 297B tokens of SlimPajama. They sweep over different maximum learning rates and warm-up lengths in a linear-warmup-then-cosine-decay schedule, measuring both upstream (Pile) and downstream (SlimPajama) loss across the transition.
+
+**Conclusion:** Re-warming the LR causes an initial spike in upstream and downstream loss, but ultimately produces stronger downstream performance than keeping the LR low. The bigger the LR rewarm, the larger the short-term upstream forgetting but the larger the long-term downstream gain — i.e., aggressive re-warming wins when downstream tokens are abundant. Continual pretraining beats training from scratch on the downstream data despite the same total token budget.
+
+---
+
+### [Simple and Scalable Strategies to Continually Pre-train Large Language Models](https://arxiv.org/abs/2403.08763) (Ibrahim, Thérien, Gupta, Richter, Anthony, Lesort, Belilovsky, Rish, 2024)
+
+**Motivation:** Building on Gupta et al.'s rewarming study, the authors ask whether a small set of cheap continual-pretraining tricks — LR rewarming, LR redecaying, and replaying a fraction of the original dataset — can match the loss and downstream performance of retraining from scratch on the union of old and new data, across realistic distribution shifts and at scale.
+
+**Experiment Setup:** Decoder-only LLMs at 405M and 10B parameters. Two distribution shifts: a weak shift (English → English, Pile → SlimPajama, two ~300B-token corpora) and a strong shift (English → German, ~200B German tokens after 300B English). Vary LR rewarming maximum, redecay length, and replay ratio (0–25 %); compare to full-retrain baselines. Also propose infinite-LR schedules that decouple decay length from total token count.
+
+**Conclusion:** LR rewarming + LR redecay + a small replay buffer (≈5–25 % of pretraining data depending on shift strength) matches the average-loss and downstream-evaluation performance of full retraining, at a fraction of the compute. The infinite-LR alternative to cosine works comparably to cosine and avoids needing to commit to a token budget upfront. Replay alone helps mitigate forgetting; LR rewarming alone improves new-distribution learning; combining them dominates.
+
+---
+
+### [Reuse, Don't Retrain: A Recipe for Continued Pretraining of Language Models](https://arxiv.org/abs/2407.07263) (Parmar, Satheesh, Patwary, Shoeybi, Catanzaro; NVIDIA, 2024)
+
+**Motivation:** Frontier-scale LLM pretraining is increasingly expensive, and most labs cannot afford to redo it for each new data release or domain shift. The authors set out to produce a practitioner-oriented "recipe" — data-distribution choices and LR schedules — that makes continued pretraining reliably better than naive baselines at large scale.
+
+**Experiment Setup:** 15B-parameter Nemotron-style model. Compare alternative continued-pretraining configurations along three axes: (1) data composition (mix of new domain data with retained general data), (2) LR schedule (warmup-rewarming and decay strategies), and (3) total continued-pretraining token budget. Report aggregate downstream accuracy across MMLU, code, math, and reasoning benchmarks.
+
+**Conclusion:** The recommended recipe (a calibrated rewarmed cosine schedule plus an ~10 % blend of high-quality general data into the continued-pretraining mix) yields a 9 % average-accuracy improvement over standard continued-pretraining baselines on the same compute. Documents concrete defaults — data blend, LR rewarm peak, decay length — that practitioners can lift directly.
+
+---
+
+### [Efficient Continual Pre-training by Mitigating the Stability Gap](https://arxiv.org/abs/2406.14833) (Guo, Fu, Zhang, Zhao, Shen, 2024)
+
+**Motivation:** Continually pretraining an LLM on a new domain often causes downstream performance to drop sharply at the start before recovering — a "stability gap" analogous to the loss-spike phenomenon during pretraining itself. The authors quantify this gap and ask whether small recipe changes can shrink it.
+
+**Experiment Setup:** OpenLLaMA-3B continually pretrained on medical-domain data. Compare three mitigations: (1) multi-epoch training on smaller properly-sized subsets vs. single-epoch on the full domain corpus, (2) restricting continued pretraining to the highest-quality subset of the domain, and (3) mixing the domain data with general data of similar distribution to the original pretraining. Measure performance on medical-domain tasks and on general capability throughout training.
+
+**Conclusion:** All three mitigations shrink the stability gap and accelerate domain-task improvement at fixed compute. Combining them, OpenLLaMA-3B reaches 40.7 % on medical tasks (up from 36.2 % baseline) using only 40 % of the compute, while preserving more general capability. The result reframes "continued-pretraining instability" as largely a function of data-subset size and quality, not just LR schedule.
+
+---
+
+### [LLaMA Pro: Progressive LLaMA with Block Expansion](https://arxiv.org/abs/2401.02415) (Wu, Gan, Ge, Lu, Wang, Feng, Shan, Luo; ACL 2024)
+
+**Motivation:** Replay and LR rewarming address forgetting probabilistically, but they still update existing parameters and can degrade general capability. The authors propose an architectural alternative: add new Transformer blocks for the new domain and freeze the original ones, so the base model's behavior is preserved by construction.
+
+**Experiment Setup:** Start from LLaMA2-7B, insert additional Transformer blocks at evenly spaced positions, and continue pretraining only those new blocks on a corpus of code and math (yielding LLaMA Pro-8.3B). Evaluate on a broad benchmark suite spanning programming, math, and general NLP, comparing against LLaMA2-7B and other code/math-specialized open models.
+
+**Conclusion:** LLaMA Pro-8.3B improves on programming and math benchmarks (e.g., HumanEval, MBPP, GSM8K) while maintaining or slightly improving general-NLP performance relative to LLaMA2-7B, in contrast to full continued pretraining which typically loses general capability. Block expansion is presented as a forgetting-free way to add a new domain to an existing LLM at the cost of extra parameters.
+
+---
+
+### [Revisiting Replay and Gradient Alignment for Continual Pre-Training of Large Language Models](https://arxiv.org/abs/2508.01908) (Abbes, Subbaraj, Riemer, Islah, Therien, Tabaru, Kingetsu, Chandar, Rish, 2025)
+
+**Motivation:** Replay is now the standard continual-pretraining workhorse, but classic continual-learning theory also points to gradient-alignment methods (e.g., MER) that have rarely been tested at LLM scale. The authors revisit both at large scale across languages to see which scales better.
+
+**Experiment Setup:** Llama-family architectures (multiple sizes) continually pretrained across language domains with 100B tokens per language. Compare experience replay at varying mixing ratios, gradient-alignment-based updates, and Meta-Experience Replay (MER, which combines both). Track both new-language acquisition and old-language retention as functions of model size and replay rate.
+
+**Conclusion:** Both replay and gradient alignment reduce forgetting and improve stability at LLM scale. Small replay rates (~1–5 %) deliver most of the benefit; pushing replay higher gives diminishing returns. Scaling the model is more compute-efficient than scaling replay — replay is best understood as a cheap stabilizer rather than a substitute for capacity. MER provides a marginal additional gain over plain replay.
+
+---
+
+### [To Code, or Not To Code? Exploring Impact of Code in Pre-training](https://arxiv.org/abs/2408.10914) (Aryabumi, Su, Ma, Morisot, Zhang, Locatelli, Fadaee, Üstün, Hooker; Cohere For AI, 2024)
+
+**Motivation:** Code data is now standard in LLM pretraining, but it is unclear how much code is optimal and at what stage of training it should appear. The authors systematically vary code proportion and code-vs-text staging to measure effects on NL reasoning, world knowledge, code generation, and generative quality.
+
+**Experiment Setup:** 470M and 2.8B decoder-only LMs. Sweep code-to-text ratios in single-phase pretraining; also test a two-stage code→text "cooldown" recipe (stage 1: 100 % code+markup; stage 2: ~90 % NL + ~10 % code+markup) with cosine LR decaying through both stages. Code data spans multi-language StarCoderData and markup; text data uses standard web/wiki/books. Evaluate on NL reasoning suites, world-knowledge tasks, HumanEval / MBPP, and LLM-as-judge win-rates.
+
+**Conclusion:** Including code in pretraining improves not only code benchmarks (+12× HumanEval) but also NL reasoning (+8.2 %), world knowledge (+4.2 %), and generative win-rate (+6.6 %) relative to text-only pretraining. The two-stage code→text schedule outperforms an equivalent uniform code/text mix at matched tokens, suggesting that *when* code appears matters, not just *how much*. Higher-quality code (Markdown, synthetic textbook-style) further amplifies the NL benefit. The C5 family of experiments in this repo follows this two-stage recipe.
+
+---
+
+### [Synthetic Continued Pretraining (EntiGraph)](https://arxiv.org/abs/2409.07431) (Yang, Singh, Belrose, Robert-Nicoud, Levy, Manning, Liang; Stanford, 2024)
+
+**Motivation:** When the target domain is small (a single textbook, a private codebase), single-pass continued pretraining is too sample-inefficient — facts may appear only once. Standard replay cannot fix this because there is nothing to replay from inside the small corpus.
+
+**Experiment Setup:** Take 265 QuALITY books (1.3M source tokens). Extract entities, build a relational knowledge graph, and use GPT-4-turbo to generate relation descriptions between entity pairs and triplets, producing a 455M-token synthetic corpus (~350× expansion). Llama-3-8B-Base is continually pretrained for two epochs on this synthetic corpus with RedPajama replay, then evaluated on QuALITY closed-book 5-shot CoT (4,609 MC questions). Compare to Raw CPT and Rephrase CPT baselines, and to a RAG baseline.
+
+**Conclusion:** EntiGraph CPT raises closed-book accuracy from 39.5 % → 56.2 % and scales log-linearly with synthetic-token count up to 455M. Raw CPT *hurts* downstream performance; Rephrase CPT scales poorly. EntiGraph reaches ~80 % of the gain from a RAG baseline (60.4 %), and the two are complementary (EntiGraph + RAG = 62.6 %). The relational-graph structure provides the diversity that simple paraphrase cannot. (Fuller notes in [`causal_bridge.md`](causal_bridge.md).)
+
+---
+
+### [Towards Lifelong Learning of Large Language Models: A Survey](https://arxiv.org/abs/2406.06391) (Zheng, Qiu, Shi, Ma, 2024)
+
+**Motivation:** Continual / lifelong learning for LLMs is now a broad area covering pretraining-time adaptation, finetuning-time adaptation, and retrieval-based augmentation; practitioners need a structured map of the design space.
+
+**Experiment Setup:** Survey of ~200 papers organized into a two-axis taxonomy: (i) *internal* knowledge updates (continual pretraining, continual finetuning, parameter-efficient adapters, block expansion) vs. *external* knowledge access (retrieval, tools), and (ii) twelve concrete lifelong-learning scenarios (e.g., new language, new modality, new task, instruction shift). Catalogs canonical methods and benchmarks for each cell of the taxonomy.
+
+**Conclusion:** The survey highlights replay, regularization (e.g., EWC variants), and architectural expansion (e.g., LLaMA Pro) as the three families dominating recent continual-pretraining work, and notes that the field is rapidly converging on small-replay + LR-rewarming as the default for "broad-shift" continual pretraining. Identifies open problems in cross-task transfer measurement and in evaluating retention without prohibitive eval cost.
+
+</details>
