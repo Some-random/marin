@@ -55,6 +55,139 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## June 14: C5-v6-NEW and C5-V7 complete + evaluate; REPLAY > NEW on Code at 30%; replay-axis scaling 10% → 30% → 50% monotone-better on Code only
+
+### Both training runs finished
+
+Launched late June 13 PM, finished early June 14 AM:
+- **C5-v6-NEW** (4 nodes dy-2,3,4,5, ~11h training): same 70/30 data mix as C5-v6 but phase 2 code+markup is genuinely NEW data — SE-Python from a fresh score-in-[2.8, 3.0) cache (`c5v6new_stack_edu_python_low`, 3.27 B tokens, 4.17 M docs), and Nemotron-CC + Nemotron-UA + Markdown reuse existing caches with explicit per-component sequence offsets (1.34 M, 36.7 K, 750 K) so phase 2 starts past phase 1's consumption point. Required the new Levanter `DatasetComponent.offset` field. Final ckpt: `1_4b_c5v6new_phase2/trjdoz82/step-14671`.
+- **C5-V7** (4 nodes st-1..4, ~11h training): same recipe as C5-v6 (strict-replay) but phase 2 code+markup share bumped 30% → 50%. Forms the replay-axis scaling series with C5-v3 (10%), C5-v6 (30%), C5-V7 (50%). Final ckpt: `1_4b_c5v7_phase2/u8yjtp2f/step-14671`.
+
+Both evals ran via `/eval-for-section3` on the freed nodes. All §3 cells filled; strict validate passes. Committed and pushed.
+
+### Big finding: REPLAY > NEW at 30% on Code (+0.043 pp)
+
+Direct comparison at matched (30%) code+markup share in phase 2:
+
+| Metric | C5-v6 (30% REPLAY) | C5-v6-NEW (30% NEW) | Δ (new − replay) |
+|---|---:|---:|---:|
+| Mean Open-book | 0.587 | 0.596 | +0.009 (new wins slightly) |
+| Mean Closed-book NL | 0.392 | 0.393 | ≈ 0 |
+| Mean Aggregate | 0.202 | 0.197 | −0.005 |
+| Mean Math (std) | 0.013 | 0.010 | −0.003 |
+| **Mean Code** | **0.208** | **0.165** | **−0.043 (replay wins big)** |
+| dclm_200m_val (bpb) | 0.955 | 0.954 | ≈ 0 |
+| paloma_macro (bpb) | 1.087 | 1.084 | ≈ 0 |
+
+**Interpretation:** C5-v6's improvement over C5-v3 on Code is from *re-activation* of already-learned code circuits (replay), NOT from seeing new diverse code data. Showing the model fresh score-2.8–3.0 Python during phase 2 actually *hurts* code performance vs replaying the score-3.0+ Python from phase 1. The most likely mechanism: in phase 2's mostly-NL training, the few code tokens act as a "wake-up" signal for the code subnetwork; refreshing the *same* memorized examples wakes it up more cleanly than diluting it with novel-but-lower-quality code.
+
+This retracts the original C5-v6 design intent ("30% new code in phase 2 to keep code circuits warm via diverse exposure"). The actual mechanism is closer to a continual-learning replay buffer.
+
+### Replay-axis scaling (10% → 30% → 50%): monotone-better on Code, plateaus / regresses on NL
+
+| Metric | C5-v3 (10% replay) | C5-v6 (30% replay) | C5-V7 (50% replay) |
+|---|---:|---:|---:|
+| Mean Open-book | 0.529 | 0.587 | 0.592 |
+| Mean Closed-book NL | 0.388 | 0.392 | 0.388 |
+| Mean Aggregate | 0.168 | 0.202 | 0.195 |
+| Mean Math (std) | 0.002 | 0.013 | 0.013 |
+| **Mean Code** | **0.107** | **0.208** | **0.240** |
+| dclm_200m_val (bpb) | 1.110 | 0.955 | 0.973 |
+| paloma_macro (bpb) | 1.315 | 1.087 | 1.099 |
+
+**Mean Code is monotone-increasing.** Mean NL (Closed-book) and Aggregate plateau or regress past 30%; ppl gets slightly worse at 50%. So the optimal replay fraction is *task-dependent* — for Code you want more replay, for NL the sweet spot is around 30%. Past 30% you start trading NL capability for additional Code at a poor exchange rate.
+
+### Levanter feature added: `DatasetComponent.offset`
+
+`lib/levanter/src/levanter/data/text/datasets.py:330`: added `offset: int = 0` field; `dataset_for_component` wraps the resulting `AsyncDataset` with `ds.slice_dataset(start_index=offset)` when `offset > 0` (reusing the existing `SlicedAsyncDataset` from `dataset.py:274`). Backward-compatible default (offset=0 changes nothing). Used by `run_1_4b_c5v6_phase2_new.py` to force the per-component skip past phase 1's consumption.
+
+### Infra notes
+
+- **wandb-core multi-node SIGSEGV is sporadic, NOT solved.** Earlier belief that "wandb-online + WANDB_DISABLED on non-leader nodes" fixed it was wrong — a grep of past log dirs shows the same panic occurred on most multi-node launches (C5-v3 phase 1, C5-v3 phase 2, 4B 8-node, C5-v5 attempt 1, C5-v6 phase 2 — typically 1-3 attempts before a clean launch). The actually-working strategy is retry-on-panic: kill the hung rendezvous, relaunch, repeat until compile sails through. NoopConfig is the reliable workaround if you care about getting started fast.
+- **SE-Python low cache had 36 None-text docs** from SWH fetch misses (0.0005% miss rate). Levanter's `_batch_tokenizer.py:71` does `d + " " + eos` and crashes on `None`. Filter at the jsonl-shard level before tokenization (parallel filter via `multiprocessing.Pool(24)` took ~70s for 6.9M docs).
+- **Validation cache symlink trick:** newly tokenized caches via `default_tokenize` only get `train/` written. Levanter at train time tries to load `validation/shard_ledger.json` even when `num_validation_sequences={...: 0}` for that component. Fix: `ln -s train validation` in the cache dir. (Existing c5v2 caches have a real `validation/` dir that wraps the train data; the symlink achieves the same.)
+- **Re-filter [2.7, 3.0) → [2.8, 3.0) per Dongwei's quality concern.** Initial fetch pulled 6.94 M docs at score ≥ 2.7 (3.66 M new tokens after token-rate scaling). Filtered down to [2.8, 3.0) = 4.17 M docs (3.27 B tokens), ~63% margin over phase 2's 2.0 B need.
+
+### Cleanup of EVALUATION.md naming
+
+Dongwei flagged that the ⚛-family footnote stack (C5-v4 ⚛, A5-SP ⚛⚛, C5-v5 ⚛⚛⚛) was noisy and the `_stepXXX` suffix was redundant for sole-checkpoint runs. Cleaned:
+- Dropped all ⚛ symbols (kept † / ◊ / ★ where the footnote text is meaningful).
+- Renamed `c5v5_step29343` → `C5-v5 final`, `c5v6_phase2_step14671` → `C5-v6 final` (kept `★`).
+- Step suffix only appears now when a run has multiple evaluated checkpoints (e.g., `C5-v3 phase 1` vs `C5-v3 final`).
+
+### Continual-learning paper notes added
+
+Added a new "Continual Learning / Continued Pretraining" section to `papers/reasoning_curriculum.md` covering 8 canonical / recent papers: Gururangan et al "Don't Stop Pretraining" (DAPT/TAPT, ACL 2020); Gupta et al "How to (Re)warm" 2023; Ibrahim et al "Simple and Scalable" 2024; Parmar et al "Reuse, Don't Retrain" (NVIDIA) 2024; Guo et al "Stability Gap" 2024; Wu et al "LLaMA Pro" (block expansion) 2024; Abbes et al "Revisiting Replay and Gradient Alignment" 2025; Zheng et al lifelong-learning survey 2024.
+
+---
+
+## June 13: C5-v6 (30% code+markup phase 2) completes and evaluates; replay-vs-new mechanism investigation; Levanter offset feature needed
+
+### C5-v6 phase 2 evaluation complete
+
+C5-v6 phase 2 (1.4B, separate-cosine init from `c5v3_phase1` step-14671, 14,672 steps × 15.39 B tokens, **70% DCLM + 30% (80% code + 20% markup)** vs C5-v3's 90/10) finished overnight and was evaluated this morning via `/eval-for-section3`. All §3 cells filled, strict validate passes, committed and pushed (`c5v6_phase2_step14671 ★` column in EVALUATION.md).
+
+**Headline numbers vs C5-v3 (10% code+markup replay in phase 2):**
+- Mean Open-book: +5.8 pp
+- Mean Code: +10.1 pp
+- paloma_macro (bpb): −0.228
+- dclm_200m_val (bpb): −0.155
+- Mean Closed-book: slight regression (~−1 pp)
+
+**Vs A5 (single-phase 30.77 B DCLM):**
+- Mean Code: +20.5 pp
+- Mean NL (closed-book + open-book): −4.5 pp net
+- paloma_macro (bpb): roughly comparable
+
+C5-v6 clearly preserves code performance better than C5-v3 while improving open-book NL, at a small closed-book cost.
+
+### Replay-vs-new code investigation (CRITICAL FINDING)
+
+While writing up the result, the user asked: "the 30% of replay is mostly from new code data, right? or is that 30% like from the data the model already seen in stage 1 of training?"
+
+Read `lib/levanter/src/levanter/data/mixture.py:221-232` to settle it. **C5-v6 phase 2 is doing strict prefix-subset REPLAY of phase 1's code+markup data, not new code.** Mechanism:
+
+- Phase 2 uses `data_seed=0` (same as phase 1), same component caches, fresh single-stage `MixtureDataset` with `weight_stages=[(0, weights)]`.
+- `initialize_from_checkpoint_path` loads model weights only — no data-loader state carry-over.
+- Per-component doc index at block T: `block_id * counts_per_block[component]`, where `counts_per_block` scales with the component's share in the current phase.
+  - Phase 1 (100% code+markup): SE-Python `counts_per_block ≈ 1760`. Total SE-Python range over 14672 blocks: `[0 .. 14672 × 1760]`.
+  - Phase 2 (30% code+markup): SE-Python `counts_per_block ≈ 532`. Total range: `[0 .. 14672 × 532]` — strict prefix.
+- Same applies to Nemotron-CC, Nemotron-UA, SE-Markdown.
+- → Every code+markup token phase 2 sees is a token phase 1 already saw, in the same shuffled order. C5-v6's +10.1 pp Mean Code / +5.8 pp Open-book gain over C5-v3 reflects the effect of *replay-style code-circuit reactivation*, NOT of seeing new code.
+
+This means the original C5-v6 design intent ("more code in phase 2 to keep code circuits warm via NEW code") is not what C5-v6 actually tested. We tested a different (and useful, but distinct) hypothesis: code-circuit re-activation via replay of seen code.
+
+Updated:
+- EVALUATION.md §2 row for `c5v6_phase2_step14671` clarified to say "STRICT REPLAY of phase 1's first ~30% of code+markup data, NOT new code".
+- New ★ footnote in EVALUATION.md explaining the Levanter sampler mechanism.
+- `run_1_4b_c5v6_phase2.py` header comment rewritten — removed the incorrect "mostly NEW code in phase 2 with a small overlap tail" claim and replaced with the strict-replay explanation.
+
+### C5-v6-NEW blocked by cache size
+
+Wanted to launch a contrast run (C5-v6-NEW = same 70/30 mix as C5-v6 but phase 2 reads NEW code, not replay). Computed required vs actual cache sizes at `mixture_block_size=2048`:
+
+| Component | Phase 1 consumed (seqs) | Phase 2 will consume (seqs) | Total needed | Cache has (seqs) |
+|---|---:|---:|---:|---:|
+| **SE-Python** | 1.62 M | 0.49 M | 2.11 M | **1.66 M** (~97% consumed in phase 1) |
+| **Nemotron-CC** | 1.34 M | 0.40 M | 1.74 M | **1.71 M** (~78% consumed) |
+| **Nemotron-UA** | 0.037 M | 0.011 M | 0.048 M | 0.05 M (tiny corpus, basically all consumed) |
+| **Stack-Edu-Markdown** | 0.75 M | 0.23 M | 0.98 M | 2.42 M (~31% consumed, plenty of headroom) |
+
+Phase 1 already consumed ~97% of SE-Python and ~78% of Nemotron-CC. With Levanter's RESTART strategy (`% length_of_dataset`), an offset-only fix would just wrap phase 2 back to the start — only ~9% of SE-Python and ~8% of Nemotron-CC in phase 2 would be genuinely new tokens.
+
+Path forward: tokenize additional code+markup shards (Stack-Edu Python clean remainder + more Nemotron Code-Concepts), then implement the Levanter offset feature, then launch C5-v6-NEW with offsets = phase 1 consumption per component.
+
+Levanter offset feature plan:
+- Add `offset: int = 0` to `DatasetComponent` in `lib/levanter/src/levanter/data/text/datasets.py`.
+- Implement `OffsetAsyncDataset(AsyncDataset[T])` wrapper that does `underlying.get_batch([(i + offset) % len(underlying) for i in indices])`.
+- In `dataset_for_component`, wrap the returned `AsyncDataset` when `offset > 0`.
+
+### C5-v5 status
+
+C5-v5 (4 nodes, multi-node) was at 22.8 kit / 29.3 kit at 10:33 PDT — expected completion ~15:42 PDT. Will eval via `/eval-for-section3` once it lands and fill the C5-v5 column in §3.
+
+---
+
 ## June 12: A5-SP completes — code-circuit elicitation hypothesis CONFIRMED; +StoryCloze/CB/QUAC; C5-v5 launched; papers restructured
 
 ### A5-SP + C5-v4 training launched (4 nodes each, parallel)
