@@ -424,26 +424,6 @@
 
 ---
 
-### [To Code, or Not To Code? Exploring Impact of Code in Pre-training](https://arxiv.org/abs/2408.10914) (Aryabumi, Su, Ma, Morisot, Zhang, Locatelli, Fadaee, Üstün, Hooker; Cohere For AI, 2024)
-
-**Motivation:** Code data is now standard in LLM pretraining, but it is unclear how much code is optimal and at what stage of training it should appear. The authors systematically vary code proportion and code-vs-text staging to measure effects on NL reasoning, world knowledge, code generation, and generative quality.
-
-**Experiment Setup:** 470M and 2.8B decoder-only LMs. Sweep code-to-text ratios in single-phase pretraining; also test a two-stage code→text "cooldown" recipe (stage 1: 100 % code+markup; stage 2: ~90 % NL + ~10 % code+markup) with cosine LR decaying through both stages. Code data spans multi-language StarCoderData and markup; text data uses standard web/wiki/books. Evaluate on NL reasoning suites, world-knowledge tasks, HumanEval / MBPP, and LLM-as-judge win-rates.
-
-**Conclusion:** Including code in pretraining improves not only code benchmarks (+12× HumanEval) but also NL reasoning (+8.2 %), world knowledge (+4.2 %), and generative win-rate (+6.6 %) relative to text-only pretraining. The two-stage code→text schedule outperforms an equivalent uniform code/text mix at matched tokens, suggesting that *when* code appears matters, not just *how much*. Higher-quality code (Markdown, synthetic textbook-style) further amplifies the NL benefit. The C5 family of experiments in this repo follows this two-stage recipe.
-
----
-
-### [Synthetic Continued Pretraining (EntiGraph)](https://arxiv.org/abs/2409.07431) (Yang, Singh, Belrose, Robert-Nicoud, Levy, Manning, Liang; Stanford, 2024)
-
-**Motivation:** When the target domain is small (a single textbook, a private codebase), single-pass continued pretraining is too sample-inefficient — facts may appear only once. Standard replay cannot fix this because there is nothing to replay from inside the small corpus.
-
-**Experiment Setup:** Take 265 QuALITY books (1.3M source tokens). Extract entities, build a relational knowledge graph, and use GPT-4-turbo to generate relation descriptions between entity pairs and triplets, producing a 455M-token synthetic corpus (~350× expansion). Llama-3-8B-Base is continually pretrained for two epochs on this synthetic corpus with RedPajama replay, then evaluated on QuALITY closed-book 5-shot CoT (4,609 MC questions). Compare to Raw CPT and Rephrase CPT baselines, and to a RAG baseline.
-
-**Conclusion:** EntiGraph CPT raises closed-book accuracy from 39.5 % → 56.2 % and scales log-linearly with synthetic-token count up to 455M. Raw CPT *hurts* downstream performance; Rephrase CPT scales poorly. EntiGraph reaches ~80 % of the gain from a RAG baseline (60.4 %), and the two are complementary (EntiGraph + RAG = 62.6 %). The relational-graph structure provides the diversity that simple paraphrase cannot. (Fuller notes in [`causal_bridge.md`](causal_bridge.md).)
-
----
-
 ### [Towards Lifelong Learning of Large Language Models: A Survey](https://arxiv.org/abs/2406.06391) (Zheng, Qiu, Shi, Ma, 2024)
 
 **Motivation:** Continual / lifelong learning for LLMs is now a broad area covering pretraining-time adaptation, finetuning-time adaptation, and retrieval-based augmentation; practitioners need a structured map of the design space.
