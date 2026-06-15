@@ -110,13 +110,13 @@ TASKS: list[TaskRow] = [
         "math_verify,none",             # newer lm-eval default; more permissive
     )),
     TaskRow("humaneval[0] (lm-eval)", "humaneval", ("pass@1,create_test",)),
-    TaskRow("humaneval[0] (bigcode) ‡‡", "_bigcode_he", ()),  # special: read bigcode metrics.json
+    TaskRow("humaneval[0] (bigcode)", "_bigcode_he", ()),  # special: read bigcode metrics.json
     TaskRow("mbpp[3]", "mbpp", ("pass_at_1,none",)),
     # Perplexity rows are NOT run by run_eval_v2.sh — they come from
     # Levanter in-training eval. Listed here for completeness only.
     TaskRow("gsm_symbolic_main[8]", "gsm_symbolic_main", ("exact_match,strict-match",), runs_in_v2_suite=False),
     TaskRow("gsm_noop[8]", "gsm_noop", ("exact_match,strict-match",), runs_in_v2_suite=False),
-    TaskRow("dclm_200m_val (nats)", "_dclm_in_training", (), runs_in_v2_suite=False),
+    TaskRow("dclm_200m_val (bpb)", "_dclm_in_training", (), runs_in_v2_suite=False),
     TaskRow("paloma_macro (bpb)", "_paloma_macro", (), runs_in_v2_suite=False),
 ]
 
@@ -146,7 +146,7 @@ MEAN_ROWS = [
      ["gsm_symbolic_main[8]", "gsm_noop[8]"]),
     ("Mean Code",
      "Code",
-     ["humaneval[0] (lm-eval)", "humaneval[0] (bigcode) ‡‡", "mbpp[3]"]),
+     ["humaneval[0] (lm-eval)", "humaneval[0] (bigcode)", "mbpp[3]"]),
 ]
 
 
@@ -233,7 +233,7 @@ def is_category_header_label(label: str) -> bool:
     if not label:
         return False
     # After parse_row_label strips outer **, label is like 'Open-book' or 'Math (perturbation-robust) °'
-    # Differentiate from task rows like 'sciq[0]' or 'humaneval[0] (bigcode) ‡‡' by:
+    # Differentiate from task rows like 'sciq[0]' or 'humaneval[0] (bigcode)' by:
     # - category labels don't contain '[' or numeric metric markers
     if "[" in label:
         return False
@@ -802,7 +802,7 @@ def cmd_add_model(args):
     if args.train_log:
         v = extract_dclm_from_train_log(Path(args.train_log))
         if v is not None:
-            cmd_fill_cell(argparse.Namespace(row="dclm_200m_val (nats)", col=col_core_label, value=str(v)))
+            cmd_fill_cell(argparse.Namespace(row="dclm_200m_val (bpb)", col=col_core_label, value=str(v)))
             print(f"dclm_200m_val filled: {v:.3f} nats")
         else:
             print(f"WARN: could not find dclm_200m_val in {args.train_log}")
@@ -878,7 +878,7 @@ def main():
     pf.set_defaults(func=cmd_fill_from_results)
 
     pc = sub.add_parser("fill-cell", help="Fill a single (row, column) cell with a value (e.g. dclm_200m_val from a training log)")
-    pc.add_argument("--row", required=True, help="row label (e.g. 'dclm_200m_val (nats)')")
+    pc.add_argument("--row", required=True, help="row label (e.g. 'dclm_200m_val (bpb)')")
     pc.add_argument("--col", required=True, help="column header substring (e.g. 'C5-v3 final')")
     pc.add_argument("--value", required=True, help="numeric value")
     pc.set_defaults(func=cmd_fill_cell)
