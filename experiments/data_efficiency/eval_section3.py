@@ -73,22 +73,25 @@ TASKS: list[TaskRow] = [
     TaskRow("sciq[0]", "sciq", ("acc,none",)),
     TaskRow("boolq[0]", "boolq", ("acc,none",)),
     TaskRow("piqa[0]", "piqa", ("acc,none",)),
-    TaskRow("openbookqa_fact[0]", "openbookqa_fact", ("acc,none",)),
+    # acc_norm is the canonical reporting metric for uneven-length multi-choice
+    # tasks (HF open-llm-leaderboard convention). Prefer acc_norm,none; fall back
+    # to acc,none for older result JSONs that didn't log acc_norm.
+    TaskRow("openbookqa_fact[0]", "openbookqa_fact", ("acc_norm,none", "acc,none")),
     TaskRow("arc_easy[25]", "arc_easy", ("acc,none",)),
-    TaskRow("arc_challenge[25]", "arc_challenge", ("acc,none",)),
-    TaskRow("hellaswag[10]", "hellaswag", ("acc,none",)),
+    TaskRow("arc_challenge[25]", "arc_challenge", ("acc_norm,none", "acc,none")),
+    TaskRow("hellaswag[10]", "hellaswag", ("acc_norm,none", "acc,none")),
     TaskRow("winogrande[5]", "winogrande", ("acc,none",)),
     TaskRow("mmlu[5]", "_mmlu_mean", ()),                         # special: average mmlu_<subject>
     TaskRow("commonsense_qa[0]", "commonsense_qa", ("acc,none",)),
     TaskRow("social_iqa[0]", "social_iqa", ("acc,none",)),
-    TaskRow("logiqa[0]", "logiqa", ("acc,none",)),
+    TaskRow("logiqa[0]", "logiqa", ("acc_norm,none", "acc,none")),
     TaskRow("lambada_openai[0]", "lambada_openai", ("acc,none",)),  # NOT perplexity
     TaskRow("copa[0]", "copa", ("acc,none",)),
     TaskRow("wsc[0]", "wsc", ("acc,none",)),
     TaskRow("storycloze_2018_local[0]", "storycloze_2018_local", ("acc,none",)),
     TaskRow("cb[0]", "cb", ("acc,none",)),
     TaskRow("quac_first_turn[0]", "quac_first_turn", ("f1,none",)),
-    TaskRow("agieval_lsat_ar[0]", "agieval_lsat_ar", ("acc,none",)),
+    TaskRow("agieval_lsat_ar[0]", "agieval_lsat_ar", ("acc_norm,none", "acc,none")),
     TaskRow("gpqa_diamond[0]", "gpqa_diamond_zeroshot", ("acc,none",)),
     TaskRow("bbh[3] (limit=0.1)", "bbh", (
         "exact_match,get-answer",       # current lm-eval (June 2026)
