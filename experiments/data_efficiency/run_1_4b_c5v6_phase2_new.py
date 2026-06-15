@@ -65,7 +65,12 @@ def _resolve_cache(prefix: str) -> str:
     matches = sorted(_TOKENIZED_BASE.glob(f"{prefix}-*"))
     if not matches:
         raise FileNotFoundError(f"No tokenized cache for prefix '{prefix}'.")
-    return str(matches[-1])
+    if len(matches) > 1:
+        raise RuntimeError(
+            f"Multiple tokenized caches match prefix '{prefix}': {[m.name for m in matches]}. "
+            f"Pin one explicitly by including the hash, e.g. '{matches[0].name}' instead of bare prefix."
+        )
+    return str(matches[0])
 
 
 try:
@@ -132,7 +137,12 @@ def _paloma_components() -> dict[str, DatasetComponent]:
         matches = sorted(paloma_dir.glob(f"{sub}-*"))
         if not matches:
             raise FileNotFoundError(f"Paloma subset '{sub}' not tokenized.")
-        found[f"paloma_{sub}"] = DatasetComponent(cache_dir=str(matches[-1]))
+        if len(matches) > 1:
+            raise RuntimeError(
+                f"Multiple caches match {sub!r}: " + str([p.name for p in matches]) + ". "
+                "Pin one explicitly (include hash in prefix)."
+            )
+        found[f"paloma_{sub}"] = DatasetComponent(cache_dir=str(matches[0]))
     return found
 
 

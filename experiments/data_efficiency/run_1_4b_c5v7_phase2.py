@@ -1,20 +1,25 @@
 # Copyright The Marin Authors
 # SPDX-License-Identifier: Apache-2.0
 
-# 1.4B C5-v3-SMALL PHASE 1: code-LM from scratch (matched-budget small variant).
+# 1.4B C5-v7 PHASE 2: continued text pretraining with 50% code+markup REPLAY.
 #
-# Same recipe as C5-v3 phase 1 (separate cosine LR per phase, faithful to
-# Aryabumi §3.1) but at the SMALL token budget that matches C5-v2-small
-# (6,400 steps per phase, 6.71 B trained tokens per phase, 13.42 B total
-# across both phases).
+# Same recipe as C5-v6 phase 2 (separate fresh-cosine init from C5-v3 phase 1's
+# step-14671, strict-replay code+markup) BUT the phase 2 code+markup share goes
+# 30% → 50%. Forms a scaling axis (C5-v3=10%, C5-v6=30%, C5-v7=50%) to
+# characterize how Mean Code and Mean NL respond to the replay proportion.
 #
-# Comparison to C5-v2-small:
-#   - C5-v2-small: SINGLE continuous cosine across both stages, staged
-#     data weights inside one process. Stage 2 inherited a half-decayed LR.
-#   - C5-v3-small: SEPARATE cosines per phase, fork via
-#     initialize_from_checkpoint_path. Phase 2 gets a FRESH peak LR.
+# Phase 1: REUSE c5v3_phase1_step14671 (no retrain — same code+markup checkpoint).
+# Phase 2: 50% DCLM + 50% (80% code + 20% markup) = 50% DCLM + 40% code + 10% markup.
 #
-# This isolates the LR-schedule effect at small scale.
+# IMPORTANT — STRICT REPLAY, NOT NEW CODE (same mechanism as C5-v6):
+# Levanter's MixtureDataset re-indexes each component starting at sequence-index 0.
+# With mixture_block_size=2048 (default) and counts_per_block ≈ weight × block_size:
+# Phase 1 (100% code+markup):       SE-Python counts_per_block ≈ 886.
+# Phase 2 (50% code+markup, C5-v7): SE-Python counts_per_block ≈ 442.
+# Phase 2's SE-Python sequence range [0..14672×442] ⊂ phase 1's [0..14672×886].
+# Same for Nemotron-CC, Nemotron-UA, Stack-Edu-Markdown.
+# → Every code+markup token phase 2 sees is a token phase 1 already saw,
+#   in the same shuffled order — strict replay of the first ~50% of phase 1's data.
 
 import os
 from datetime import timedelta
@@ -42,15 +47,14 @@ from experiments.data_efficiency.models import model_dict
 BASE_TOKENIZED = "/fsx/users/dongweij/marin/outputs/tokenized"
 _TOKENIZED_BASE = Path(BASE_TOKENIZED)
 
+# === Phase 1 final checkpoint (REUSE C5-v3 phase 1) ===
+PHASE1_INIT_FROM = "checkpoints/1_4b_c5v3_phase1/8dtdcear/step-14671"
+
 
 def _resolve_cache(prefix: str) -> str:
     matches = sorted(_TOKENIZED_BASE.glob(f"{prefix}-*"))
     if not matches:
-        raise FileNotFoundError(
-            f"No tokenized cache for prefix '{prefix}'. "
-            f"Run `MARIN_PREFIX=/fsx/users/dongweij/marin/outputs .venv/bin/python "
-            f"-m experiments.data_efficiency.code_data_c5v2` first."
-        )
+        raise FileNotFoundError(f"No tokenized cache for prefix '{prefix}'.")
     if len(matches) > 1:
         raise RuntimeError(
             f"Multiple tokenized caches match prefix '{prefix}': {[m.name for m in matches]}. "
@@ -65,15 +69,30 @@ try:
     NEMOTRON_CC_CACHE = _resolve_cache("c5v2_nemotron_code_concepts")
     NEMOTRON_UA_CACHE = _resolve_cache("c5v2_nemotron_unconditional_algorithmic")
 except FileNotFoundError as _e:
-    SE_PYTHON_CACHE = ""
-    SE_MARKDOWN_CACHE = ""
-    NEMOTRON_CC_CACHE = ""
-    NEMOTRON_UA_CACHE = ""
-    print(f"[c5v3-small-p1] WARN: {_e}")
+    SE_PYTHON_CACHE = SE_MARKDOWN_CACHE = NEMOTRON_CC_CACHE = NEMOTRON_UA_CACHE = ""
+    print(f"[c5v7-p2] WARN: {_e}")
 
 
-# === Eval-only components (no training weight) ===
+DCLM_SHARDS = [
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00006",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00020",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00026",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00035",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00042",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00047",
+    f"{BASE_TOKENIZED}/dclm_baseline-0206f1/train/part-00071",
+]
 DCLM_VAL = f"{BASE_TOKENIZED}/data_efficiency/dclm_200m_val-415aea"
+
+
+CODE_RATIOS = {
+    "se_python": 8.8 / 16.3,
+    "nemotron_cc": 7.3 / 16.3,
+    "nemotron_ua": 0.2 / 16.3,
+}
+MARKUP_RATIOS = {"se_markdown": 1.0}
+
+
 PALOMA_SUBSETS = [
     "4chan", "c4_100_domains", "c4_en", "dolma-v1_5",
     "dolma_100_programing_languages", "dolma_100_subreddits",
@@ -102,14 +121,6 @@ def _paloma_components() -> dict[str, DatasetComponent]:
 paloma_components = _paloma_components()
 
 
-CODE_RATIOS = {
-    "se_python": 8.8 / 16.3,
-    "nemotron_cc": 7.3 / 16.3,
-    "nemotron_ua": 0.2 / 16.3,
-}
-MARKUP_RATIOS = {"se_markdown": 1.0}
-
-
 def _distributed_from_env() -> DistributedConfig:
     num_proc = os.environ.get("JAX_DIST_NUM_PROCESSES")
     if num_proc is None:
@@ -122,15 +133,12 @@ def _distributed_from_env() -> DistributedConfig:
     )
 
 
-# === Batch and step layout — same per-step config; SMALL token budget ===
 NUM_PROC = int(os.environ.get("JAX_DIST_NUM_PROCESSES", "1"))
 TOTAL_GPUS = NUM_PROC * 8
-TRAIN_BATCH_SIZE = 64  # matches base x16 / code25 v2 / C5-v2-small exactly; do NOT change without re-deriving total tokens
+TRAIN_BATCH_SIZE = 256
 PER_DEVICE_PARALLELISM = max(1, TRAIN_BATCH_SIZE // TOTAL_GPUS)
-TOKENS_PER_STEP = TRAIN_BATCH_SIZE * 4096  # 262,144
-# Small variant: each phase = 6,400 steps. Phase 1 + phase 2 = 12,800 steps × 64 × 4096 ≈ 3.36 B tokens total
-# (matches C5-v2-small total exactly: 12,800 × 64 × 4096 = 3.36 B)
-NUM_TRAIN_STEPS = 6_400
+TOKENS_PER_STEP = TRAIN_BATCH_SIZE * 4096
+NUM_TRAIN_STEPS = 14_672  # Same as C5-v3 phase 2 — 15.39 B tokens
 
 
 _code_key_to_cache = {
@@ -138,36 +146,39 @@ _code_key_to_cache = {
     "nemotron_cc": NEMOTRON_CC_CACHE,
     "nemotron_ua": NEMOTRON_UA_CACHE,
 }
-_markup_key_to_cache = {
-    "se_markdown": SE_MARKDOWN_CACHE,
-}
+_markup_key_to_cache = {"se_markdown": SE_MARKDOWN_CACHE}
 
 
-def _phase1_weights() -> dict[str, float]:
-    """100% code + markup, 80/20 split. Eval-only components get weight 0."""
+def _phase2_weights() -> dict[str, float]:
+    """50% DCLM (7 shards equal) + 50% (80% code + 20% markup) = scaling-axis replay phase 2."""
     w: dict[str, float] = {}
+    dclm_share = 0.50 / len(DCLM_SHARDS)
+    for i in range(len(DCLM_SHARDS)):
+        w[f"dclm_shard{i}"] = dclm_share
     for k, r in CODE_RATIOS.items():
-        w[f"code_{k}"] = 0.80 * r
+        w[f"code_{k}"] = 0.50 * 0.80 * r
     for k, r in MARKUP_RATIOS.items():
-        w[f"markup_{k}"] = 0.20 * r
+        w[f"markup_{k}"] = 0.50 * 0.20 * r
     for k in ["dclm_200m_val", *[f"paloma_{s}" for s in PALOMA_SUBSETS]]:
         w[k] = 0.0
     return w
 
 
+_dclm_components = {f"dclm_shard{i}": DatasetComponent(cache_dir=p) for i, p in enumerate(DCLM_SHARDS)}
 _code_components = {f"code_{k}": DatasetComponent(cache_dir=v) for k, v in _code_key_to_cache.items() if v}
 _markup_components = {f"markup_{k}": DatasetComponent(cache_dir=v) for k, v in _markup_key_to_cache.items() if v}
 
-_shard_val_sizes = {k: 0 for k in {**_code_components, **_markup_components}}
+_shard_val_sizes = {k: 0 for k in {**_dclm_components, **_code_components, **_markup_components}}
 
 data_config = LmDataConfig(
     components={
+        **_dclm_components,
         **_code_components,
         **_markup_components,
         "dclm_200m_val": DatasetComponent(cache_dir=DCLM_VAL),
         **paloma_components,
     },
-    train_weights=_phase1_weights(),
+    train_weights=_phase2_weights(),
     num_validation_sequences=_shard_val_sizes,
     tokenizer="meta-llama/Meta-Llama-3.1-8B",
     shuffle=True,
@@ -181,13 +192,14 @@ model_config = model_dict["1_4b4k"]
 
 train_config = TrainLmConfig(
     data=data_config,
+    initialize_from_checkpoint_path=os.environ.get("C5V3_PHASE1_CKPT", PHASE1_INIT_FROM),
     trainer=TrainerConfig(
         seed=0,
         tracker=WandbConfig(
             project="dongwei-data-efficiency",
             entity="dongwei_jiang",
-            tags=["1.4b", "c5v3", "small", "phase1-code-only", "clean-code", "wd-0.1", f"nodes-{NUM_PROC}"],
-            save_code=False,  # see lib/levanter/src/levanter/tracker/wandb.py — wandb-core 0.24.0 segfaults in ArtifactSaver on multi-node
+            tags=["1.4b", "c5v7", "phase2-50pct-code-replay", "dclm", "wd-0.1", f"nodes-{NUM_PROC}"],
+            save_code=False,
         ),
         mp=jmp.get_policy("p=f32,c=bfloat16"),
         train_batch_size=TRAIN_BATCH_SIZE,
@@ -196,7 +208,7 @@ train_config = TrainLmConfig(
         per_device_parallelism=PER_DEVICE_PARALLELISM,
         per_device_eval_parallelism=PER_DEVICE_PARALLELISM,
         checkpointer=CheckpointerConfig(
-            base_path="checkpoints/1_4b_c5v3_small_phase1/",
+            base_path="checkpoints/1_4b_c5v7_phase2/",
             save_interval=timedelta(minutes=30),
             keep=[{"every": NUM_TRAIN_STEPS // 4}],
         ),
@@ -220,20 +232,15 @@ train_config = TrainLmConfig(
 )
 
 if __name__ == "__main__":
-    print("=== 1.4B C5-v3-SMALL PHASE 1 (code-LM from scratch, small budget) ===")
+    print("=== 1.4B C5-v7 PHASE 2 (continued text from code-LM, 50% code+markup replay) ===")
     print(f"  num_processes (nodes): {NUM_PROC}  total GPUs: {TOTAL_GPUS}")
+    print(f"  initialize_from_checkpoint_path: {train_config.initialize_from_checkpoint_path}")
     print(f"  train_batch_size: {TRAIN_BATCH_SIZE}  per-device: {PER_DEVICE_PARALLELISM}")
     print(f"  num_train_steps: {NUM_TRAIN_STEPS:,}  total trained tokens: {NUM_TRAIN_STEPS * TOKENS_PER_STEP / 1e9:.2f}B")
-    print(f"  LR=3e-4, WD=0.1, cosine to 0 (warmup 1% = ~{int(NUM_TRAIN_STEPS * 0.01)} steps)")
-    print(f"  data: 80% code + 20% markup (clean sources)")
-    print()
-    print("  caches:")
-    print(f"    SE_PYTHON   : {SE_PYTHON_CACHE or '(MISSING)'}")
-    print(f"    SE_MARKDOWN : {SE_MARKDOWN_CACHE or '(MISSING)'}")
-    print(f"    NEMOTRON_CC : {NEMOTRON_CC_CACHE or '(MISSING)'}")
-    print(f"    NEMOTRON_UA : {NEMOTRON_UA_CACHE or '(MISSING)'}")
+    print(f"  LR=3e-4 (FRESH), WD=0.1, cosine to 0 (warmup 1% ≈ 147 steps)")
+    print(f"  data: 50% DCLM + 50% (80% code + 20% markup)")
     if not SE_PYTHON_CACHE or not SE_MARKDOWN_CACHE or not NEMOTRON_CC_CACHE or not NEMOTRON_UA_CACHE:
-        print("\nERROR: caches missing.")
+        print("\nERROR: code caches missing.")
         raise SystemExit(1)
     from levanter.main import train_lm
     train_lm.main(train_config)

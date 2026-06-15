@@ -80,7 +80,12 @@ def _paloma_components() -> dict[str, DatasetComponent]:
         matches = sorted(paloma_dir.glob(f"{sub}-*"))
         if not matches:
             raise FileNotFoundError(f"Paloma subset '{sub}' not tokenized.")
-        found[f"paloma_{sub}"] = DatasetComponent(cache_dir=str(matches[-1]))
+        if len(matches) > 1:
+            raise RuntimeError(
+                f"Multiple caches match {sub!r}: " + str([p.name for p in matches]) + ". "
+                "Pin one explicitly (include hash in prefix)."
+            )
+        found[f"paloma_{sub}"] = DatasetComponent(cache_dir=str(matches[0]))
     return found
 
 

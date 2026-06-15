@@ -10,11 +10,23 @@
 #
 # Phase 1: REUSE c5v3_phase1_step14671 (no retrain — same code+markup checkpoint).
 # Phase 2: 70% DCLM + 30% (80% code + 20% markup) = 70% DCLM + 24% code + 6% markup.
-# Code+markup come from the SAME caches as phase 1 (Stack-Edu Python clean +
-# Nemotron Code-Concepts + Nemotron UA + Stack-Edu Markdown clean) → ~98% of
-# code pool consumed across both phases combined → mostly NEW code in phase 2
-# with a small overlap tail. NOT a strict-replay setup; same caches, random
-# sampling per Levanter's default.
+#
+# IMPORTANT — STRICT REPLAY, NOT NEW CODE:
+# Levanter's MixtureDataset re-indexes each component starting at doc-index 0
+# whenever a fresh `MixtureDataset` is built. Because phase 2 uses the same
+# `data_seed=0` and the same code+markup caches as phase 1, and because
+# `initialize_from_checkpoint_path` loads model weights only (no loader state),
+# the per-component doc index at block T is `block_id * counts_per_block`,
+# where counts_per_block is proportional to the component's share in that phase.
+# Phase 1 (100% code+markup): SE-Python counts_per_block ≈ 1760.
+# Phase 2 (30% code+markup):  SE-Python counts_per_block ≈ 532.
+# Phase 2's SE-Python doc range [0..14672×532] ⊂ phase 1's [0..14672×1760].
+# Same for Nemotron-CC, Nemotron-UA, Stack-Edu-Markdown.
+# → Every code+markup token phase 2 sees is a token phase 1 already saw,
+#   in the same shuffled order. This is approximately strict replay of the
+#   first ~30% of phase 1's code+markup data.
+# The "new code" version is C5-v6-NEW (separate script) which uses an
+# explicit per-component doc-offset to start phase 2 where phase 1 ended.
 
 import os
 from datetime import timedelta
@@ -50,7 +62,12 @@ def _resolve_cache(prefix: str) -> str:
     matches = sorted(_TOKENIZED_BASE.glob(f"{prefix}-*"))
     if not matches:
         raise FileNotFoundError(f"No tokenized cache for prefix '{prefix}'.")
-    return str(matches[-1])
+    if len(matches) > 1:
+        raise RuntimeError(
+            f"Multiple tokenized caches match prefix '{prefix}': {[m.name for m in matches]}. "
+            f"Pin one explicitly by including the hash, e.g. '{matches[0].name}' instead of bare prefix."
+        )
+    return str(matches[0])
 
 
 try:
@@ -99,7 +116,12 @@ def _paloma_components() -> dict[str, DatasetComponent]:
         matches = sorted(paloma_dir.glob(f"{sub}-*"))
         if not matches:
             raise FileNotFoundError(f"Paloma subset '{sub}' not tokenized.")
-        found[f"paloma_{sub}"] = DatasetComponent(cache_dir=str(matches[-1]))
+        if len(matches) > 1:
+            raise RuntimeError(
+                f"Multiple caches match {sub!r}: " + str([p.name for p in matches]) + ". "
+                "Pin one explicitly (include hash in prefix)."
+            )
+        found[f"paloma_{sub}"] = DatasetComponent(cache_dir=str(matches[0]))
     return found
 
 

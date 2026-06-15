@@ -55,6 +55,102 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## June 15: AUDIT day — found 3 critical bugs in §3 evaluation pipeline + 2 critical bugs in data composition; invalidates / weakens several recent conclusions
+
+Dongwei did a thorough review of `eval_section3.py`, the training scripts, and the C5-v6-NEW disjointness mechanism. Five distinct bug classes uncovered:
+
+### Critical bug #1: Mean Code label mismatch — silent under-aggregation
+
+`eval_section3.py` had `TaskRow("humaneval[0] (bigcode) ‡‡", ...)` but `EVALUATION.md` uses `humaneval[0] (bigcode)` (no `‡‡`). Mean Code's source-row list contained the `‡‡` version, so the substring match silently FAILED on the bigcode row and Mean Code averaged only the (much higher) lm-eval HumanEval + MBPP, excluding the trustworthy bigcode HumanEval.
+
+**Impact on every recent claim about Code:** every Mean Code value in §3 was wrong. After fix:
+- C5-v5: 0.305 → **0.224**
+- C5-V7: 0.240 → **0.188**
+- C5-v6: 0.208 → **0.143**
+- C5-v6-NEW: 0.165 → **0.118**
+- phi-1.5: 0.342 → unchanged (lm-eval HE and bigcode HE were already coincidentally identical)
+
+Fix: removed the `‡‡` marker from `eval_section3.py` so labels match. Re-extracted all 19 columns from existing v2 result JSONs.
+
+### Critical bug #2: SP-NL part-uniform-not-token-proportional weighting
+
+`run_1_4b_c5v4_phase2.py`, `run_1_4b_c5v5.py`, `run_1_4b_a5_sp.py` all weight SP-NL shards uniformly per shard directory, NOT per token. The two SP-NL caches differ wildly in token count:
+- chunk1: **12.83 B tokens, 128 parts** → ~100 M tokens/part
+- chunk2: **51.94 B tokens, 100 parts** → ~519 M tokens/part
+
+Actual sampling: 128/(128+100) = **56% chunk1 / 44% chunk2**.
+Intended (token-proportional): 12.83/(12.83+51.94) = **19.8% chunk1 / 80.2% chunk2**.
+
+**Invalidates the SP-NL conclusions:**
+- A5-SP: the "100% SP-NL" model actually saw a chunk1-biased SP-NL distribution
+- C5-v4: 90% SP-NL slot in phase 2 was chunk1-biased
+- C5-v5: same as C5-v4 with continuous cosine
+
+The C5-v4 > C5-v3 claim ("SP-NL > DCLM after code phase 1") is suspect — the SP-NL the model saw was NOT the intended 64.77 B token-proportional distribution. The numbers stand for "what was actually trained" but cannot be interpreted as "SP-NL effect".
+
+Fix: marked these rows with ⚠ in EVALUATION.md §2. Future re-runs need to use token-proportional weighting (not patched yet — requires getting per-shard token counts and rewriting `_phase2_weights()`).
+
+### Critical bug #3: C5-v6-NEW offset is in raw index space, not shuffled space
+
+The Levanter `DatasetComponent.offset` I added today slices the underlying cache in RAW INDEX space, but training reads each component through a Feistel shuffle (via `dataset.shuffle(PRNGKey(0))` in `_split_into_trainval_sets`). Phase 1 read a shuffled view of the full cache; phase 2 with offset reads a shuffled view of the sliced tail.
+
+Even though the SETS of indices visible to phase 1 vs phase 2 are disjoint, the OVERLAP-IN-CONSUMPTION depends on what phase 1 actually drew during its training. Dongwei's uniqueness check: phase 2 of C5-v6-NEW overlaps with phase-1 consumed code+markup at ~394,605 sequence draws ≈ 1.62 B tokens ≈ **10.4% of phase 2's total token budget ≈ 34.7% of the code+markup slice**.
+
+Per-component:
+- **SE-Python**: phase 2 uses a fully fresh cache (`c5v6new_stack_edu_python_low`, score [2.8, 3.0)). GENUINELY new — 0% overlap.
+- **Nemotron-CC + Nemotron-UA + Markdown**: reuse phase-1 caches with offset. Phase 2 OVERLAPS with phase 1 due to the Feistel shuffle hitting indices in both phase 1's "early-permutation" reads and phase 2's "after-offset" set.
+
+**C5-v6-NEW is NOT a clean "REPLAY vs NEW" experiment.** It's "partial-new" — only SE-Python (large) is truly disjoint; other components are partially-replayed. The +0.043 REPLAY > NEW finding on Code I reported yesterday should be treated cautiously: C5-v6 (full replay) really did show better Code than C5-v6-NEW (mostly new SE-Python, partial new other code+markup) at matched 30%, but the contrast isn't pure.
+
+Fix: relabeled the row as "partially fresh" in EVALUATION.md §2 with full audit caveat. The proper fix for future replay-vs-new experiments needs a "shuffled-position offset" API (track which Feistel-permutation positions phase 1 consumed, then start phase 2 past them in the same permutation).
+
+### High bug #4: C5-v6-NEW script said [2.7, 3.0) but actual is [2.8, 3.0)
+
+We initially fetched SE-Python blobs at score ≥ 2.7 (6.94 M docs), then filtered to score ≥ 2.8 (4.17 M docs, 3.27 B tokens) before tokenization per the quality discussion. Header comments still claimed [2.7, 3.0). Fix: updated 4 references in `code_data_c5v6_new.py` and `run_1_4b_c5v6_phase2_new.py`.
+
+### High bug #5: `dclm_200m_val (nats)` label mismatch in eval_section3.py
+
+`eval_section3.py` referenced `dclm_200m_val (nats)` for the in-training fill, but EVALUATION.md uses `(bpb)`. Result: future automated fills would have failed silently. Existing values look correctly bpb-scaled (A5 0.923, C5-v3 1.110), so no past values were corrupted. Fix: rename to `(bpb)` in 3 places.
+
+### Medium bug #6: `matches[-1]` cache resolution is silently non-reproducible
+
+Many scripts use:
+```python
+matches = sorted(_TOKENIZED_BASE.glob(f"{prefix}-*"))
+return str(matches[-1])
+```
+
+If a retokenize creates a second directory with the same prefix but a different hash, the script silently picks the lexicographically-last one. Re-running a "frozen" recipe might therefore train on different data.
+
+Fix (applied today): patched the `_resolve_cache` helper in all 25 active training scripts to ASSERT exactly one matching directory. If a second cache appears, the script will RAISE with a clear error pointing to the specific hashes available, and the user must pin one explicitly (e.g. `c5v2_stack_edu_python_clean-865765`). Same treatment for `_paloma_components` loops.
+
+### Audit re-runs (to verify no other silent drifts)
+
+Re-ran v2-suite on A5 / B4 / C5 final / phi-1 / phi-1.5 with the patched `eval_section3.py`:
+
+- **A5 1ep final**: matches after metric fix. The Mean shifts (Open-book −0.005 ↓, CB-NL −0.025 ↓) were due to the bigcode-row inclusion in Mean Code, NOT a re-eval drift.
+- **B4 1ep final**: 0 tasks differ by >5%; existing column matches fresh re-eval.
+- **C5 final**: 0 tasks differ by >5%; existing column matches.
+- **phi-1**: 3 drifts caught: `logiqa` (+26 % rel — acc vs acc_norm switch I patched today), `gsm8k_cot` (−35 % rel — real lm-eval extraction drift, tiny absolute), `minerva_math` (−7 % rel, tiny abs). Updated column with fresh values.
+- **phi-1.5**: same 3-drift pattern. Updated column.
+
+**Conclusion of the audit:** all §3 columns are now internally consistent with a single eval pipeline (v2-suite + the patched extractor). The metric extraction now uses `acc_norm,none` (with `acc,none` fallback) for hellaswag, openbookqa_fact, arc_challenge, logiqa, agieval_lsat_ar — matching HF open-llm-leaderboard convention and the original (pre-`eval_section3.py`) A5/B4/C5 column-fill convention.
+
+### What's still NOT fixed (carry-forward TODOs)
+
+1. **SP-NL token-proportional weighting** in C5-v4 / C5-v5 / A5-SP scripts (only documented in §2; scripts need a per-shard token-count weight rewrite). Future re-runs would be on the correct distribution.
+2. **`DatasetComponent.offset` shuffled-position semantics** — for true replay-vs-new contrast, need a different API that aligns with phase 1's Feistel positions. The current `offset` is raw-index-only and gives partial disjointness at best.
+3. **Manifest validation in `fill-from-results`** — currently can silently fill 0 if a task JSON is missing. Should assert presence of all expected task JSONs + metric keys before writing, and refuse-fail on gap.
+
+### Honest re-read of the C-family story given the bugs
+
+- "C5-v6 (REPLAY) beats C5-v6-NEW (NEW) on Code at 30%": **direction holds** (C5-v6 Code 0.143 > C5-v6-NEW Code 0.118 after Mean Code fix), but the experiment is "replay vs partial-new", not "replay vs fully-new". The fully-new run hasn't been done.
+- "Replay-axis 10% → 30% → 50% is monotone-better on Code": still holds with corrected Mean Code (0.079 → 0.143 → 0.188).
+- "Nothing beats A5 on NL": with the bigcode-row fix and metric fix, A5 Mean Open-book = 0.636, C5-v6-NEW = 0.620. A5 STILL wins, but by 2.6 % rel not 7-9 %. The race is closer than I claimed yesterday but A5 holds.
+- "SP-NL > DCLM after code phase 1": **suspect**. C5-v4 trained on chunk1-biased SP-NL, not the intended token-proportional distribution. Cannot make clean claims about SP-NL effects from these runs.
+
+---
+
 ## June 14: C5-v6-NEW and C5-V7 complete + evaluate; REPLAY > NEW on Code at 30%; replay-axis scaling 10% → 30% → 50% monotone-better on Code only
 
 ### Both training runs finished
