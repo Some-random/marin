@@ -21,6 +21,26 @@ description: Evaluate a model for §3 of `experiments/data_efficiency/EVALUATION
 Flags: `--no-v2`, `--no-paloma`, `--no-gsm` skip individual sub-evals.
 `--background` launches everything then exits without waiting (re-run `fill-from-results` later).
 
+# QUICK PATH — sharded v2-suite (4 nodes, ~16-19 min instead of ~67)
+
+When 4 GPU nodes are free, the v2-suite can be split across them. Each
+shard runs ~25% of task groups in parallel into the SAME OUT_ROOT:
+
+```bash
+nohup bash /fsx/users/dongweij/marin/experiments/data_efficiency/convert_and_eval_v2_sharded.sh \
+  --label <LABEL> \
+  --src <LEVANTER_DIR> \
+  --hf-dst /fsx/users/dongweij/marin/checkpoints/<LABEL>_hf \
+  --shard-nodes "node1,node2,node3,node4" \
+  > /fsx/users/dongweij/marin/logs/v2_<LABEL>_<TS>.log 2>&1 < /dev/null &
+disown
+```
+
+Verify each node is <1 GB GPU memory before launch. The 4 shards (A/B/C/D)
+are balanced to ~16-19 min each based on observed C5-v6-NEW v7 timings.
+fill-from-results works the same on the shared OUT_ROOT (file layout is
+identical to single-node mode).
+
 # QUICK PATH — sub-commands (when add-model can't handle a case)
 
 ```bash
@@ -28,6 +48,8 @@ Flags: `--no-v2`, `--no-paloma`, `--no-gsm` skip individual sub-evals.
 .venv/bin/python experiments/data_efficiency/eval_section3.py run <LABEL> <LEVANTER_OR_HF_DIR> [--node NODE]
 # Then when 'ALL DONE' appears in the log:
 .venv/bin/python experiments/data_efficiency/eval_section3.py fill-from-results <RESULTS_DIR> "<COLUMN_LABEL_SUBSTR>"
+# Strict-fail by default if any v2-suite task is missing. Add --allow-missing
+# only for intentional partial backfill (e.g. one cell from one re-run).
 # Manual cell fill (e.g. from grepped training log):
 .venv/bin/python experiments/data_efficiency/eval_section3.py fill-cell --row "<ROW_LABEL>" --col "<COL_SUBSTR>" --value 1.234
 # Validate after manual edits:
@@ -183,6 +205,8 @@ git push origin main
 - **Trusting `ALL DONE` markers** from runner scripts that swallow per-task failures with `||`. The runner can print `ALL DONE` even when all subsets failed. Always check at least one `<results_dir>/<subset>/*results*.json` exists before extracting; if the dir is empty, grep the `.log` for `Traceback|ConnectionError|FAILED`.
 - **Mixing paloma_macro values from Levanter in-training eval and lm-eval-harness.** They disagree by up to +0.05 bpb on average (and +0.55 on twitterAAE). All paloma_macro values in §3 must come from `run_paloma_for_model.sh` (lm-eval-harness), NOT from a wandb-logged Levanter in-training value. If you discover a value that was sourced from Levanter, re-run paloma via `run_paloma_for_model.sh` to get the apples-to-apples number. Discovered 2026-06-12 after C5-v4 paloma 1.093 looked like it beat A5's 1.122 (Levanter-sourced); the apples-to-apples A5 value via lm-eval was actually 1.077 — C5-v4 is close but doesn't beat A5.
 - **Running paloma on models bigger than 1.4B at default `batch_size=16`.** 4B model OOMs on 8×40GB GPUs. Set `BATCH_SIZE=4` env var when running `run_paloma_for_model.sh` for the 4B model (the script honors `BATCH_SIZE` since 2026-06-12).
+- **Passing `--allow-missing` to `fill-from-results` to bypass strict-fail.** Since 2026-06-15 the command refuse-fails when any v2-suite task is missing a results JSON or its metric key. The strict-fail catches partial v2 failures (mbpp/humaneval cache collision, paloma offline-mode crash, runner-script `||`-swallowed crash). NEVER pass `--allow-missing` just to make the table validate — that hides the bug the check exists to surface. Use it only for an intentional single-task backfill where you understand exactly which task is being filled.
+- **Adding a new TASKS row with `runs_in_v2_suite=True` without confirming `run_eval_v2.sh` actually runs it.** Strict-fail will then block on every fill until either the task is added to the v2 script or the TASKS row is marked `runs_in_v2_suite=False` (the right choice for storycloze, cb, quac — they live in the aux runners).
 
 ## Why this skill exists
 

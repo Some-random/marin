@@ -229,6 +229,126 @@ def test_train_set_last_mile_wraps_to_named(tmp_path):
     assert isinstance(named_example, LmExample)
 
 
+def test_component_offset_is_shuffled_position(tmp_path):
+    """Offset must slice in shuffled-position space, not raw-cache space.
+
+    Regression for the C5-v6-NEW bug: a run with `offset=N` should read the
+    items at positions `[N, N+K)` of the same shuffled stream that a paired
+    run with `offset=0` reads from `[0, L)`. Pre-fix the offset slice was
+    applied to the raw cache before Feistel, re-domaining the permutation
+    and breaking the disjointness contract.
+    """
+    n_records = 32
+    records = [{"input_ids": [i, i, i, i]} for i in range(n_records)]
+    data_path = tmp_path / "offset_train.jsonl"
+    with data_path.open("w") as f:
+        for record in records:
+            f.write(json.dumps(record) + "\n")
+
+    Pos = hax.Axis("position", 4)
+    skip = 10
+
+    def _build_train_dataset(offset: int):
+        component = DatasetComponent(
+            source=UrlDatasetSourceConfig(train_urls=[str(data_path)], validation_urls=[]),
+            format=PrebuiltLmDatasetFormat(),
+            cache_dir=str(tmp_path / f"cache_off{offset}"),
+            offset=offset,
+        )
+        config = LmDataConfig(
+            components={"prebuilt": component},
+            tokenizer="passthrough",
+            vocab_size=16,
+            shuffle=True,
+        )
+        train_sets = config.train_sets(Pos, initial_batch_size=1, key=jax.random.PRNGKey(0))
+        return train_sets["prebuilt"].as_sync_dataset()
+
+    full = _build_train_dataset(0)
+    sliced = _build_train_dataset(skip)
+    full_tokens = [int(np.asarray(full[i].tokens)[0]) for i in range(n_records)]
+    sliced_tokens = [int(np.asarray(sliced[i].tokens)[0]) for i in range(n_records - skip)]
+
+    assert full_tokens[skip:] == sliced_tokens, (
+        "offset=N must equal full[N:]. Got full[N:]={full[skip:]}, sliced={sliced}".format(
+            full=full_tokens, skip=skip, sliced=sliced_tokens
+        )
+    )
+    assert set(full_tokens[:skip]).isdisjoint(set(sliced_tokens)), (
+        "offset=N must hide exactly the first N shuffled items."
+    )
+
+
+def test_component_offset_position_dependency(tmp_path):
+    """Document the invariant: a component's shuffled stream depends on its
+    INSERTION ORDER in the components dict, NOT just its name.
+
+    Levanter pulls shuffle keys from a `key_iterator` in dict-iteration
+    order (lib/levanter/src/levanter/data/text/datasets.py:786). So a
+    component "tracked" at position 0 in config A gets a different shuffle
+    key from the same-named "tracked" at position 1 in config B (where a
+    decoy precedes it).
+
+    Practical implication: if you build a two-phase replay/disjoint
+    pipeline using `DatasetComponent.offset`, the reused-cache components
+    MUST appear at the SAME insertion positions in both phases for their
+    shuffled streams to align. C5-v6-NEW initially violated this — phase 1
+    had code/markup at indices 0..3 but phase 2 inserted DCLM components
+    ahead of them, putting code/markup at indices 7..10 → different shuffle
+    keys → offset slicing didn't actually skip past phase 1's seen data.
+    Fix: reorder phase 2 to put code/markup first (caught in Dongwei
+    review, 2026-06-15).
+
+    This test asserts the position dependency exists (it's the documented
+    contract). If Levanter ever switches to name-keyed shuffles, this test
+    will start failing — which would be a good prompt to delete the
+    component-reorder workaround in the experiment scripts.
+    """
+    n_records = 32
+    records = [{"input_ids": [i, i, i, i]} for i in range(n_records)]
+    data_path = tmp_path / "tracked_train.jsonl"
+    with data_path.open("w") as f:
+        for record in records:
+            f.write(json.dumps(record) + "\n")
+    decoy_path = tmp_path / "decoy_train.jsonl"
+    with decoy_path.open("w") as f:
+        for record in records:
+            f.write(json.dumps(record) + "\n")
+
+    Pos = hax.Axis("position", 4)
+
+    def _stream(components: dict[str, DatasetComponent], target_name: str) -> list[int]:
+        cfg = LmDataConfig(
+            components=components, tokenizer="passthrough", vocab_size=16, shuffle=True
+        )
+        ds = cfg.train_sets(Pos, initial_batch_size=1, key=jax.random.PRNGKey(0))[target_name].as_sync_dataset()
+        return [int(np.asarray(ds[i].tokens)[0]) for i in range(len(ds.as_sync_dataset()))]
+
+    tracked_comp = DatasetComponent(
+        source=UrlDatasetSourceConfig(train_urls=[str(data_path)], validation_urls=[]),
+        format=PrebuiltLmDatasetFormat(),
+        cache_dir=str(tmp_path / "tracked_cache"),
+    )
+    decoy_comp = DatasetComponent(
+        source=UrlDatasetSourceConfig(train_urls=[str(decoy_path)], validation_urls=[]),
+        format=PrebuiltLmDatasetFormat(),
+        cache_dir=str(tmp_path / "decoy_cache"),
+    )
+
+    # Config A: tracked at index 0
+    stream_a = _stream({"tracked": tracked_comp}, "tracked")
+    # Config B: tracked at index 1 (decoy at index 0 pushes tracked back)
+    stream_b = _stream({"decoy": decoy_comp, "tracked": tracked_comp}, "tracked")
+
+    assert stream_a != stream_b, (
+        "Shuffled streams should differ when 'tracked' sits at different "
+        "positions in the components dict — this is the documented "
+        "insertion-order dependency. If this test now passes (streams equal), "
+        "Levanter likely switched to name-keyed shuffles; you can remove the "
+        "component-reorder workaround in experiment scripts."
+    )
+
+
 def test_dataset_for_component_rejects_preference_format():
     component = DatasetComponent(format=PreferenceChatLmDatasetFormat())
     Pos = hax.Axis("position", 8)

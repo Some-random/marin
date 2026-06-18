@@ -34,6 +34,7 @@ from levanter.data.text import LmDataConfig, DatasetComponent
 from levanter.distributed import DistributedConfig
 from levanter.main.train_lm import TrainLmConfig
 from levanter.optim import AdamConfig
+from levanter.tracker import NoopConfig
 from levanter.tracker.wandb import WandbConfig
 from levanter.distributed import RayConfig
 from levanter.trainer import TrainerConfig
@@ -85,19 +86,56 @@ except FileNotFoundError as _e:
 # (Add chunk_2 shards here after the second tokenize finishes if you want
 # >13.23 B unique-text budget — current setting epochs the cache ~1.05× to
 # hit phase 2's 13.85 B text target.)
-def _collect_sp_nl_shards() -> list[str]:
-    """Collect SlimPajama-NL English-only shards across all available caches."""
-    shards: list[str] = []
+def _collect_sp_nl_shards_with_rows() -> list[tuple[str, int]]:
+    """Per-part SP-NL components with row counts for ROW-PROPORTIONAL weighting.
+
+    chunk1: 128 parts × ~100 M tokens (~99,892 rows/part); chunk2: 100 parts ×
+    ~519 M tokens (~518,293 rows/part). Each part is its own Levanter cache
+    (with train/+validation/ sub-caches written by zephyr tokenize), so
+    per-part components work natively with `build_caches("validation")` even
+    with `num_validation_sequences=0`.
+
+    Weighting is ROW-proportional (rows[i] / total_rows), which is
+    approximately token-proportional because chunk1 and chunk2 have similar
+    avg-tokens-per-row (chunk-level row/token ratios are within ~5%). It is
+    NOT exactly token-proportional — if the per-part token counts ever
+    diverge meaningfully, we'd need a separate per-part token-count column.
+
+    Replaces the original per-part-uniform bug where chunk1's 128 parts
+    received 56% of the SP-NL weight despite holding only 19.8% of the rows.
+    Combined with the Hamilton/largest-remainder rounding fix in
+    `mixture.py:144` (2026-06-15), the actual per-block mix matches the
+    intended 90/8/2 within 0.04 pp.
+
+    Audit history (2026-06-15):
+      - pre-fix per-part-uniform: chunk1/chunk2 = 56/44 (intended 19.8/80.2)
+      - first attempt "row-proportional + 228 components + dump-to-largest":
+        SP/code/markup = 81/17/2 (intended 90/8/2). Caught by Dongwei review;
+        the 189-sample remainder pooled into code_se_python, jumping it from
+        floor 88 → actual 277 per 2048-block.
+      - now per-part + Hamilton + row-proportional: SP/code/markup =
+        90.04/7.96/2.00 (within 0.04 pp), chunk1/chunk2 = 20.82/79.18
+        (within 1 pp of intended 19.79/80.21).
+    """
+    import json
+    out: list[tuple[str, int]] = []
     for prefix in ("slimpajama_nl_en", "slimpajama_nl_chunk2_en"):
         try:
             root = Path(_resolve_cache(prefix))
         except FileNotFoundError:
             continue
-        shards.extend(sorted(str(p) for p in (root / "train").glob("part-*-of-*")))
-    return shards
+        ledger = json.loads((root / "train" / "shard_ledger.json").read_text())
+        for part_name, rows in sorted(ledger["shard_rows"].items()):
+            part_path = root / "train" / part_name
+            if not part_path.exists():
+                continue
+            out.append((str(part_path), int(rows)))
+    return out
 
 
-SP_NL_SHARDS = _collect_sp_nl_shards()
+SP_NL_SHARDS_WITH_ROWS = _collect_sp_nl_shards_with_rows()
+SP_NL_SHARDS = [p for p, _ in SP_NL_SHARDS_WITH_ROWS]
+SP_NL_TOTAL_ROWS = sum(r for _, r in SP_NL_SHARDS_WITH_ROWS) or 1
 
 
 # === DCLM_200M_VAL — kept for in-domain held-out tracking ===
@@ -173,12 +211,11 @@ _markup_key_to_cache = {
 
 
 def _phase2_weights() -> dict[str, float]:
-    """90% SlimPajama-NL (equal across shards) + 10% (80% code + 20% markup) — matches Aryabumi §3.1 footnote 5."""
+    """90% SlimPajama-NL (ROW-PROPORTIONAL across parts, ≈ token-proportional) + 10% (80% code + 20% markup)."""
     w: dict[str, float] = {}
-    if SP_NL_SHARDS:
-        sp_share = 0.90 / len(SP_NL_SHARDS)
-        for i, _ in enumerate(SP_NL_SHARDS):
-            w[f"sp_nl_shard{i:03d}"] = sp_share
+    if SP_NL_SHARDS_WITH_ROWS:
+        for i, (_, rows) in enumerate(SP_NL_SHARDS_WITH_ROWS):
+            w[f"sp_nl_shard{i:03d}"] = 0.90 * rows / SP_NL_TOTAL_ROWS
     for k, r in CODE_RATIOS.items():
         w[f"code_{k}"] = 0.10 * 0.80 * r
     for k, r in MARKUP_RATIOS.items():
@@ -265,12 +302,12 @@ if __name__ == "__main__":
     print(f"  train_batch_size: {TRAIN_BATCH_SIZE}  per-device: {PER_DEVICE_PARALLELISM}")
     print(f"  num_train_steps: {NUM_TRAIN_STEPS:,}  total trained tokens: {NUM_TRAIN_STEPS * TOKENS_PER_STEP / 1e9:.2f}B")
     print(f"  LR=3e-4 (FRESH), WD=0.1, cosine to 0 (warmup 1% ≈ 147 steps)")
-    print(f"  data: 90% SlimPajama-NL ({len(SP_NL_SHARDS)} shards) + 10% (80% code + 20% markup)")
+    print(f"  data: 90% SlimPajama-NL ({len(SP_NL_SHARDS)} parts, row-proportional ≈ token-proportional) + 10% (80% code + 20% markup)")
     if not SE_PYTHON_CACHE or not SE_MARKDOWN_CACHE or not NEMOTRON_CC_CACHE or not NEMOTRON_UA_CACHE:
         print("\nERROR: code caches missing.")
         raise SystemExit(1)
     if not SP_NL_SHARDS:
-        print("\nERROR: SlimPajama-NL shards missing.")
+        print("\nERROR: SlimPajama-NL parts missing.")
         raise SystemExit(1)
     from levanter.main import train_lm
     train_lm.main(train_config)

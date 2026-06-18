@@ -198,6 +198,81 @@ async def test_mixture_dataset_unpermuted_ids():
     assert unpermuted_ids[0] >> 32 in range(3)  # Ensure the dataset ID is valid
 
 
+def test_expected_counts_hamilton_remainder():
+    """Regression for the per-block apportionment bug caught in the C5-v4 audit,
+    fixed 2026-06-15.
+
+    Mirrors the EXACT C5-v4 phase 2 setup that triggered the bug: SlimPajama-NL
+    in 228 row-proportional per-part components (128 small chunk1 parts at
+    ~99,892 rows each + 100 large chunk2 parts at ~518,293 rows each), plus 4
+    code/markup components at their intended 80/20-of-10% inner split. With
+    block_size=2048 this gives a 189-sample remainder; the old "dump to
+    argmax" behavior pooled all 189 into code_se_python (floor 88 → actual
+    277), shifting the bucket totals from intended 90/8/2 NL/code/markup to
+    actual 81/17/2 (caught in Dongwei review, 2026-06-15).
+
+    Hamilton's method bounds per-component drift to ≤ 1 sample. Bucket totals
+    end within 1 sample of intended.
+    """
+    # Row counts: chunk1 = 128 × 99,892 = 12,786,235; chunk2 = 100 × 518,293
+    # = 51,829,342; total = 64,615,577. (Match shard_ledger.json for the
+    # 2026-06-15 SP-NL en-filtered cache.)
+    chunk1_rows_each = 99_892
+    chunk2_rows_each = 518_293
+    n_chunk1, n_chunk2 = 128, 100
+    sp_total_rows = chunk1_rows_each * n_chunk1 + chunk2_rows_each * n_chunk2
+    sp_share = 0.90
+    sp_weights = {
+        **{f"sp_chunk1_{i:03d}": sp_share * chunk1_rows_each / sp_total_rows for i in range(n_chunk1)},
+        **{f"sp_chunk2_{i:03d}": sp_share * chunk2_rows_each / sp_total_rows for i in range(n_chunk2)},
+    }
+    # 10% code+markup at 80/20 inner split, code split per C5-v4's 8.8/7.3/0.2 ratio.
+    code_total = 8.8 + 7.3 + 0.2
+    bucket_weights = {
+        "code_se_python": 0.10 * 0.80 * (8.8 / code_total),
+        "code_nemotron_cc": 0.10 * 0.80 * (7.3 / code_total),
+        "code_nemotron_ua": 0.10 * 0.80 * (0.2 / code_total),
+        "markup_se_markdown": 0.10 * 0.20 * 1.0,
+    }
+    all_weights = {**sp_weights, **bucket_weights}
+    dses = {name: ListAsyncDataset([0]) for name in all_weights}
+    block_size = 2048
+    md = MixtureDataset(dses, all_weights, block_size=block_size, key=key())
+
+    counts = md._compute_expected_counts_per_block(all_weights, block_size)
+    assert int(counts.sum()) == block_size
+
+    # Per-component drift ≤ 1 sample (the Hamilton invariant).
+    targets = np.array([all_weights[n] * block_size for n in all_weights])
+    drift = np.abs(counts - targets)
+    assert drift.max() < 1.0, (
+        f"Hamilton per-component drift exceeds 1 sample (max={drift.max()}). "
+        "This regresses to the dump-to-largest behavior."
+    )
+
+    # Bucket totals within 1 sample of intended (the audit-relevant property).
+    names = list(all_weights.keys())
+    sp_count = sum(int(counts[i]) for i, n in enumerate(names) if n.startswith("sp_"))
+    code_count = sum(int(counts[i]) for i, n in enumerate(names) if n.startswith("code_"))
+    markup_count = sum(int(counts[i]) for i, n in enumerate(names) if n.startswith("markup_"))
+    sp_target = 0.90 * block_size
+    code_target = 0.08 * block_size
+    markup_target = 0.02 * block_size
+    assert abs(sp_count - sp_target) < 2, f"SP-NL bucket drift too large: {sp_count} vs {sp_target}"
+    assert abs(code_count - code_target) < 2, f"CODE bucket drift too large: {code_count} vs {code_target}"
+    assert abs(markup_count - markup_target) < 2, f"MARKUP bucket drift too large: {markup_count} vs {markup_target}"
+
+    # The exact bug-scenario witness: code_se_python must be near its intended
+    # floor (~88), NOT the old dump-to-largest result (~277).
+    se_python_idx = names.index("code_se_python")
+    se_python_target = bucket_weights["code_se_python"] * block_size
+    assert abs(int(counts[se_python_idx]) - se_python_target) < 1.0, (
+        f"code_se_python count {counts[se_python_idx]} far from intended "
+        f"{se_python_target:.2f}. Old 'dump-to-largest' gave 277 here — "
+        "this regression test must catch that."
+    )
+
+
 @pytest.mark.asyncio
 async def test_mixture_dataset_remap_indices():
     dses = datasets()

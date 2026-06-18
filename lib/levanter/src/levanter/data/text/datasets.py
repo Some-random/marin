@@ -328,13 +328,37 @@ class DatasetComponentBase(ChoiceRegistry):
 @DatasetComponentBase.register_subclass("cached")
 @dataclass(frozen=True)
 class DatasetComponent(DatasetComponentBase):
-    """A single cache-backed dataset component with optional source."""
+    """A single cache-backed dataset component with optional source.
+
+    `offset`: when > 0, skip the first `offset` sequences of the FULLY-SHUFFLED
+    train dataset (i.e. after both the optional pre-split Feistel shuffle and
+    the post-split `shuffle` permutation have been applied).
+
+    Used to resume a `MixtureDataset` to a position past what an earlier phase
+    consumed (e.g. C5-v6-NEW phase 2 starts past phase 1's consumption point so
+    it sees disjoint docs, not replay).
+
+    Disjointness contract: given two runs with identical `data_seed`, identical
+    `shuffle` / `permutation_type` / `shuffle_before_trainval_split` settings,
+    identical `num_validation_sequences` per component, and run A using
+    `offset=0` and run B using `offset=N`, the docs A reads from indices
+    `[0, N)` of its shuffled stream are exactly the docs B's offset hides.
+    The earlier (buggy) implementation sliced in pre-shuffle index space and
+    then re-shuffled a smaller domain, which broke this contract because
+    Feistel-of-length-L and Feistel-of-length-(L-N) are unrelated permutations.
+
+    The offset slice is applied at the end of `LmDataConfig.train_sets()`, so
+    validation data is unaffected (val sees the same fixed positional tail).
+    With Levanter's RESTART strategy, the `MixtureDataset` wraps modulo the
+    sliced length, so the first `offset` shuffled docs are never revealed.
+    """
 
     source: LmDatasetSourceConfigBase | None = None
     cache_dir: str | None = None
     format: LmDatasetFormatBase = field(default_factory=TextLmDatasetFormat)
     pack: bool | int | Literal["pad"] | None = None
     tags: list[str] | None = None
+    offset: int = 0
 
 
 @DatasetComponentBase.register_subclass("direct")
@@ -464,14 +488,14 @@ def dataset_for_component(
             raise NotImplementedError("Padding mode not yet implemented.")
         if pack:
             max_segments = 64 if pack is True else int(pack)
-            return PackedTokenDataset(
+            ds: AsyncDataset[GrugLmExample] = PackedTokenDataset(
                 cache,
                 Pos,
                 max_segments_per_example=max_segments,
                 block_cross_document_attention=block_cross_document_attention,
             )
         else:
-            return CausalLmDataset(
+            ds = CausalLmDataset(
                 TokenSeqDataset(cache, Pos.size),
                 Pos,
                 eos_id=eos_id,
@@ -485,7 +509,7 @@ def dataset_for_component(
             64 if effective_pack is True else (int(effective_pack) if isinstance(effective_pack, int) else 1)
         )
         mask_user_turns = fmt.mask_user_turns
-        return ChatDataset(
+        ds = ChatDataset(
             cache,
             Pos,
             max_segments_per_example=max_segments,
@@ -493,7 +517,7 @@ def dataset_for_component(
             block_cross_document_attention=block_cross_document_attention,
         )  # type: ignore
     elif isinstance(fmt, PrebuiltLmDatasetFormat):
-        return PrebuiltLmDataset(
+        ds = PrebuiltLmDataset(
             cache,
             Pos,
             input_ids_key=fmt.input_ids_key,
@@ -504,6 +528,13 @@ def dataset_for_component(
         )
     else:
         raise ValueError(f"Unknown format {fmt}")
+    # NOTE: `component.offset` is intentionally NOT applied here. Applying it
+    # pre-shuffle would re-domain the Feistel permutation and break the
+    # phase-1 / phase-2 disjointness contract documented on `DatasetComponent`.
+    # The offset slice is applied at the end of `LmDataConfig.train_sets`,
+    # after the full pre-split + post-split shuffles, so phase 2 truly skips
+    # the prefix of phase 1's shuffled stream.
+    return ds
 
 
 def _component_cache_dir(name: str, component: DatasetComponent, default_root: str | None) -> str:
@@ -781,6 +812,21 @@ class LmDataConfig:
                         num_sequences <= len_dataset
                     ), f"Max sequences for {name} ({num_sequences}) is greater than the dataset size ({len_dataset})"
                     datasets[name] = ds.slice_dataset(end_index=num_sequences)
+
+        # Apply per-component `offset` AFTER all shuffles/slicing. See
+        # DatasetComponent.offset docstring for the disjointness contract.
+        for name, component in self.components.items():
+            if not isinstance(component, DatasetComponent) or component.offset <= 0:
+                continue
+            if name not in datasets:
+                continue
+            ds = datasets[name]
+            len_ds = len(ds.as_sync_dataset())
+            assert component.offset < len_ds, (
+                f"Component {name!r} offset={component.offset} exceeds shuffled-train length {len_ds}. "
+                "Pick a smaller offset (typical: previous phase's per-component consumption count)."
+            )
+            datasets[name] = ds.slice_dataset(start_index=component.offset)
 
         return datasets
 

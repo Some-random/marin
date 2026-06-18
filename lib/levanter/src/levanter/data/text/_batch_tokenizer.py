@@ -59,7 +59,14 @@ class BatchTokenizer(BatchProcessor[dict, dict]):
         self._workaround_len = _workaround_len
 
     def __call__(self, batch: Sequence[dict]) -> list[dict]:
+        # Filter out None / empty text records — some SWH-fetched corpora write
+        # records with text=null when a blob fetch returned empty content. The
+        # rest of the pipeline assumes str-typed text; without this guard the
+        # next list-comp crashes with `unsupported operand type(s) for +:
+        # 'NoneType' and 'str'`. Doc-level filter; the count drop is at most
+        # a fraction of a percent on Stack-Edu fetches (2026-06-16).
         batch_text = [example[self.text_field] for example in batch]
+        batch_text = [d for d in batch_text if d is not None and d != ""]
 
         if self._need_to_add_bos:
             bos = self.tokenizer.bos_token

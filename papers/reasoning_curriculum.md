@@ -197,6 +197,16 @@
 
 ---
 
+### [Nemotron-CLIMB: CLustering-based Iterative Data Mixture Bootstrapping for Language Model Pre-training](https://arxiv.org/abs/2504.13161) (Diao, Yang, Fu, Dong, Su, Kliegl, Chen, Belcak et al., NVIDIA, 2025)
+
+**Motivation:** Pre-training datasets are typically web-collected and have no inherent domain divisions (Common Crawl has no domain labels; The Pile-style manual curation is labor-intensive). Identifying an optimal pre-training data mixture remains an open problem despite large potential gains.
+
+**Experiment Setup:** CLustering-based Iterative Data Mixture Bootstrapping (CLIMB): embed and cluster a large-scale dataset in semantic space, then iteratively search for optimal cluster mixtures using a smaller proxy model + a predictor. Train a 1B model continuously on 400 B tokens with the discovered mixture. Also ablate domain-specific optimization (e.g. Social Sciences).
+
+**Conclusion:** CLIMB's 1B model trained on 400 B tokens exceeds Llama-3.2-1B by 2.0 % on the chosen aggregate. Optimizing for a specific domain (Social Sciences) gives a +5 % improvement over random sampling. Releases (1) **Nemotron-ClimbLab**, a filtered 1.2 T-token corpus with 20 clusters as a research playground, and (2) **Nemotron-ClimbMix**, a compact 400 B-token mixture that delivers superior performance under equal token budget compared to standard recipes. Final-mixture analysis characterizes what an optimal mixture looks like in their setup. Data at https://research.nvidia.com/labs/lpr/climb/
+
+---
+
 ### [Warm Up Before You Train](https://arxiv.org/abs/2505.13718) (Shrestha et al., 2025)
 
 **Motivation:** Training reasoning-capable LLMs requires large-scale RLVR or extensive curated long-CoT data. The paper asks whether a lightweight warmup on a simple, domain-agnostic reasoning task can serve as a meta-learning prior for sample-efficient adaptation.

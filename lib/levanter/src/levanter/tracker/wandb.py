@@ -227,9 +227,19 @@ class WandbConfig(TrackerConfig):
     document for more details.
     """
 
-    save_code: Union[bool, str] = True
+    save_code: Union[bool, str] = False
     """If string, will save code from that directory. If True, will attempt to sniff out the main directory (since we
-    typically don't run from the root of the repo)."""
+    typically don't run from the root of the repo).
+
+    Default changed True → False on 2026-06-17 — the wandb-core
+    artifact-saver subsystem has a nil-context race condition that fires
+    from `save_code=True`'s code-artifact upload on non-zero ranks. The
+    crash manifests as a Go-side SIGSEGV in `gql.CreateArtifact` at
+    `pc=0xb458cb` due to nil `ArtifactSaver.ctx`. Same bug class that
+    motivated flipping `TrainerConfig.log_jaxprs` and `log_xla_hlo` to
+    False on 2026-06-15. Three separate `log_artifact` triggers, same
+    root cause. Disabling `save_code` by default eliminates the third
+    trigger; per-script override to True is still possible for debug."""
 
     save_xla_dumps: bool = False
     """If True, will save the XLA code to wandb (as configured by XLA_FLAGS). This is useful for debugging."""

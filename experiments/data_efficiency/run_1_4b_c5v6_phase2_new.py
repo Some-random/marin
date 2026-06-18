@@ -201,9 +201,21 @@ _shard_val_sizes = {k: 0 for k in {**_dclm_components, **_code_components, **_ma
 
 data_config = LmDataConfig(
     components={
-        **_dclm_components,
-        **_code_components,
-        **_markup_components,
+        # IMPORTANT: code_* and markup_* MUST come first, in the SAME order as
+        # C5-v3 phase 1's components dict (see run_1_4b_c5v3_phase1.py:166-171).
+        # Reason: Levanter's shuffle keys are pulled from a key_iterator in
+        # dict-iteration order (lib/levanter/.../data/text/datasets.py:786).
+        # If a reused-cache component is at a different position here than in
+        # phase 1, it gets a different shuffle key → its shuffled stream
+        # differs from phase 1's → the offset slice doesn't cleanly skip past
+        # what phase 1 consumed. Keeping code/markup at the SAME insertion
+        # positions as phase 1 (0..3) ensures their shuffle keys align so the
+        # offset = phase-1-consumption math actually gives disjointness.
+        # The DCLM components are NEW (no phase 1 equivalent) so they can sit
+        # anywhere; placing them after code/markup avoids the position drift.
+        **_code_components,    # index 0..2 — matches C5-v3 phase 1 indices 0..2
+        **_markup_components,  # index 3    — matches C5-v3 phase 1 index 3
+        **_dclm_components,    # index 4..10 — new in phase 2, no phase-1 dependency
         "dclm_200m_val": DatasetComponent(cache_dir=DCLM_VAL),
         **paloma_components,
     },
@@ -241,6 +253,12 @@ train_config = TrainLmConfig(
             save_interval=timedelta(minutes=30),
             keep=[{"every": NUM_TRAIN_STEPS // 4}],
         ),
+        # 2026-06-16: attempt 4 crashed at step ~10500 of 14672 with JAX
+        # DEADLINE_EXCEEDED (2 ranks died silently). Resume from the latest
+        # full checkpoint to recover the remaining ~4200 steps + their
+        # optimizer state. Setting load_checkpoint_path forces the trainer
+        # to load this checkpoint instead of starting from initialize_from.
+        load_checkpoint_path="checkpoints/1_4b_c5v6new_phase2/f190140z/step-10458",
         ray=RayConfig(auto_start_cluster=False),
         distributed=_distributed_from_env(),
         jax_compilation_cache_dir="/fsx/users/dongweij/marin/outputs/jax_compile_cache",

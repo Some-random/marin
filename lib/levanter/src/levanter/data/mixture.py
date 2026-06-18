@@ -142,23 +142,74 @@ class MixtureDataset(AsyncDataset[T]):
         return counts_per_block_per_stage, counts_after_stage, unpermuted_ids_per_stage
 
     def _compute_expected_counts_per_block(self, weights: dict[str, float], block_size: int):
-        _expected_values_per_block = np.zeros(len(self.datasets), dtype=np.int32)
-        for i, dsname in enumerate(self.dataset_index):
-            _expected_values_per_block[i] = weights.get(dsname, 0) * block_size
+        """Distribute `block_size` samples across components by their weights.
 
-        # handle remainder by adding to the largest dataset
-        largest_dataset = np.argmax(_expected_values_per_block)
-        _expected_values_per_block[largest_dataset] += block_size - _expected_values_per_block.sum()
+        Uses Hamilton/largest-remainder apportionment:
+          1. Compute exact float target = weight * block_size for each component.
+          2. Floor each to the integer count.
+          3. Distribute the remaining (block_size − sum_of_floors) samples one
+             at a time to the components with the largest fractional residuals
+             (ties broken stably by insertion order).
 
-        # check if any dataset has 0 samples (and nonzero weight)
+        Per-component drift is bounded by 1 sample regardless of N.
+
+        Replaces an earlier "dump entire remainder into the argmax floor"
+        implementation that produced large drift on multi-component mixes.
+        Caught 2026-06-15 on the C5-v4 phase 2 setup: 228 row-proportional
+        SP-NL components (128 small chunk1 parts at weight ≈ 1.4e-3 each + 100
+        large chunk2 parts at weight ≈ 7.2e-3 each) + 4 code/markup components.
+        For block_size=2048:
+          - floor sum = 1859  (1656 SP-NL + 203 code/markup)
+          - remainder = 189 samples
+          - argmax = code_se_python (floor 88)
+          - old behavior dumped all 189 → se_python jumped to 277
+          - bucket totals shifted from intended 90/8/2 to actual 81/17/2 NL/code/markup
+
+        BACKWARD INCOMPATIBLE: this changes per-block component counts for
+        EVERY MixtureDataset, not just multi-component setups. Resumed runs
+        started under the old sampler will see a different data ordering
+        after this patch — do not expect bitwise-identical data streams.
+        """
+        n_components = len(self.datasets)
+        targets = np.zeros(n_components, dtype=np.float64)
         for i, dsname in enumerate(self.dataset_index):
-            if _expected_values_per_block[i] == 0 and weights.get(dsname, 0) > 0:
+            targets[i] = weights.get(dsname, 0) * block_size
+
+        floors = np.floor(targets).astype(np.int64)
+        remainder = int(block_size - floors.sum())
+        residuals = targets - floors
+
+        # For normalized nonnegative weights (sum(weights) ≤ 1) the floor sum is
+        # always ≤ block_size, so remainder ≥ 0. We assert it: a negative
+        # remainder indicates sum(weights) > 1 (which means the mixture is
+        # over-prescribed and the train_weights config is wrong upstream).
+        assert remainder >= 0, (
+            f"Negative remainder ({remainder}) in Hamilton apportionment: "
+            f"sum(weights)={sum(weights.values()):.6f} likely exceeds 1.0. "
+            f"Fix the upstream train_weights config so weights sum to ≤ 1."
+        )
+
+        counts = floors.copy()
+        if remainder > 0:
+            # argsort(-residuals) gives indices ordered by descending residual;
+            # numpy's stable sort breaks ties by insertion order, so the result
+            # is deterministic across runs.
+            top = np.argsort(-residuals, kind="stable")[:remainder]
+            counts[top] += 1
+
+        assert counts.sum() == block_size, (
+            f"Hamilton apportionment failed: counts sum to {counts.sum()} != block_size={block_size}"
+        )
+
+        # Warn on zero-but-nonzero-weight components (sampler can't include them).
+        for i, dsname in enumerate(self.dataset_index):
+            if counts[i] == 0 and weights.get(dsname, 0) > 0:
                 warnings.warn(
                     f"Dataset {dsname} has 0 samples in the block, but weight of {weights[dsname]}."
                     " Recommend increasing block size."
                 )
 
-        return _expected_values_per_block
+        return counts.astype(np.int32)
 
     def _compute_unpermuted_ids(self, counts_per_block):
         unpermuted_ids = np.zeros(int(counts_per_block.sum()), dtype=np.int64)

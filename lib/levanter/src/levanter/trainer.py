@@ -807,10 +807,30 @@ class TrainerConfig:
     watch: WatchConfig = WatchConfig()
     profiler: ProfilerConfig = ProfilerConfig()
 
-    log_jaxprs: bool = True
-    """Whether to log the jaxpr of the training step. This is useful for debugging and understanding the model."""
-    log_xla_hlo: bool = True
-    """Whether to log the XLA HLO of the training step. This is useful for debugging and understanding the model."""
+    log_jaxprs: bool = False
+    """Whether to log the jaxpr of the training step as a wandb artifact.
+
+    Default changed True → False on 2026-06-15 because the wandb-core
+    artifact-saver subsystem has a nil-context race condition that crashes
+    multi-node runs at startup. The crash manifests as either:
+      (a) Go-side SIGSEGV in `gql.CreateArtifact` (or `gql.InputFields` on
+          wandb < 0.26) at `pc=0xb458cb` due to nil `ArtifactSaver.ctx`, or
+      (b) Python-side SIGBUS during wandb's md5 file hash on Lustre.
+    Both crash modes fire from the FIRST `log_artifact` call after
+    `wandb.init`, which is this `_maybe_save_jaxpr` save. Disabling the
+    save eliminates both failure modes — verified on C5-v6-NEW retry chain
+    2026-06-15 (attempts 1, 2, 3 all failed; attempt 4 with this off
+    survived). For debug needs, override to True per-script after weighing
+    the multi-node crash risk against your need to inspect the jaxpr."""
+    log_xla_hlo: bool = False
+    """Whether to log the XLA HLO of the training step as a wandb artifact.
+
+    Default changed True → False on 2026-06-15 for the same wandb-core
+    artifact-saver bug described above on `log_jaxprs`. The HLO save is the
+    SECOND `log_artifact` call (after the jaxpr save), and it's the more
+    common SIGBUS trigger on Lustre because the HLO file is large
+    (~hundreds of MB) and wandb md5-hashes it via mmap. Override per-script
+    if you need the HLO."""
 
     # helpful checks
     crash_on_nan: bool = True

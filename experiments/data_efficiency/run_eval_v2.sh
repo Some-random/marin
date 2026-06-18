@@ -6,7 +6,14 @@
 #   (b) code_eval cache race on multi-GPU mbpp/humaneval — wrapper sets
 #       HF_METRICS_CACHE=/tmp/hf_metrics_rank_$LOCAL_RANK per worker.
 #
-# Usage: run_eval_v2.sh <LABEL> <HF_DIR>
+# Usage:
+#   run_eval_v2.sh <LABEL> <HF_DIR>             (run all 15 task groups, ~67 min)
+#   run_eval_v2.sh <LABEL> <HF_DIR> <SHARD>     (run a shard: A/B/C/D, ~16-19 min)
+#
+# When invoked with a SHARD arg, the dispatcher driver
+# (run_eval_v2_sharded.sh) MUST pass OUT_ROOT via env so all 4 shards
+# write into the same timestamped results dir. Without the env var the
+# script generates its own OUT_ROOT (back-compat for single-node mode).
 set -uo pipefail
 cd /fsx/users/dongweij/marin
 export HF_TOKEN=$(cat /fsx/users/dongweij/.cache/huggingface/token)
@@ -20,7 +27,13 @@ export HF_HUB_OFFLINE=1
 
 LABEL="${1:?LABEL required}"
 HF_DST="${2:?HF_DST required}"
-OUT_ROOT=/fsx/users/dongweij/marin/outputs/eval_results/v2_${LABEL}_$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M)
+SHARD="${3:-all}"   # all | A | B | C | D
+
+# OUT_ROOT may be passed via env by the sharded dispatcher so all 4 shards
+# write into the same dir. Otherwise generate a new timestamped path.
+if [ -z "${OUT_ROOT:-}" ]; then
+  OUT_ROOT=/fsx/users/dongweij/marin/outputs/eval_results/v2_${LABEL}_$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M)
+fi
 mkdir -p "$OUT_ROOT"
 WRAPPER=/fsx/users/dongweij/marin/outputs/lm_eval_wrapper.py
 echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL eval suite → $OUT_ROOT"
@@ -67,43 +80,77 @@ run_lm_eval() {
   return 1
 }
 
-# Standard suite — same task set + nshot as the previous final eval.
-run_lm_eval "arc_easy,arc_challenge" 25 16 ""
-run_lm_eval "hellaswag" 10 16 ""
-run_lm_eval "winogrande,gsm8k" 5 16 ""
-run_lm_eval "mmlu" 5 16 ""
-run_lm_eval "piqa,boolq,sciq,openbookqa,commonsense_qa,social_iqa,logiqa" 0 16 ""
-run_lm_eval "openbookqa_fact" 0 16 ""
-run_lm_eval "gsm8k_cot" 8 8 "--confirm_run_unsafe_code"
-# code_eval tasks now safe multi-GPU thanks to per-rank metrics cache.
-run_lm_eval "mbpp" 3 8 "--confirm_run_unsafe_code"
-run_lm_eval "humaneval" 0 8 "--confirm_run_unsafe_code"
-run_lm_eval "minerva_math" 4 8 ""
-run_lm_eval "lambada_openai,copa,wsc,agieval_lsat_ar" 0 16 ""
-run_lm_eval "gpqa" 0 8 ""
-run_lm_eval "bbh" 3 8 "--limit 0.1"
-run_lm_eval "mmlu_pro" 5 8 "--limit 0.1"
+# bigcode HumanEval (separate venv) — packaged as a function so shards can call it.
+run_bigcode_humaneval() {
+  local BC_OUT="$OUT_ROOT/bigcode_humaneval"
+  mkdir -p "$BC_OUT"
+  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval start"
+  .venv_bigcode/bin/accelerate launch --multi_gpu --num_processes 8 --num_machines 1 \
+    /fsx/users/dongweij/marin/bigcode-evaluation-harness/main.py \
+    --model "$HF_DST" \
+    --tasks humaneval \
+    --max_length_generation 512 \
+    --temperature 0.0 \
+    --do_sample False \
+    --n_samples 1 \
+    --batch_size 1 \
+    --precision bf16 \
+    --allow_code_execution \
+    --save_generations \
+    --save_generations_path "$BC_OUT/generations.json" \
+    --metric_output_path "$BC_OUT/metrics.json" \
+    --trust_remote_code > "$BC_OUT/eval.log" 2>&1 && \
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval DONE" || \
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval FAILED-CONTINUE"
+}
 
-# bigcode HumanEval — same env vars apply, openai_humaneval is in shared cache.
-BC_OUT="$OUT_ROOT/bigcode_humaneval"
-mkdir -p "$BC_OUT"
-echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval start"
-.venv_bigcode/bin/accelerate launch --multi_gpu --num_processes 8 --num_machines 1 \
-  /fsx/users/dongweij/marin/bigcode-evaluation-harness/main.py \
-  --model "$HF_DST" \
-  --tasks humaneval \
-  --max_length_generation 512 \
-  --temperature 0.0 \
-  --do_sample False \
-  --n_samples 1 \
-  --batch_size 1 \
-  --precision bf16 \
-  --allow_code_execution \
-  --save_generations \
-  --save_generations_path "$BC_OUT/generations.json" \
-  --metric_output_path "$BC_OUT/metrics.json" \
-  --trust_remote_code > "$BC_OUT/eval.log" 2>&1 && \
-  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval DONE" || \
-  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval FAILED-CONTINUE"
+# Task groups grouped by SHARD. Balanced from observed C5-v6-NEW v7 timings
+# (each shard ~16-19 min vs 67 min serial).
+# Shard A (~16 min): mmlu_pro [13] + openbookqa_fact [1] + lambada group [2]
+# Shard B (~16 min): minerva_math [12] + arc [4]
+# Shard C (~17 min): gpqa [7] + bbh [6] + hellaswag [4]
+# Shard D (~19 min): bigcode [3] + humaneval [3] + mbpp [2] + gsm8k_cot [3] +
+#                    mmlu [3] + winogrande+gsm8k [3] + piqa group [2]
+shard_A() {
+  run_lm_eval "mmlu_pro" 5 8 "--limit 0.1"
+  run_lm_eval "openbookqa_fact" 0 16 ""
+  run_lm_eval "lambada_openai,copa,wsc,agieval_lsat_ar" 0 16 ""
+}
+shard_B() {
+  run_lm_eval "minerva_math" 4 8 ""
+  run_lm_eval "arc_easy,arc_challenge" 25 16 ""
+}
+shard_C() {
+  run_lm_eval "gpqa" 0 8 ""
+  run_lm_eval "bbh" 3 8 "--limit 0.1"
+  run_lm_eval "hellaswag" 10 16 ""
+}
+shard_D() {
+  run_bigcode_humaneval
+  run_lm_eval "humaneval" 0 8 "--confirm_run_unsafe_code"
+  run_lm_eval "mbpp" 3 8 "--confirm_run_unsafe_code"
+  run_lm_eval "gsm8k_cot" 8 8 "--confirm_run_unsafe_code"
+  run_lm_eval "mmlu" 5 16 ""
+  run_lm_eval "winogrande,gsm8k" 5 16 ""
+  run_lm_eval "piqa,boolq,sciq,openbookqa,commonsense_qa,social_iqa,logiqa" 0 16 ""
+}
 
-echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] ALL DONE → $OUT_ROOT"
+case "$SHARD" in
+  A) shard_A ;;
+  B) shard_B ;;
+  C) shard_C ;;
+  D) shard_D ;;
+  all)
+    shard_A
+    shard_B
+    shard_C
+    shard_D
+    ;;
+  *) echo "unknown SHARD '$SHARD' — must be A/B/C/D/all" >&2; exit 2 ;;
+esac
+
+if [ "$SHARD" = "all" ]; then
+  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] ALL DONE → $OUT_ROOT"
+else
+  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] SHARD $SHARD DONE → $OUT_ROOT"
+fi

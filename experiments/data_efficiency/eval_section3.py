@@ -88,9 +88,11 @@ TASKS: list[TaskRow] = [
     TaskRow("lambada_openai[0]", "lambada_openai", ("acc,none",)),  # NOT perplexity
     TaskRow("copa[0]", "copa", ("acc,none",)),
     TaskRow("wsc[0]", "wsc", ("acc,none",)),
-    TaskRow("storycloze_2018_local[0]", "storycloze_2018_local", ("acc,none",)),
-    TaskRow("cb[0]", "cb", ("acc,none",)),
-    TaskRow("quac_first_turn[0]", "quac_first_turn", ("f1,none",)),
+    # Not in run_eval_v2.sh — filled by auxiliary runners
+    # (run_aryabumi_nl_extras.sh for storycloze+cb, run_quac_for_model.sh for quac).
+    TaskRow("storycloze_2018_local[0]", "storycloze_2018_local", ("acc,none",), runs_in_v2_suite=False),
+    TaskRow("cb[0]", "cb", ("acc,none",), runs_in_v2_suite=False),
+    TaskRow("quac_first_turn[0]", "quac_first_turn", ("f1,none",), runs_in_v2_suite=False),
     TaskRow("agieval_lsat_ar[0]", "agieval_lsat_ar", ("acc_norm,none", "acc,none")),
     TaskRow("gpqa_diamond[0]", "gpqa_diamond_zeroshot", ("acc,none",)),
     TaskRow("bbh[3] (limit=0.1)", "bbh", (
@@ -436,9 +438,21 @@ def cmd_validate(args):
 
 
 def cmd_fill_from_results(args):
-    """Fill a §3 column from a single results dir. Column is identified by header substring match."""
+    """Fill a §3 column from a single results dir. Column is identified by header substring match.
+
+    Manifest validation: by default, refuse-fail if any v2-suite task is missing
+    a results JSON (or its expected metric key). This guards against the
+    2026-06-15 audit bug where `humaneval[0] (bigcode)` silently dropped from
+    Mean Code because nothing checked the expected file list was present.
+    Pass `--allow-missing` to opt out (e.g. partial backfill of a single task).
+    """
     results_dir = Path(args.results_dir)
     col_label_substr = args.col_label
+    allow_missing = bool(getattr(args, "allow_missing", False))
+
+    if not results_dir.exists():
+        print(f"ERROR: results dir does not exist: {results_dir}")
+        sys.exit(1)
 
     lines = MD.read_text().split("\n")
     header_idx, table_end = find_section3_table(lines)
@@ -461,7 +475,21 @@ def cmd_fill_from_results(args):
             missing.append(task.label)
     print(f"extracted {len(scores)} scores, {len(missing)} missing")
     if missing:
-        print("missing:", missing)
+        print("missing v2-suite tasks (no results JSON or missing metric key):")
+        for label in missing:
+            print(f"  - {label}")
+        if not allow_missing:
+            print(
+                "\nERROR: refusing to update §3 with a half-empty manifest.\n"
+                f"  results_dir: {results_dir}\n"
+                "  Re-run the missing tasks, or pass --allow-missing to fill what IS present.\n"
+                "  Common causes:\n"
+                "    * humaneval/mbpp 'FAILED-CONTINUE' due to torchrun multi-GPU cache collision\n"
+                "      → re-run with num_processes=1 (convert_and_eval_v2.sh has the fix)\n"
+                "    * paloma OfflineModeIsEnabled → use run_paloma_for_model.sh (OFFLINE=0)\n"
+                "    * runner script `||`-swallowed crash → grep the .log for Traceback"
+            )
+            sys.exit(2)
 
     # Update cells
     updated = 0
@@ -593,21 +621,37 @@ def pick_free_nodes(n: int, pool: list[str]) -> list[str]:
     return free
 
 
+# Conversion factor from Levanter eval-loss nats → bits-per-byte on DCLM
+# with the Llama-3.1 tokenizer (4.408 bytes/token, log_e(2) ≈ 0.6931):
+#   bpb = nats / (log_e(2) × bytes_per_token) = nats × (1 / (0.6931 × 4.408)) ≈ nats × 0.3273
+DCLM_NATS_TO_BPB = 0.3273
+
+
 def extract_dclm_from_train_log(log_path: Path) -> float | None:
-    """Grep a Levanter training stdout log for the last `eval/dclm_200m_val/loss` value (nats)."""
+    """Grep a Levanter training stdout log for the last `eval/dclm_200m_val/loss`
+    and return it as **bits-per-byte** (converted from nats via DCLM_NATS_TO_BPB).
+
+    Bug 2026-06-15: this previously returned raw nats but the caller wrote
+    the value into the `dclm_200m_val (bpb)` cell unchanged, so every model
+    filled through `add-model --train-log` had its dclm_200m_val column entry
+    overstated by ~3.05× in the wrong unit. Fixed by converting inside the
+    extractor.
+    """
     if not log_path.exists():
         return None
-    last = None
+    last_nats = None
     # Match: 'eval/dclm_200m_val/loss': 3.992  OR  dclm_200m_val/loss=3.992
     pat = re.compile(r"dclm_200m_val[^=:]*[=:'\"]+\s*([\d.]+)")
     with open(log_path, errors="ignore") as f:
         for line in f:
             for m in pat.finditer(line):
                 try:
-                    last = float(m.group(1))
+                    last_nats = float(m.group(1))
                 except ValueError:
                     pass
-    return last
+    if last_nats is None:
+        return None
+    return last_nats * DCLM_NATS_TO_BPB
 
 
 def extract_paloma_macro(paloma_root: Path) -> float | None:
@@ -803,7 +847,7 @@ def cmd_add_model(args):
         v = extract_dclm_from_train_log(Path(args.train_log))
         if v is not None:
             cmd_fill_cell(argparse.Namespace(row="dclm_200m_val (bpb)", col=col_core_label, value=str(v)))
-            print(f"dclm_200m_val filled: {v:.3f} nats")
+            print(f"dclm_200m_val filled: {v:.3f} bpb")
         else:
             print(f"WARN: could not find dclm_200m_val in {args.train_log}")
 
@@ -875,6 +919,11 @@ def main():
     pf = sub.add_parser("fill-from-results", help="Fill a §3 column from an existing v2-suite results dir")
     pf.add_argument("results_dir")
     pf.add_argument("col_label", help="substring that uniquely identifies the column header (e.g. 'C5-v3-small final')")
+    pf.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help="Allow filling even if some v2-suite tasks are missing. Default is refuse-fail.",
+    )
     pf.set_defaults(func=cmd_fill_from_results)
 
     pc = sub.add_parser("fill-cell", help="Fill a single (row, column) cell with a value (e.g. dclm_200m_val from a training log)")
