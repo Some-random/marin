@@ -15,6 +15,7 @@ LABEL=""
 SRC=""
 HF_DST=""
 NODE="gpu-st-p4d24xlarge-4"
+MODEL_KEY="1_4b4k"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -22,12 +23,13 @@ while [ $# -gt 0 ]; do
     --src) SRC="$2"; shift 2 ;;
     --hf-dst) HF_DST="$2"; shift 2 ;;
     --node) NODE="$2"; shift 2 ;;
+    --model-key) MODEL_KEY="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
 
 if [ -z "$LABEL" ] || [ -z "$SRC" ] || [ -z "$HF_DST" ]; then
-  echo "Usage: $0 --label NAME --src LEVANTER_DIR --hf-dst HF_DIR [--node NODENAME]" >&2
+  echo "Usage: $0 --label NAME --src LEVANTER_DIR --hf-dst HF_DIR [--node NODENAME] [--model-key 1_4b4k|300m4k|600m4k|...]" >&2
   exit 1
 fi
 
@@ -55,7 +57,7 @@ import equinox as eqx, haliax as hax, jax
 from experiments.data_efficiency.models import model_dict
 from levanter.checkpoint import load_checkpoint
 from levanter.compat.hf_checkpoints import load_tokenizer
-mc = model_dict['1_4b4k']
+mc = model_dict['$MODEL_KEY']
 tok = load_tokenizer('meta-llama/Meta-Llama-3.1-8B')
 Vocab = hax.Axis('vocab', len(tok))
 mesh = jax.sharding.Mesh(jax.devices('cpu')[:1], ('data',))
