@@ -3,7 +3,7 @@
 <details>
 <summary><h2>Model Training / Tech Reports</h2></summary>
 
-### [Textbooks Are All You Need (Phi-1)](https://arxiv.org/abs/2306.11644) (Gunasekar et al., 2023)
+### [Textbooks Are All You Need (Phi-1)](https://arxiv.org/abs/2306.11644) (Gunasekar et al., 2023, 603 citations)
 
 **Motivation:** Existing code LLMs rely on massive datasets and large model sizes, yet most training data from The Stack and StackOverflow is noisy and poorly instructive. The authors hypothesize that curating high-quality "textbook-like" data can dramatically shift scaling laws and allow much smaller models to achieve state-of-the-art code generation.
 
@@ -13,7 +13,7 @@
 
 ---
 
-### [Phi-1.5 Technical Report](https://arxiv.org/abs/2309.05463) (Li et al., 2023)
+### [Phi-1.5 Technical Report](https://arxiv.org/abs/2309.05463) (Li et al., 2023, 655 citations)
 
 **Motivation:** Following phi-1's success on code, the authors extend the "textbooks are all you need" approach to common sense reasoning and natural language understanding, testing how small an LLM can be while still exhibiting strong reasoning.
 
@@ -23,7 +23,7 @@
 
 ---
 
-### [Phi-3 Technical Report](https://arxiv.org/abs/2404.14219) (Microsoft, 2024)
+### [Phi-3 Technical Report](https://arxiv.org/abs/2404.14219) (Microsoft, 2024, 2244 citations)
 
 **Motivation:** Prior Phi models showed quality data enables small models to rival larger ones, but still trailed frontier models on broad benchmarks. The authors aim to build a model small enough to run on a phone (3.8B parameters) that rivals GPT-3.5 and Mixtral 8x7B, introducing a "data optimal regime" -- focusing on the right quality of data for a given model size.
 
@@ -33,7 +33,7 @@
 
 ---
 
-### [Phi-4 Technical Report](https://arxiv.org/abs/2412.08905) (Abdin et al., 2024)
+### [Phi-4 Technical Report](https://arxiv.org/abs/2412.08905) (Abdin et al., 2024, 672 citations)
 
 **Motivation:** Previous Phi models largely distilled from GPT-4, but phi-4 aims to go beyond distillation -- substantially surpassing its teacher on STEM QA. The key insight is that synthetic data offers structural advantages: it provides gradual, step-by-step reasoning that aligns with how LLMs learn via next-token prediction.
 
@@ -43,7 +43,7 @@
 
 ---
 
-### [OLMo 2: 2 OLMo 2 Furious](https://arxiv.org/abs/2501.00656) (AI2, 2025)
+### [OLMo 2: 2 OLMo 2 Furious](https://arxiv.org/abs/2501.00656) (AI2, 2025, 226 citations)
 
 **Motivation:** Despite many open-weights models (Llama 3, Qwen 2, Gemma 2), these are only final artifacts lacking full training data, code, and recipes for reproduction. OLMo 2 aims to be a fully open alternative on the Pareto frontier, with released weights, data, code, logs, and thousands of intermediate checkpoints.
 
@@ -53,7 +53,7 @@
 
 ---
 
-### [OLMo 3](https://arxiv.org/abs/2512.13961) (OLMo Team, AI2, 2026)
+### [OLMo 3](https://arxiv.org/abs/2512.13961) (OLMo Team, AI2, 2026, 0 citations)
 
 **Motivation:** OLMo 2 was fully open but trailed frontier open-weight models. OLMo 3 aims to be the strongest fully-open model family, releasing the entire model flow (every stage, checkpoint, data point, and dependency) at 7B and 32B scales, including thinking (OLMo 3 Think), instruction (OLMo 3 Instruct), and RL-Zero variants.
 
@@ -63,7 +63,7 @@
 
 ---
 
-### [SmolLM2: When Smol Goes Big — Data-Centric Training of a Small Language Model](https://arxiv.org/abs/2502.02737) (Allal et al., HuggingFace, 2025)
+### [SmolLM2: When Smol Goes Big — Data-Centric Training of a Small Language Model](https://arxiv.org/abs/2502.02737) (Allal et al., HuggingFace, 2025, 267 citations)
 
 **Motivation:** Existing small LMs (Qwen2.5-1.5B, Llama3.2-1B) achieve strong results but their training data is closed and ad-hoc, leaving the community without a recipe for "what works at small scale." SmolLM2 argues that small-model performance is bottlenecked by data quality and stage-wise data mixing more than by architecture or scale, and demonstrates that with three new curated datasets (FineMath, Stack-Edu, SmolTalk) and explicit per-stage ablations one can match much larger frontier-derived small models entirely from public open data.
 
@@ -85,7 +85,7 @@
 <details>
 <summary><h2>Reasoning in Pretraining</h2></summary>
 
-### [Front-Loading Reasoning: Synergy between Pretraining and Post-Training Data](https://arxiv.org/abs/2510.03264) (Akter et al., NVIDIA, 2025)
+### [Front-Loading Reasoning: Synergy between Pretraining and Post-Training Data](https://arxiv.org/abs/2510.03264) (Akter et al., NVIDIA, 2025, 21 citations)
 
 **Motivation:** The prevailing approach treats reasoning as a post-training skill, but the role of reasoning data during pretraining itself is poorly understood. This paper asks whether front-loading reasoning data into pretraining establishes durable foundations that later SFT cannot replicate.
 
@@ -95,7 +95,7 @@
 
 ---
 
-### [Procedural Knowledge in Pretraining Drives Reasoning](https://arxiv.org/abs/2411.12580) (Ruis et al., 2025)
+### [Procedural Knowledge in Pretraining Drives Reasoning](https://arxiv.org/abs/2411.12580) (Ruis et al., 2025, 41 citations)
 
 **Motivation:** It is debated whether LLMs truly reason or merely retrieve answers from pretraining data. Understanding which pretraining documents are influential for reasoning vs factual recall can reveal the generalization strategy and inform data selection.
 
@@ -131,7 +131,7 @@
 <details>
 <summary><h2>Reasoning in Post-Training</h2></summary>
 
-### [Echo Chamber: RL Post-training Amplifies Behaviors Learned in Pretraining](https://arxiv.org/abs/2504.07912) (Zhao et al., 2025)
+### [Echo Chamber: RL Post-training Amplifies Behaviors Learned in Pretraining](https://arxiv.org/abs/2504.07912) (Zhao et al., 2025, 116 citations)
 
 **Motivation:** RL fine-tuning consistently improves mathematical reasoning, but the mechanisms are poorly understood. Prior studies use proprietary base models with unknown pretraining data, making it impossible to disentangle RL's effect from what was already learned.
 
@@ -141,7 +141,7 @@
 
 ---
 
-### [On the Interplay of Pre-Training, Mid-Training, and RL](https://arxiv.org/abs/2512.07783) (Zhang et al., CMU, 2025)
+### [On the Interplay of Pre-Training, Mid-Training, and RL](https://arxiv.org/abs/2512.07783) (Zhang et al., CMU, 2025, 50 citations)
 
 **Motivation:** Conflicting views on whether RL truly extends reasoning beyond pretraining, and mid-training's role is underexamined. Prior analyses rely on uncontrolled settings with opaque corpora.
 
@@ -151,7 +151,7 @@
 
 ---
 
-### [Open Thoughts: Data Recipes for Reasoning Models](https://arxiv.org/abs/2506.04178) (Guha et al., 2025)
+### [Open Thoughts: Data Recipes for Reasoning Models](https://arxiv.org/abs/2506.04178) (Guha et al., 2025, 176 citations)
 
 **Motivation:** Frontier reasoning models rely on proprietary training recipes. OpenThoughts aims to create open-source reasoning datasets by systematically investigating each step of the data generation pipeline through over 1,000 controlled experiments.
 
@@ -164,7 +164,7 @@
 <details>
 <summary><h2>Training (Synthetic) Data and Tasks</h2></summary>
 
-### [DataComp-LM: In search of the next generation of training sets for language models](https://arxiv.org/abs/2406.11794) (Li, Fang, Smyrnis, Ivgi et al., 2024-2025)
+### [DataComp-LM: In search of the next generation of training sets for language models](https://arxiv.org/abs/2406.11794) (Li, Fang, Smyrnis, Ivgi et al., 2024-2025, 347 citations)
 
 **Motivation:** Two challenges in data-curation research: (1) lack of controlled comparisons — proposals often compare models trained with different architectures, compute, or hyperparameters, so it's unclear whether a dataset-A vs dataset-B difference is actually due to the data; (2) state-of-the-art training sets are increasingly proprietary (Llama, Mistral, Gemma do not release training data), so the ingredients of a SOTA training set are largely unknown.
 
@@ -174,7 +174,7 @@
 
 ---
 
-### [SlimPajama-DC: Understanding Data Combinations for LLM Training](https://arxiv.org/abs/2309.10818) (Shen, Tao, Ma, Neiswanger et al., MBZUAI/UIUC/Stanford/CMU/Cerebras, 2024)
+### [SlimPajama-DC: Understanding Data Combinations for LLM Training](https://arxiv.org/abs/2309.10818) (Shen, Tao, Ma, Neiswanger et al., MBZUAI/UIUC/Stanford/CMU/Cerebras, 2024, 83 citations)
 
 **Motivation:** SlimPajama is a 627B-token deduplicated version of the 1.2T-token RedPajama corpus (CommonCrawl + C4 + GitHub + Books + ArXiv + Wikipedia + StackExchange). Two open questions: (1) does **global deduplication** across all sources matter more than **local deduplication** within each source (most prior open-source LM data does only local)? (2) Once data is heavily deduplicated, how should the **proportions** across sources be chosen?
 
@@ -183,7 +183,7 @@
 **Conclusion:** (1) **Global deduplication** (across all sources combined) is preferable to local — it produces a more balanced representation and avoids the cross-source redundancy that local-only methods miss. (2) After heavy global dedup, **increasing data diversity** (across multiple sources) becomes crucial — the best mix configuration beats RedPajama by a meaningful margin at matched compute. (3) These findings transfer to the 7B scale with large-batch training. Releases SlimPajama-DC dataset variants.
 
 ---
-### [Demystifying Synthetic Data in LLM Pre-training](https://arxiv.org/abs/2510.01631) (Kang et al., 2025)
+### [Demystifying Synthetic Data in LLM Pre-training](https://arxiv.org/abs/2510.01631) (Kang et al., 2025, 17 citations)
 
 **Motivation:** Synthetic data is well-established for post-training but its role during foundational pre-training remains poorly understood, with inconsistent findings and unresolved concerns about model collapse.
 
@@ -193,7 +193,7 @@
 
 ---
 
-### [Nemotron-CLIMB: CLustering-based Iterative Data Mixture Bootstrapping for Language Model Pre-training](https://arxiv.org/abs/2504.13161) (Diao, Yang, Fu, Dong, Su, Kliegl, Chen, Belcak et al., NVIDIA, 2025)
+### [Nemotron-CLIMB: CLustering-based Iterative Data Mixture Bootstrapping for Language Model Pre-training](https://arxiv.org/abs/2504.13161) (Diao, Yang, Fu, Dong, Su, Kliegl, Chen, Belcak et al., NVIDIA, 2025, 41 citations)
 
 **Motivation:** Pre-training datasets are typically web-collected and have no inherent domain divisions (Common Crawl has no domain labels; The Pile-style manual curation is labor-intensive). Identifying an optimal pre-training data mixture remains an open problem despite large potential gains.
 
@@ -203,7 +203,7 @@
 
 ---
 
-### [Warm Up Before You Train](https://arxiv.org/abs/2505.13718) (Shrestha et al., 2025)
+### [Warm Up Before You Train](https://arxiv.org/abs/2505.13718) (Shrestha et al., 2025, 1 citation)
 
 **Motivation:** Training reasoning-capable LLMs requires large-scale RLVR or extensive curated long-CoT data. The paper asks whether a lightweight warmup on a simple, domain-agnostic reasoning task can serve as a meta-learning prior for sample-efficient adaptation.
 
@@ -213,7 +213,7 @@
 
 ---
 
-### [Scaling Laws for Implicit Reasoning at Pretraining](https://arxiv.org/abs/2504.03635) (Wang et al., 2025)
+### [Scaling Laws for Implicit Reasoning at Pretraining](https://arxiv.org/abs/2504.03635) (Wang et al., 2025, 5 citations)
 
 **Motivation:** Standard scaling laws assume larger models always yield better performance, but the impact of model size on reasoning ability (vs memorization) during pretraining is poorly understood.
 
@@ -226,7 +226,7 @@
 <details>
 <summary><h2>Analysis of Training Mechanism, Scaling Laws, and Mech Interp</h2></summary>
 
-### [Scaling Data-Constrained Language Models](https://arxiv.org/abs/2305.16264) (Muennighoff, Rush, Barak, Le Scao, Tazi, Piktus, Pyysalo, Wolf, Raffel, 2023)
+### [Scaling Data-Constrained Language Models](https://arxiv.org/abs/2305.16264) (Muennighoff, Rush, Barak, Le Scao, Tazi, Piktus, Pyysalo, Wolf, Raffel, 2023, 408 citations)
 
 **Motivation:** Chinchilla's scaling law (Hoffmann et al 2022) was fit to single-epoch training and predicts compute-optimal D ≈ 20 N. But when unique data is scarce, you have to either repeat data, add code, or accept a smaller model — Chinchilla can't tell you which. This paper extends Chinchilla's law with explicit terms for the diminishing return of repeated tokens and excess parameters, fit on 182 training runs.
 
@@ -260,7 +260,7 @@
 >
 >
 
-### [Tracr: Compiled Transformers as a Laboratory for Interpretability](https://arxiv.org/abs/2301.05062) (Lindner, Kramár, Farquhar, Rahtz, McGrath & Mikulik, NeurIPS 2023 Spotlight)
+### [Tracr: Compiled Transformers as a Laboratory for Interpretability](https://arxiv.org/abs/2301.05062) (Lindner, Kramár, Farquhar, Rahtz, McGrath & Mikulik, NeurIPS 2023 Spotlight, 100 citations)
 
 **Motivation:** Mechanistic interpretability methods are typically evaluated on transformers whose learned computation is itself opaque — so when a method finds (or fails to find) a circuit, you can't tell whether the method is right or wrong. The authors want a transformer where the ground-truth computation is known by construction, so interpretability methods can be calibrated.
 
@@ -270,7 +270,7 @@
 
 ---
 
-### [Progress measures for grokking via mechanistic interpretability](https://arxiv.org/abs/2301.05217) (Nanda, Chan, Lieberum, Smith & Steinhardt, ICLR 2023)
+### [Progress measures for grokking via mechanistic interpretability](https://arxiv.org/abs/2301.05217) (Nanda, Chan, Lieberum, Smith & Steinhardt, ICLR 2023, 858 citations)
 
 **Motivation:** Grokking — the phenomenon where a small transformer trained on a synthetic task (here modular addition) suddenly transitions from memorization to perfect generalization long after training loss reaches zero — looks like an abrupt phase change in behavior. The authors ask whether the underlying mechanism is actually continuous and whether mech-interp can expose a smooth progress measure that predicts when grokking will occur.
 
@@ -284,7 +284,7 @@
 <details>
 <summary><h2>Physics of Language Models</h2></summary>
 
-### [Part 1: Learning Hierarchical Language Structures](https://arxiv.org/abs/2305.13673) (Allen-Zhu & Li, 2023)
+### [Part 1: Learning Hierarchical Language Structures](https://arxiv.org/abs/2305.13673) (Allen-Zhu & Li, 2023, 59 citations)
 
 **Motivation:** Prior interpretability work focused on simple tasks like name copying, leaving open whether generative models can learn and reason over recursive, hierarchical language structures defined by context-free grammars (CFGs) that are locally ambiguous and require dynamic programming to parse.
 
@@ -294,7 +294,7 @@
 
 ---
 
-### [Part 2.1: Grade-School Math and the Hidden Reasoning Process](https://arxiv.org/abs/2407.20311) (Ye, Xu, Li & Allen-Zhu, 2024)
+### [Part 2.1: Grade-School Math and the Hidden Reasoning Process](https://arxiv.org/abs/2407.20311) (Ye, Xu, Li & Allen-Zhu, 2024, 120 citations)
 
 **Motivation:** LMs achieve near-perfect accuracy on GSM8K, but it is unclear whether they truly learn reasoning or memorize solution templates. Studying this on internet-pretrained models is confounded by data contamination, motivating a controlled synthetic setting.
 
@@ -304,7 +304,7 @@
 
 ---
 
-### [Part 2.2: How to Learn From Mistakes on Grade-School Math Problems](https://arxiv.org/abs/2408.16293) (Ye, Xu, Li & Allen-Zhu, 2024)
+### [Part 2.2: How to Learn From Mistakes on Grade-School Math Problems](https://arxiv.org/abs/2408.16293) (Ye, Xu, Li & Allen-Zhu, 2024, 58 citations)
 
 **Motivation:** LMs can self-correct via multi-round prompting, but it would be more efficient to correct errors immediately during generation. It is unclear whether including error-correction ("retry") data in pretraining can improve reasoning accuracy, or whether training on mistakes teaches the model to produce errors.
 
@@ -314,7 +314,7 @@
 
 ---
 
-### [Part 3.1: Knowledge Storage and Extraction](https://arxiv.org/abs/2309.14316) (Allen-Zhu & Li, 2023)
+### [Part 3.1: Knowledge Storage and Extraction](https://arxiv.org/abs/2309.14316) (Allen-Zhu & Li, 2023, 278 citations)
 
 **Motivation:** LLMs store vast knowledge extractable via QA, but it is unclear whether they answer by genuinely extracting knowledge from training or by memorizing similar questions (data contamination). Understanding the storage-extraction relationship is critical for practical training.
 
@@ -324,7 +324,7 @@
 
 ---
 
-### [Part 3.2: Knowledge Manipulation](https://arxiv.org/abs/2309.14402) (Allen-Zhu & Li, 2023)
+### [Part 3.2: Knowledge Manipulation](https://arxiv.org/abs/2309.14402) (Allen-Zhu & Li, 2023, 157 citations)
 
 **Motivation:** LMs can store factual knowledge, but whether they can flexibly manipulate it at inference -- classification, comparison, and inverse search over memorized facts -- remains unclear. Real-world evaluation cannot distinguish genuine deduction from contamination.
 
@@ -334,7 +334,7 @@
 
 ---
 
-### [Part 3.3: Knowledge Capacity Scaling Laws](https://arxiv.org/abs/2404.05405) (Allen-Zhu & Li, 2024)
+### [Part 3.3: Knowledge Capacity Scaling Laws](https://arxiv.org/abs/2404.05405) (Allen-Zhu & Li, 2024, 147 citations)
 
 **Motivation:** Larger models store more knowledge, but the precise scaling constant -- bits of factual knowledge per parameter -- lacks rigorous quantification. Existing scaling laws focus on loss rather than measuring actual knowledge bits stored.
 
@@ -344,7 +344,7 @@
 
 ---
 
-### [Part 4.1: Architecture Design and the Magic of Canon Layers](https://arxiv.org/abs/2512.17351) (Allen-Zhu, 2025)
+### [Part 4.1: Architecture Design and the Magic of Canon Layers](https://arxiv.org/abs/2512.17351) (Allen-Zhu, 2025, 27 citations)
 
 **Motivation:** Systematic architecture comparison is hindered by noisy benchmarks (2-4% variance at 1.3B/100B scale), unreliable pretraining loss as a capability proxy, and data quality confounds. Controlled synthetic tasks can isolate and evaluate core capabilities cheaply and reliably.
 
@@ -356,7 +356,7 @@
 <details>
 <summary><h2>Continual Learning / Continued Pretraining</h2></summary>
 
-### [Don't Stop Pretraining: Adapt Language Models to Domains and Tasks](https://arxiv.org/abs/2004.10964) (Gururangan, Marasović, Swayamdipta, Lo, Beltagy, Downey, Smith, ACL 2020)
+### [Don't Stop Pretraining: Adapt Language Models to Domains and Tasks](https://arxiv.org/abs/2004.10964) (Gururangan, Marasović, Swayamdipta, Lo, Beltagy, Downey, Smith, ACL 2020, 3012 citations)
 
 **Motivation:** General pretrained LMs like RoBERTa may not be optimal for specialized domains. The authors ask whether continued pretraining on domain- or task-specific text improves downstream task performance, even after large-scale general pretraining.
 
@@ -366,7 +366,7 @@
 
 ---
 
-### [Continual Pre-Training of Large Language Models: How to (re)warm your model?](https://arxiv.org/abs/2308.04014) (Gupta, Thérien, Ibrahim, Richter, Anthony, Belilovsky, Rish, Lesort, 2023)
+### [Continual Pre-Training of Large Language Models: How to (re)warm your model?](https://arxiv.org/abs/2308.04014) (Gupta, Thérien, Ibrahim, Richter, Anthony, Belilovsky, Rish, Lesort, 2023, 161 citations)
 
 **Motivation:** When restarting training on a new dataset, the LR is typically reset and re-warmed before decay. The authors investigate whether and how this LR re-warming affects continual pretraining performance.
 
@@ -376,7 +376,7 @@
 
 ---
 
-### [Simple and Scalable Strategies to Continually Pre-train Large Language Models](https://arxiv.org/abs/2403.08763) (Ibrahim, Thérien, Gupta, Richter, Anthony, Lesort, Belilovsky, Rish, 2024)
+### [Simple and Scalable Strategies to Continually Pre-train Large Language Models](https://arxiv.org/abs/2403.08763) (Ibrahim, Thérien, Gupta, Richter, Anthony, Lesort, Belilovsky, Rish, 2024, 118 citations)
 
 **Motivation:** Building on Gupta et al.'s rewarming study, the authors ask whether a small set of cheap continual-pretraining tricks — LR rewarming, LR redecaying, and replaying a fraction of the original dataset — can match the loss and downstream performance of retraining from scratch on the union of old and new data, across realistic distribution shifts and at scale.
 
@@ -386,7 +386,7 @@
 
 ---
 
-### [Reuse, Don't Retrain: A Recipe for Continued Pretraining of Language Models](https://arxiv.org/abs/2407.07263) (Parmar, Satheesh, Patwary, Shoeybi, Catanzaro; NVIDIA, 2024)
+### [Reuse, Don't Retrain: A Recipe for Continued Pretraining of Language Models](https://arxiv.org/abs/2407.07263) (Parmar, Satheesh, Patwary, Shoeybi, Catanzaro; NVIDIA, 2024, 73 citations)
 
 **Motivation:** Frontier-scale LLM pretraining is increasingly expensive, and most labs cannot afford to redo it for each new data release or domain shift. The authors set out to produce a practitioner-oriented "recipe" — data-distribution choices and LR schedules — that makes continued pretraining reliably better than naive baselines at large scale.
 
@@ -396,7 +396,7 @@
 
 ---
 
-### [Efficient Continual Pre-training by Mitigating the Stability Gap](https://arxiv.org/abs/2406.14833) (Guo, Fu, Zhang, Zhao, Shen, 2024)
+### [Efficient Continual Pre-training by Mitigating the Stability Gap](https://arxiv.org/abs/2406.14833) (Guo, Fu, Zhang, Zhao, Shen, 2024, 22 citations)
 
 **Motivation:** Continually pretraining an LLM on a new domain often causes downstream performance to drop sharply at the start before recovering — a "stability gap" analogous to the loss-spike phenomenon during pretraining itself. The authors quantify this gap and ask whether small recipe changes can shrink it.
 
@@ -406,7 +406,7 @@
 
 ---
 
-### [LLaMA Pro: Progressive LLaMA with Block Expansion](https://arxiv.org/abs/2401.02415) (Wu, Gan, Ge, Lu, Wang, Feng, Shan, Luo; ACL 2024)
+### [LLaMA Pro: Progressive LLaMA with Block Expansion](https://arxiv.org/abs/2401.02415) (Wu, Gan, Ge, Lu, Wang, Feng, Shan, Luo; ACL 2024, 117 citations)
 
 **Motivation:** Replay and LR rewarming address forgetting probabilistically, but they still update existing parameters and can degrade general capability. The authors propose an architectural alternative: add new Transformer blocks for the new domain and freeze the original ones, so the base model's behavior is preserved by construction.
 
@@ -416,7 +416,7 @@
 
 ---
 
-### [Revisiting Replay and Gradient Alignment for Continual Pre-Training of Large Language Models](https://arxiv.org/abs/2508.01908) (Abbes, Subbaraj, Riemer, Islah, Therien, Tabaru, Kingetsu, Chandar, Rish, 2025)
+### [Revisiting Replay and Gradient Alignment for Continual Pre-Training of Large Language Models](https://arxiv.org/abs/2508.01908) (Abbes, Subbaraj, Riemer, Islah, Therien, Tabaru, Kingetsu, Chandar, Rish, 2025, 8 citations)
 
 **Motivation:** Replay is now the standard continual-pretraining workhorse, but classic continual-learning theory also points to gradient-alignment methods (e.g., MER) that have rarely been tested at LLM scale. The authors revisit both at large scale across languages to see which scales better.
 
@@ -426,7 +426,7 @@
 
 ---
 
-### [Towards Lifelong Learning of Large Language Models: A Survey](https://arxiv.org/abs/2406.06391) (Zheng, Qiu, Shi, Ma, 2024)
+### [Towards Lifelong Learning of Large Language Models: A Survey](https://arxiv.org/abs/2406.06391) (Zheng, Qiu, Shi, Ma, 2024, 94 citations)
 
 **Motivation:** Continual / lifelong learning for LLMs is now a broad area covering pretraining-time adaptation, finetuning-time adaptation, and retrieval-based augmentation; practitioners need a structured map of the design space.
 
