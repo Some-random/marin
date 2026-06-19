@@ -51,6 +51,45 @@ For the `--config` script, extract and print:
 - **Token budget**: `NUM_TRAIN_STEPS × batch × seq_len`. Compute Chinchilla ratio (`tokens / params`).
 - **Hyperparameters**: batch size, LR + schedule + warmup, weight decay, max_grad_norm, model size.
 
+After the table, also print an **explicit "Key file paths" block** so the user can directly open any of the referenced files in a separate terminal / editor for review. This includes:
+
+- The training script itself (the value of `--config`).
+- The model spec file (e.g. `experiments/data_efficiency/models.py` — wherever `model_dict[MODEL_KEY]` is defined).
+- The init checkpoint path (resolved absolute, e.g. `/fsx/users/dongweij/marin/checkpoints/<run-id>/step-<N>`). Print `ls -la` of the dir so the user can see the actual ckpt files.
+- Every non-zero-weighted data cache (absolute path; one line per cache).
+- The launcher script path (`experiments/data_efficiency/multi_node_launch.sh`).
+- The eval scripts that will be fired in Stage 3 (`convert_and_eval_v2.sh`, `run_paloma_for_model.sh`, etc.) — so user knows what eval pipeline this run will go through.
+- The §3 EVALUATION.md path so the user can preview the target column structure / baselines.
+
+Format example:
+
+```
+Key file paths (review any before launching):
+  Training script:        experiments/data_efficiency/run_1_4b_c5v6_strict_phase2.py
+  Model spec:             experiments/data_efficiency/models.py (model_dict["1_4b4k"])
+  Launcher:               experiments/data_efficiency/multi_node_launch.sh
+  Init checkpoint:        /fsx/users/dongweij/marin/checkpoints/1_4b_c5v3_phase1/8dtdcear/step-14671/
+                          (84G, 5 shard files, last modified 2026-06-11)
+  Eval pipeline scripts:
+    experiments/data_efficiency/convert_and_eval_v2.sh
+    experiments/data_efficiency/run_paloma_for_model.sh
+    experiments/data_efficiency/run_gsm_for_model.sh
+    experiments/data_efficiency/run_aryabumi_nl_extras.sh
+    experiments/data_efficiency/run_quac_for_model.sh
+  EVALUATION.md (§3):     experiments/data_efficiency/EVALUATION.md   (target col label: c5v6_strict_step14671)
+  Data caches (% of mix):
+    70.00% dclm_baseline (7 shards):
+      /fsx/users/dongweij/marin/outputs/tokenized/dclm_baseline-0206f1/train/part-00006
+      /fsx/users/dongweij/marin/outputs/tokenized/dclm_baseline-0206f1/train/part-00020
+      … (5 more)
+    12.97% /fsx/users/dongweij/marin/outputs/tokenized/c5v2_stack_edu_python_clean-xxxx
+    10.75% /fsx/users/dongweij/marin/outputs/tokenized/c5v2_nemotron_code_concepts-xxxx
+     6.00% /fsx/users/dongweij/marin/outputs/tokenized/c5v2_stack_edu_markdown_clean-xxxx
+     0.28% /fsx/users/dongweij/marin/outputs/tokenized/c5v2_nemotron_unconditional_algorithmic-xxxx
+```
+
+Sort caches by weight descending so the user sees the largest contributors first. Truncate long path-lists (e.g. 7 DCLM shards) to first 2 + "… (N more)" if it would clutter the output.
+
 Format as a table the user can scan in <30 seconds. Example:
 
 ```
