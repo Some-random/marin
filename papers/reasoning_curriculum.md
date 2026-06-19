@@ -157,14 +157,6 @@
 
 **Conclusion:** OpenThinker3-7B achieves 53% AIME 2025, 51% LiveCodeBench, 54% GPQA Diamond, outperforming DeepSeek-R1-Distill-Qwen-7B by 12.4 points average across 12 tasks. Key pipeline findings: (1) Concentration beats diversity — using only the top 1-2 ranked sources outperforms mixing 8-16 by ~5%, because splitting a fixed budget across more sources dilutes the highest-quality questions. (2) LLM-based question filtering (difficulty scoring, response length) outperforms classical methods (fastText, embeddings) by 4-6%. (3) QwQ-32B is a stronger teacher than DeepSeek-R1 despite lower benchmark scores (+1.9% code, +2.6% math). (4) Sampling 16x answers per question is highly effective; no answer verification or filtering improved over unfiltered data. (5) Self-reflection in reasoning traces is critical — removing "wait"/"but wait" keywords causes -49.1% performance (Appendix H.3). (6) Cross-domain transfer gains (e.g., code→science) vanish when in-domain data is mixed in (Appendix H.5). Safety degrades significantly with reasoning training (Harmbench: 14.5→55.5, Appendix L).
 
-> <details>
-> <summary><b>Dongwei's comment</b></summary>
->
-> All 1,000+ ablation experiments use a single student model (Qwen2.5-7B-Instruct). The only validation on a second model is one Llama-3.1-8B-Instruct run (Appendix G.1) — not a full ablation sweep. This means every pipeline recommendation (top 1-2 sources > mixing 8-16, difficulty filtering > fastText, QwQ-32B > DeepSeek-R1 as teacher) could be Qwen-specific. Given what we've seen in Twist et al. (optimal code complexity is model-specific) and Waheed et al. (optimal programming language is model-specific), there's reason to suspect the optimal question source, filtering strategy, and teacher model may also be model-dependent. The paper acknowledges this implicitly by noting the Llama model shows "more significant performance gains" on some benchmarks, but doesn't test whether the *relative rankings* of pipeline choices change across models. The final question sources — CodeGolf, OpenCodeReasoning (code), OpenMath-2-Math (math), StackExchange Physics + OrganicChemistry PDFs (science) — were selected by average score across domains on Qwen, not validated cross-model.
->
-> 
-</details>
-
 <details>
 <summary><h2>Training (Synthetic) Data and Tasks</h2></summary>
 
