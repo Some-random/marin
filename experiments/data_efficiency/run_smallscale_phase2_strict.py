@@ -175,15 +175,15 @@ for s in PALOMA_SUBSETS:
 
 data_config = LmDataConfig(
     components={
-        # Text FIRST — matches the 1.4B C5-v3/v6/V7 reference behavior (DCLM at index 0).
-        # This gives "same-cache different-shuffle" replay (NOT strict prefix replay).
-        # The c5v6_strict_step14671 experiment (2026-06-19) showed strict prefix replay
-        # LOSES to same-cache different-shuffle at 1.4B (Mean Aggregate -0.009; paloma_macro
-        # bpb +0.034). So the small-scale battery uses the same regime as the 1.4B
-        # references for apples-to-apples comparison.
-        **_text_components,
+        # STRICT PREFIX REPLAY VARIANT (300M version of 1.4B c5v6_strict_step14671):
+        # code + markup FIRST so the per-component Feistel shuffle keys match phase 1's
+        # order (code-p1's components dict also has code+markup first). Phase 2's reads of
+        # the same caches = strict prefix of phase 1's shuffled stream. The 1.4B result
+        # showed strict LOSES to same-cache-different-shuffle (Mean Aggregate -0.009);
+        # this script tests whether the same holds at 300M.
         **_code_components,
         **_markup_components,
+        **_text_components,
         "dclm_200m_val": DatasetComponent(cache_dir=DCLM_VAL),
         **paloma_components,
     },
@@ -217,7 +217,7 @@ train_config = TrainLmConfig(
         per_device_parallelism=PER_DEVICE_PARALLELISM,
         per_device_eval_parallelism=PER_DEVICE_PARALLELISM,
         checkpointer=CheckpointerConfig(
-            base_path=f"checkpoints/smallscale_{MODEL_KEY}_p2_{TEXT_SOURCE}_r{int(REPLAY_FRAC*100)}/",
+            base_path=f"checkpoints/smallscale_{MODEL_KEY}_p2_strict_{TEXT_SOURCE}_r{int(REPLAY_FRAC*100)}/",
             save_interval=timedelta(minutes=30),
             keep=[{"every": NUM_TRAIN_STEPS // 4}],
         ),
