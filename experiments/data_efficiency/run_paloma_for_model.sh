@@ -10,6 +10,10 @@ export HF_DATASETS_CACHE=/fsx/users/dongweij/marin/outputs/hf_cache/datasets
 # allenai/paloma is a Hub-hosted gated dataset; offline mode breaks it.
 export HF_DATASETS_OFFLINE=0
 export HF_HUB_OFFLINE=0
+# Fix the NCCL gather_object P2P/CUMEM IPC-buffer OOM (root-caused 2026-06-22; see run_eval_v2.sh).
+# This is what killed the large paloma subsets (dolma/m2d2/manosphere/redpajama/mc4) under
+# multi-GPU. Disabling P2P fixes it at full 8-GPU speed — no more single-GPU fallback needed.
+export NCCL_P2P_DISABLE=1
 
 LABEL="${1:?LABEL required}"
 HF_DST="${2:?HF_DST required}"

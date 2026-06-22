@@ -4,6 +4,8 @@ cd /fsx/users/dongweij/marin
 export HF_TOKEN=$(cat /fsx/users/dongweij/.cache/huggingface/token)
 export HF_DATASETS_OFFLINE=0
 export HF_HUB_OFFLINE=0
+# Fix the NCCL gather_object P2P/CUMEM IPC-buffer OOM (root-caused 2026-06-22; see run_eval_v2.sh).
+export NCCL_P2P_DISABLE=1
 LABEL="${1:?LABEL required}"
 HF_DST="${2:?HF_DST required}"
 INCLUDE_DIR=/fsx/users/dongweij/marin/experiments/data_efficiency

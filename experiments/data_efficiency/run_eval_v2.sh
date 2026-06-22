@@ -24,6 +24,14 @@ export HF_DATASETS_CACHE=/fsx/users/dongweij/marin/outputs/hf_cache/datasets
 # HF backend outages.
 export HF_DATASETS_OFFLINE=1
 export HF_HUB_OFFLINE=1
+# NCCL P2P/CUMEM IPC-buffer OOM fix (root-caused 2026-06-22). lm-eval's end-of-task
+# torch.distributed.gather_object builds a per-peer P2P/CUMEM gather channel to rank 0 and
+# cudaMallocs shareable IPC buffers; on A100-40GB that intermittently OOMs and surfaces as the
+# misleading "NCCL Error 1: unhandled cuda error" at evaluator.py:677/691 — killing mmlu (57
+# subtasks = biggest gather) and large paloma subsets. Disabling P2P routes the gather off the
+# CUMEM IPC path and fixes it (verified: P2P on = 8/8 fail, P2P off = 6/6 pass) at full 8-GPU
+# speed. Eval is data-parallel inference + one gather, so P2P perf is irrelevant here.
+export NCCL_P2P_DISABLE=1
 
 LABEL="${1:?LABEL required}"
 HF_DST="${2:?HF_DST required}"

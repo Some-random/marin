@@ -197,6 +197,7 @@ git push origin main
 
 ## Anti-patterns
 
+- **Reaching for `--num_processes 1` when mmlu or a large paloma subset crashes with `NCCL Error 1: unhandled cuda error` at `gather_object`. ROOT-CAUSED + FIXED 2026-06-22.** This is an OOM in NCCL's P2P/CUMEM IPC-buffer allocator on A100-40GB during the end-of-task `gather_object` (evaluator.py:677/691), not a fabric fault. The fix `export NCCL_P2P_DISABLE=1` is now baked into `run_eval_v2.sh`, `run_paloma_for_model.sh`, `run_gsm_for_model.sh`, `run_aryabumi_nl_extras.sh`, `run_quac_for_model.sh` — so these tasks now run at FULL 8-GPU speed. Do NOT fall back to single-GPU and do NOT remove the `NCCL_P2P_DISABLE=1` line. (Proven: P2P-on = 8/8 fail, P2P-off = 6/6 pass; validated on 4×600M = 32/32 task-runs.) The SEPARATE 4B-model paloma OOM is a real CUDA OOM — fix that with `BATCH_SIZE=4`, not P2P_DISABLE.
 - Calling `eval_intermediate.sh` directly. It skips ~12 §3 tasks.
 - Patching a running supervisor with `sed -i` — bash caches the script; you must kill + relaunch.
 - Reporting `mbpp` or `humaneval` as `FAILED-CONTINUE` without re-running with `--num_processes 1` (or `convert_and_eval_v2.sh`, which has the per-rank metrics cache fix).
