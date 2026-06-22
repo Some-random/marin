@@ -19,6 +19,11 @@ echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL quac start"
   --tasks quac_first_turn \
   --batch_size 16 \
   --output_path "$OUT_ROOT" \
-  --trust_remote_code > "$OUT_ROOT/run.log" 2>&1 \
-  && echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL quac DONE" \
-  || echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL quac FAILED-CONTINUE"
+  --trust_remote_code > "$OUT_ROOT/run.log" 2>&1 || true
+# Ground-truth PASS = a results JSON was written (see OPS.md "don't trust ALL DONE").
+if find "$OUT_ROOT" -name 'results_*.json' 2>/dev/null | grep -q .; then
+  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL quac ALL DONE (1/1 ok) → $OUT_ROOT"
+else
+  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL quac ALL DONE WITH FAILURES (0/1 ok, 1 FAILED: quac_first_turn) → $OUT_ROOT"
+  exit 1
+fi

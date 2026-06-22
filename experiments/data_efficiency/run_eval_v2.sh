@@ -48,6 +48,10 @@ echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL eval suite → $O
 echo "  HF_DATASETS_CACHE=$HF_DATASETS_CACHE"
 echo "  HF_DATASETS_OFFLINE=$HF_DATASETS_OFFLINE"
 
+# Track task-groups that did NOT produce a result, so the final marker can't lie
+# ("ALL DONE" must never print clean when a task crashed). See OPS.md "don't trust ALL DONE".
+FAILED_TASKS=()
+
 run_lm_eval_one() {
   # Single attempt at a specific batch size. Returns 0 on success, 1 on failure.
   local TASKS="$1" NSHOT="$2" BATCH="$3" EXTRA="$4" OUT="$5"
@@ -85,6 +89,7 @@ run_lm_eval() {
     break
   done
   echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] tasks=$TASKS FAILED-CONTINUE (last batch=$cur)" | tee -a "$OUT.log"
+  FAILED_TASKS+=("$TASKS")
   return 1
 }
 
@@ -107,9 +112,14 @@ run_bigcode_humaneval() {
     --save_generations \
     --save_generations_path "$BC_OUT/generations.json" \
     --metric_output_path "$BC_OUT/metrics.json" \
-    --trust_remote_code > "$BC_OUT/eval.log" 2>&1 && \
-    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval DONE" || \
+    --trust_remote_code > "$BC_OUT/eval.log" 2>&1 || true
+  # Ground-truth PASS = metrics.json was written (see OPS.md "don't trust ALL DONE").
+  if [ -s "$BC_OUT/metrics.json" ]; then
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval DONE"
+  else
     echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval FAILED-CONTINUE"
+    FAILED_TASKS+=("humaneval_bigcode")
+  fi
 }
 
 # Task groups grouped by SHARD. Balanced from observed C5-v6-NEW v7 timings
@@ -157,8 +167,18 @@ case "$SHARD" in
   *) echo "unknown SHARD '$SHARD' — must be A/B/C/D/all" >&2; exit 2 ;;
 esac
 
+NF=${#FAILED_TASKS[@]}
 if [ "$SHARD" = "all" ]; then
-  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] ALL DONE → $OUT_ROOT"
+  if [ "$NF" -eq 0 ]; then
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] ALL DONE (0 failures) → $OUT_ROOT"
+  else
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] ALL DONE WITH FAILURES ($NF task-group(s) FAILED: ${FAILED_TASKS[*]}) → $OUT_ROOT"
+  fi
 else
-  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] SHARD $SHARD DONE → $OUT_ROOT"
+  if [ "$NF" -eq 0 ]; then
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] SHARD $SHARD DONE (0 failures) → $OUT_ROOT"
+  else
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] SHARD $SHARD DONE WITH FAILURES ($NF FAILED: ${FAILED_TASKS[*]}) → $OUT_ROOT"
+  fi
 fi
+[ "$NF" -eq 0 ] || exit 1

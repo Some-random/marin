@@ -22,6 +22,7 @@ echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL aryabumi-nl → $
 # storycloze_2018_local: 0-shot, MC2 sentence-completion. Custom YAML at INCLUDE_DIR.
 # cb: super_glue/CB 0-shot, 3-way NLI MC. Native lm-eval task.
 TASKS=(storycloze_2018_local cb)
+FAILED_TASKS=()
 
 for T in "${TASKS[@]}"; do
   OUT="$OUT_ROOT/${T}"
@@ -35,9 +36,21 @@ for T in "${TASKS[@]}"; do
     --batch_size 16 \
     --output_path "$OUT" \
     --log_samples \
-    --trust_remote_code > "$OUT.log" 2>&1 \
-    && echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T DONE" \
-    || echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T FAILED-CONTINUE"
+    --trust_remote_code > "$OUT.log" 2>&1 || true
+  # Ground-truth PASS = a results JSON was written (see OPS.md "don't trust ALL DONE").
+  if find "$OUT" -name 'results_*.json' 2>/dev/null | grep -q .; then
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T DONE"
+  else
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T FAILED-CONTINUE"
+    FAILED_TASKS+=("$T")
+  fi
 done
 
-echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL aryabumi-nl ALL DONE → $OUT_ROOT"
+NTOTAL=${#TASKS[@]}
+NF=${#FAILED_TASKS[@]}
+if [ "$NF" -eq 0 ]; then
+  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL aryabumi-nl ALL DONE ($NTOTAL/$NTOTAL ok) → $OUT_ROOT"
+else
+  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL aryabumi-nl ALL DONE WITH FAILURES ($((NTOTAL-NF))/$NTOTAL ok, $NF FAILED: ${FAILED_TASKS[*]}) → $OUT_ROOT"
+  exit 1
+fi

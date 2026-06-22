@@ -31,6 +31,7 @@ PALOMA_SUBSETS=(
   paloma_m2d2_wikipedia_unsplit paloma_manosphere_meta_sep paloma_mc4
   paloma_ptb paloma_redpajama paloma_twitterAAE_HELM_fixed paloma_wikitext_103
 )
+FAILED_TASKS=()
 
 for T in "${PALOMA_SUBSETS[@]}"; do
   OUT="$OUT_ROOT/${T}"
@@ -47,9 +48,22 @@ for T in "${PALOMA_SUBSETS[@]}"; do
   "${LAUNCH[@]}" --model hf \
     --model_args "pretrained=$HF_DST,dtype=bfloat16,trust_remote_code=True" \
     --tasks "$T" --batch_size "$BATCH_SIZE" --output_path "$OUT" \
-    --trust_remote_code > "$OUT.log" 2>&1 \
-    && echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T DONE" \
-    || echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T FAILED"
+    --trust_remote_code > "$OUT.log" 2>&1 || true
+  # Ground-truth PASS = a results JSON was written, NOT just exit code (a swallowed
+  # crash can exit 0 with no output). See OPS.md "don't trust ALL DONE".
+  if find "$OUT" -name 'results_*.json' 2>/dev/null | grep -q .; then
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T DONE"
+  else
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T FAILED"
+    FAILED_TASKS+=("$T")
+  fi
 done
 
-echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL paloma ALL DONE → $OUT_ROOT"
+NTOTAL=${#PALOMA_SUBSETS[@]}
+NF=${#FAILED_TASKS[@]}
+if [ "$NF" -eq 0 ]; then
+  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL paloma ALL DONE ($NTOTAL/$NTOTAL ok) → $OUT_ROOT"
+else
+  echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL paloma ALL DONE WITH FAILURES ($((NTOTAL-NF))/$NTOTAL ok, $NF FAILED: ${FAILED_TASKS[*]}) → $OUT_ROOT"
+  exit 1
+fi

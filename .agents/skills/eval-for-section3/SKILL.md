@@ -153,7 +153,9 @@ Plus a 25-min `ScheduleWakeup` backstop in case the log goes silent.
 
 ### Step 4: Wait for `ALL DONE`
 
-The full v2 suite takes ~45 min. Don't end the loop until the log emits `[<LABEL>] ALL DONE → /fsx/users/dongweij/marin/outputs/eval_results/v2_<LABEL>_<TS>/`. If any task hits `FAILED-CONTINUE`, surface it to the user — the run continues but that cell will be missing.
+The full v2 suite takes ~45 min. Don't end the loop until the log emits the terminal marker. As of 2026-06-22 the runners emit a **truthful** marker (they can no longer print a clean "ALL DONE" when a task crashed — PASS is decided by whether a `results_*.json` was actually written, not by exit code):
+- Clean: `[<LABEL>] ALL DONE (0 failures) → <dir>` — proceed.
+- Dirty: `[<LABEL>] ALL DONE WITH FAILURES (N task-group(s) FAILED: <names>) → <dir>` and the script **exits non-zero**. Surface the named failures to the user and **re-run them** before extracting; do NOT fill §3 from a run that printed `WITH FAILURES`. The same convention applies to the aux runners (`paloma`, `gsm`, `aryabumi-nl`, `quac`): `… ALL DONE (N/N ok)` vs `… ALL DONE WITH FAILURES (M/N ok, K FAILED: …)`.
 
 ### Step 5: Pull scores
 
