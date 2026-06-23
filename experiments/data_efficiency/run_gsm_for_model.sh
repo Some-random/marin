@@ -18,7 +18,8 @@ LABEL="${1:?LABEL required}"
 HF_DST="${2:?HF_DST required}"
 INCLUDE_DIR=/fsx/users/dongweij/marin/experiments/data_efficiency
 
-OUT_ROOT=/fsx/users/dongweij/marin/outputs/eval_results/gsm_${LABEL}_$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M)
+# OUT_ROOT may be passed via env to RESUME into an existing dir — already-done tasks are skipped.
+OUT_ROOT="${OUT_ROOT:-/fsx/users/dongweij/marin/outputs/eval_results/gsm_${LABEL}_$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M)}"
 mkdir -p "$OUT_ROOT"
 echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL gsm → $OUT_ROOT"
 
@@ -28,6 +29,10 @@ FAILED_TASKS=()
 for T in "${GSM_TASKS[@]}"; do
   OUT="$OUT_ROOT/${T}"
   mkdir -p "$OUT"
+  if find "$OUT" -name 'results_*.json' 2>/dev/null | grep -q .; then
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T SKIP (already has results)"
+    continue
+  fi
   echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T start"
   .venv/bin/accelerate launch --multi_gpu --num_processes 8 --num_machines 1 -m lm_eval \
     --include_path "$INCLUDE_DIR" \
@@ -53,5 +58,6 @@ if [ "$NF" -eq 0 ]; then
   echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL gsm ALL DONE ($NTOTAL/$NTOTAL ok) → $OUT_ROOT"
 else
   echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL gsm ALL DONE WITH FAILURES ($((NTOTAL-NF))/$NTOTAL ok, $NF FAILED: ${FAILED_TASKS[*]}) → $OUT_ROOT"
+  .venv/bin/python experiments/data_efficiency/analyze_eval_failures.py "$OUT_ROOT" --now "$(TZ='America/Los_Angeles' date '+%H:%M %Z')" || true
   exit 1
 fi

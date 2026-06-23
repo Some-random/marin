@@ -157,6 +157,19 @@ The full v2 suite takes ~45 min. Don't end the loop until the log emits the term
 - Clean: `[<LABEL>] ALL DONE (0 failures) → <dir>` — proceed.
 - Dirty: `[<LABEL>] ALL DONE WITH FAILURES (N task-group(s) FAILED: <names>) → <dir>` and the script **exits non-zero**. Surface the named failures to the user and **re-run them** before extracting; do NOT fill §3 from a run that printed `WITH FAILURES`. The same convention applies to the aux runners (`paloma`, `gsm`, `aryabumi-nl`, `quac`): `… ALL DONE (N/N ok)` vs `… ALL DONE WITH FAILURES (M/N ok, K FAILED: …)`.
 
+### Step 4b: When tasks fail — triage, don't blind-retry
+
+On any `WITH FAILURES`, the runner **automatically** runs `analyze_eval_failures.py "$OUT_ROOT"`, which writes `FAILURES.md` into the result dir and prints a per-task diagnosis: the root-cause class (`NCCL_GATHER_OOM` / `CUDA_OOM` / `OFFLINE_MODE` / `HUB_CONN` / `CODE_EVAL_CACHE` / `KILLED` / `UNKNOWN` / …), whether it's `transient` (safe to retry) or `permanent` (fix the config first), the suggested fix, and the first real traceback. **Read `FAILURES.md` before re-running.** Retry only the `transient` classes; for `permanent` ones, apply the suggested fix (e.g. lower batch, set OFFLINE=0) and only then re-run. Run it manually on any result dir with:
+```bash
+.venv/bin/python experiments/data_efficiency/analyze_eval_failures.py <RESULTS_DIR> --now "$(TZ='America/Los_Angeles' date '+%H:%M %Z')"
+```
+
+**Resume instead of redo.** All runners accept `OUT_ROOT` via env and **skip any task that already has a `results_*.json`**. So after you fix the cause, re-run into the SAME dir to re-execute only the failed tasks — completed ones are skipped:
+```bash
+OUT_ROOT=<existing_result_dir> bash experiments/data_efficiency/run_paloma_for_model.sh <LABEL> <HF_DIR>
+# (run_eval_v2.sh already honored OUT_ROOT; paloma/gsm/aryabumi/quac now do too)
+```
+
 ### Step 5: Pull scores
 
 Results live under `outputs/eval_results/v2_<LABEL>_<TS>/`. Each task group has its own subdir with a `results_*.json`. Key extraction patterns:

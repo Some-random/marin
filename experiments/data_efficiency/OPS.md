@@ -54,6 +54,25 @@ per-task `.log` (the FIRST rank Traceback, not the torchrun `<NO_OTHER_FAILURES>
 
 ---
 
+## Eval: failure triage (don't blind-retry) + resume
+
+When a runner finishes `WITH FAILURES` it auto-runs `analyze_eval_failures.py "$OUT_ROOT"`, which
+scans for task dirs with no `results_*.json`, pulls the first real traceback from each log,
+classifies the root cause (`NCCL_GATHER_OOM`, `CUDA_OOM`, `OFFLINE_MODE`, `HUB_CONN`,
+`CODE_EVAL_CACHE`, `DATASET_MISSING`, `KILLED`, `NCCL_OTHER`, `TIMEOUT`, `UNKNOWN`, `NO_LOG`),
+marks each `transient` (safe to retry) or `permanent` (fix the config first), suggests a fix, and
+writes `FAILURES.md`. **Read it before retrying** — retry only `transient` classes; for
+`permanent` ones apply the fix (lower batch, set OFFLINE=0, …) first. Run manually on any dir:
+```bash
+.venv/bin/python experiments/data_efficiency/analyze_eval_failures.py <RESULTS_DIR> [--no-write]
+```
+
+**Resume, don't redo.** Every runner accepts `OUT_ROOT` via env and **skips any task that already
+has a `results_*.json`**. After fixing a failure cause, re-run into the SAME dir to re-execute only
+the failed tasks: `OUT_ROOT=<existing_dir> bash run_<x>_for_model.sh <LABEL> <HF_DIR>`.
+
+---
+
 ## Training: Wandb nil-context SIGSEGV — disable the three artifact-save triggers
 
 Multi-node Levanter + wandb crashes with a Go-side SIGSEGV in `gql.CreateArtifact` at

@@ -21,6 +21,7 @@ LABEL=""
 SRC=""
 HF_DST=""
 SHARD_NODES=""
+MODEL_KEY="1_4b4k"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -28,6 +29,7 @@ while [ $# -gt 0 ]; do
     --src) SRC="$2"; shift 2 ;;
     --hf-dst) HF_DST="$2"; shift 2 ;;
     --shard-nodes) SHARD_NODES="$2"; shift 2 ;;
+    --model-key) MODEL_KEY="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -72,7 +74,7 @@ import equinox as eqx, haliax as hax, jax
 from experiments.data_efficiency.models import model_dict
 from levanter.checkpoint import load_checkpoint
 from levanter.compat.hf_checkpoints import load_tokenizer
-mc = model_dict['1_4b4k']
+mc = model_dict['$MODEL_KEY']
 tok = load_tokenizer('meta-llama/Meta-Llama-3.1-8B')
 Vocab = hax.Axis('vocab', len(tok))
 mesh = jax.sharding.Mesh(jax.devices('cpu')[:1], ('data',))

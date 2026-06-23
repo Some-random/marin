@@ -20,7 +20,8 @@ HF_DST="${2:?HF_DST required}"
 # Smaller batch for larger models (4B OOMs at 16 on 8x40GB).
 BATCH_SIZE="${BATCH_SIZE:-16}"
 
-OUT_ROOT=/fsx/users/dongweij/marin/outputs/eval_results/paloma_${LABEL}_$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M)
+# OUT_ROOT may be passed via env to RESUME into an existing dir — already-done subsets are skipped.
+OUT_ROOT="${OUT_ROOT:-/fsx/users/dongweij/marin/outputs/eval_results/paloma_${LABEL}_$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M)}"
 mkdir -p "$OUT_ROOT"
 echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL paloma → $OUT_ROOT"
 
@@ -36,6 +37,10 @@ FAILED_TASKS=()
 for T in "${PALOMA_SUBSETS[@]}"; do
   OUT="$OUT_ROOT/${T}"
   mkdir -p "$OUT"
+  if find "$OUT" -name 'results_*.json' 2>/dev/null | grep -q .; then
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL $T SKIP (already has results)"
+    continue
+  fi
   # Single-GPU for memory-heavy subsets:
   #   paloma_ptb              — known long contexts, OOMs on 8-way
   #   paloma_falcon-refinedweb — same, observed 2026-06-11 (req 15.66 GiB / 15.17 free)
@@ -65,5 +70,7 @@ if [ "$NF" -eq 0 ]; then
   echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL paloma ALL DONE ($NTOTAL/$NTOTAL ok) → $OUT_ROOT"
 else
   echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] $LABEL paloma ALL DONE WITH FAILURES ($((NTOTAL-NF))/$NTOTAL ok, $NF FAILED: ${FAILED_TASKS[*]}) → $OUT_ROOT"
+  # Triage the failures (writes FAILURES.md + prints why each died) so they're fixed, not blind-retried.
+  .venv/bin/python experiments/data_efficiency/analyze_eval_failures.py "$OUT_ROOT" --now "$(TZ='America/Los_Angeles' date '+%H:%M %Z')" || true
   exit 1
 fi

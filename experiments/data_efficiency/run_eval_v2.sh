@@ -71,6 +71,10 @@ run_lm_eval() {
   local TASKS="$1" NSHOT="$2" BATCH="$3" EXTRA="$4"
   local OUT="$OUT_ROOT/${NSHOT}shot__$(echo "$TASKS" | tr ',' '_' | cut -c1-30)"
   mkdir -p "$OUT"
+  if find "$OUT" -name 'results_*.json' 2>/dev/null | grep -q .; then
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] tasks=$TASKS SKIP (already has results)" | tee -a "$OUT.log"
+    return 0
+  fi
   echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] tasks=$TASKS n-shot=$NSHOT batch=$BATCH start" | tee -a "$OUT.log"
   local cur="$BATCH"
   while [ "$cur" -ge 1 ]; do
@@ -97,6 +101,10 @@ run_lm_eval() {
 run_bigcode_humaneval() {
   local BC_OUT="$OUT_ROOT/bigcode_humaneval"
   mkdir -p "$BC_OUT"
+  if [ -s "$BC_OUT/metrics.json" ]; then
+    echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval SKIP (already has metrics)"
+    return 0
+  fi
   echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] bigcode humaneval start"
   .venv_bigcode/bin/accelerate launch --multi_gpu --num_processes 8 --num_machines 1 \
     /fsx/users/dongweij/marin/bigcode-evaluation-harness/main.py \
@@ -181,4 +189,8 @@ else
     echo "[$(TZ='America/Los_Angeles' date '+%H:%M:%S %Z')] [$LABEL] SHARD $SHARD DONE WITH FAILURES ($NF FAILED: ${FAILED_TASKS[*]}) → $OUT_ROOT"
   fi
 fi
-[ "$NF" -eq 0 ] || exit 1
+if [ "$NF" -ne 0 ]; then
+  # Triage the failures (writes FAILURES.md + prints why each died) — fix, don't blind-retry.
+  .venv/bin/python experiments/data_efficiency/analyze_eval_failures.py "$OUT_ROOT" --now "$(TZ='America/Los_Angeles' date '+%H:%M %Z')" || true
+  exit 1
+fi
