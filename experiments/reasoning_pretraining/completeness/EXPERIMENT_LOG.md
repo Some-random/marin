@@ -74,5 +74,11 @@ completeness-augmentation of text tractable AND useful for transfer.
   (−0.12→**−0.02**) → `+rationale` still **+0.11 worse** than base. No raw perplexity drop yet; bottleneck
   reframed from format to the **target** (raw web continuation isn't the reasoning's payoff) →
   `data/completeness_v2_natural_results.jsonl`.
-- Nightly experiment-log bot set up (CronCreate 12:07 AM local). Started the **perplexity-drop hunt** (goal:
-  a config where `+rationale < base`).
+- Nightly experiment-log bot set up (CronCreate 12:07 AM local). Ran the **perplexity-drop hunt** → `PERPLEXITY_HUNT.md`:
+  - Base DCLM-1.4B judge + insertion/target sweep (500 docs): mean still +, but ~12% of docs drop.
+  - Independent R/N split (100 docs, 19 R) + Claude rationales: **R ≈ N (+0.09 both)** — reasoning-dependent
+    docs show NO continuation-perplexity drop. The 12%≈warrant match was coincidence. **Continuation-perplexity
+    can't show it** (raw next-web-text isn't the reasoning's output) — verified across 4 configs.
+  - **Probe target (reasoning-determined answers), leakage-guarded: mean delta −0.358 nats/tok, 70.6% drop
+    (12/17).** So `+rationale` DOES lower perplexity — of what the reasoning *determines*, not raw
+    continuations. `data/probe_results.jsonl`.
