@@ -84,6 +84,10 @@ completeness-augmentation of text tractable AND useful for transfer.
   - **But per-probe**, the mean washes out a real split: **8/17 show a genuine reasoning-specific drop**
     (real≪placebo) on **specific answers** (id444 "spoilers never deployed" real −1.66 / placebo −0.00; id458 −1.21/−0.41;
     id89 −0.61/−0.22); vague answers ("worse") are pure priming and drag the mean to 0. `data/probe_placebo_perprobe.jsonl`.
-  - **Honest state: continuation-ppl never drops; probe-ppl shows a real reasoning-specific signal on
-    specific-answer probes, but noisy/washed in the mean.** Clean test = pre-registered specific-answer probe
-    set; real test = training experiment (needs sign-off). → `PERPLEXITY_HUNT.md`.
+  - Confirmatory strict specific-answer probes (n=8): real −0.406 vs placebo −0.307, reasoning-specific
+    −0.099 (4/8). Clean wins only where the answer is a specific non-stated consequence (id444 r−p −0.87,
+    id404 −0.49); numbers/terms ("64","malnutrition") still priming-confounded. Only ~5/19 R docs could yield
+    a valid strict probe at all.
+  - **FINAL: no clean zero-shot "+rationale lowers perplexity."** Raw drops (continuation & probe) are
+    format/priming (placebo-matched); the genuine reasoning-specific drop is faint & rare. The only
+    unconfounded test is the **training experiment** (needs sign-off; not launched). → `PERPLEXITY_HUNT.md`.

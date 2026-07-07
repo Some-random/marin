@@ -117,7 +117,31 @@ probes**, drowned in the mean by priming on generic answers + n=17 noise. (Post-
 - **Probe target (mean):** raw drop is mostly format/priming, not reasoning (real−placebo ≈ 0).
 - **Probe target (per-probe):** a **real reasoning-specific drop on ~half the probes**, large on specific
   answers — suggestive, not established (n=17, post-hoc).
-- **What would settle it:** a **pre-registered specific-answer probe set** (drop vague/directional answers,
-  n≥100, per-probe placebo) — the clean version of tonight's most promising signal. And ultimately the
-  **training experiment** (needs Dongwei's sign-off — not launched).
+### Confirmatory: strict specific-answer probes (the clean version) — faint & inconsistent
+Re-generated STRICT probes (specific answers only: numbers/names/specific phrases; vague/directional banned),
+per-probe real vs placebo (`perplexity_probe_strict.py`, n=8):
+
+| arm | mean delta | %drop |
+|---|---:|---:|
+| real | −0.406 | 88% |
+| placebo | −0.307 | 75% |
+| **real − placebo** | **−0.099** | 4/8 real<placebo |
+
+- **Clean reasoning wins** where the answer is a specific consequence stated NOWHERE in the text: id 444
+  "they never deployed" (real −1.58 / placebo −0.71, r−p **−0.87**), id 404 "confounding variables"
+  (−0.24 / +0.25, r−p **−0.49**).
+- **Still priming-confounded** for numbers/terms: id 190 "64" (placebo −0.32 beats real −0.07), id 485
+  "malnutrition" — any reasoning-register text primes a number or a clinical term.
+- **Yield is the deeper finding:** of 19 R docs only ~5 could yield a specific, non-copyable,
+  reasoning-determined answer. **Most reasoning-dependent web docs state their conclusion in-context (no gap)
+  or have only vague answers.** So the well-posed probes where reasoning demonstrably helps are RARE.
+
+### Final conclusion (2026-07-07)
+**No clean, robust "+rationale lowers perplexity" exists zero-shot.** Raw drops (continuation or probe) are
+format/priming artifacts (placebo-matched). A *genuine* reasoning-specific drop exists but is faint (−0.02 to
+−0.10 mean), inconsistent (≈half the probes), and only clear on the rare doc with a specific non-stated
+conclusion (id 444, 404). This is exactly why BoLT/Quiet-STaR only pay off *after training on the format*:
+zero-shot, the reasoning doesn't predict raw next-tokens, and where it predicts a probe answer, priming
+usually predicts it too. **The only unconfounded test is the training experiment** (train 1.4B on complete vs
+gap-broken rationale-augmented data, measure §3) — needs Dongwei's sign-off; not launched.
 
