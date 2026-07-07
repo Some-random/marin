@@ -8,7 +8,7 @@ Written 2026-06-03 as a strategic-thinking doc for review when you wake up. Capt
 
 **Established at this point:**
 
-1. **Matched-token 25% code mix HURTS NL at 1.4B / 3.3B-token / 16-epoch repetition** ([EVALUATION.md §3 headlines](EVALUATION.md)):
+1. **Matched-token 25% code mix HURTS NL at 1.4B / 3.3B-token / 16-epoch repetition** ([EVALUATION.md §3 headlines](../EVALUATION.md)):
    - paloma_macro: 1.824 vs baseline 1.631 (+0.19 nats worse)
    - dclm_200m_val: 4.596 vs baseline 4.070 (+0.53 nats worse)
    - Per-task NL (arc_easy, sciq, hellaswag, openbookqa_fact, piqa, social_iqa, logiqa): code-mix loses by 1-7pp on each

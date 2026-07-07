@@ -22,7 +22,7 @@ Token counts use the **Llama-3.1 tokenizer** (`meta-llama/Meta-Llama-3.1-8B`) �
 
 **‡** For nvidia/OpenCodeReasoning the HF datasets-server reports 337,766 rows (sum of `split_0` + `split_1` parquet configs) but our local snapshot has 567,850 rows — likely an earlier dataset revision or additional non-parquet splits. The "local_total_tok" column reflects our actual snapshot and is the right number for "what B4 trained on."
 
-**Note on tokenization**: published_rows × avg_tok/doc gives Llama-3.1-tokenizer total — different from token counts published in source-paper Tables (which often use the source's native tokenizer). The relevant number for "what we actually trained on" is the trained-tokens figure in §2 of `experiments/reasoning_pretraining/code_ladder/docs/EVALUATION.md`.
+**Note on tokenization**: published_rows × avg_tok/doc gives Llama-3.1-tokenizer total — different from token counts published in source-paper Tables (which often use the source's native tokenizer). The relevant number for "what we actually trained on" is the trained-tokens figure in §2 of `experiments/reasoning_pretraining/code_ladder/EVALUATION.md`.
 
 **Note on local snapshot**: For sources 1–5 we have local jsonl.gz files; for 6–7 we read directly from HF streaming for the samples below.
 
