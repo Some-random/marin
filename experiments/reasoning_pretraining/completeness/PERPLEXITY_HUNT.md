@@ -97,16 +97,27 @@ Re-ran the probes with a third arm: `context + ANOTHER doc's (irrelevant) ration
 | **placebo** (irrelevant rationale) | **−0.333** | 71% |
 | **real − placebo** (the reasoning-specific effect) | **−0.024** | — |
 
-An *irrelevant* rationale lowers the answer's perplexity **essentially as much** as the real one. So the
-−0.358 "drop" is a **format/priming effect** — inserting *any* rationale-length prose before a short "Answer:"
-makes short answers more predictable — **not** the specific reasoning. The reasoning-specific contribution is
-**−0.024 (n=17), i.e. noise.** The apparent win is retracted.
+In the MEAN, an irrelevant rationale drops the answer's perplexity essentially as much as the real one
+(−0.333 vs −0.358) — so most of the raw −0.358 is a **format/priming effect**, and the raw "win" is retracted.
+
+**But the per-probe split (`data/probe_placebo_perprobe.jsonl`) is the real story — the mean −0.024 washes out
+a genuine effect:**
+- **8/17 probes show a real reasoning-specific drop** (`real ≪ placebo`), strongest on **specific, non-generic
+  answers**: id 444 "spoilers never deployed" (real −1.66, placebo **−0.00**, r−p −1.65), id 458 "its low-cost
+  advantage" (−1.21 vs −0.41), id 89 "the boy's father" (−0.61 vs −0.22). The irrelevant rationale does nothing;
+  the *right* reasoning does the work.
+- **Vague/common-word answers** ("worse", "it can't escape") show the opposite — a random rationale primes the
+  common word as well or better (id 345: placebo −1.30 vs real +0.46). These outliers drag the mean to ~0.
+
+So it is **not** "all artifact": there is a real reasoning-specific signal **on well-posed (specific-answer)
+probes**, drowned in the mean by priming on generic answers + n=17 noise. (Post-hoc subset — flagged as such.)
 
 ### Honest bottom line for the night
 - **Continuation target:** no drop (4 configs). Raw next-web-text isn't the reasoning's output.
-- **Probe target:** a raw drop, but the placebo shows it's format/priming, **not** reasoning (real−placebo ≈ 0).
-- **Conclusion: zero-shot perplexity — continuation OR probe — does NOT demonstrate a reasoning-specific
-  benefit from added rationales.** This is consistent with BoLT/Quiet-STaR only paying off *after* training on
-  the format. **The real test is the training experiment**, which is the only measure not confounded by
-  zero-shot format/priming effects. (Needs Dongwei's sign-off — not launched.)
+- **Probe target (mean):** raw drop is mostly format/priming, not reasoning (real−placebo ≈ 0).
+- **Probe target (per-probe):** a **real reasoning-specific drop on ~half the probes**, large on specific
+  answers — suggestive, not established (n=17, post-hoc).
+- **What would settle it:** a **pre-registered specific-answer probe set** (drop vague/directional answers,
+  n≥100, per-probe placebo) — the clean version of tonight's most promising signal. And ultimately the
+  **training experiment** (needs Dongwei's sign-off — not launched).
 

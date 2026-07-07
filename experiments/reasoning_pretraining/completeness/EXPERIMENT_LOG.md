@@ -79,8 +79,11 @@ completeness-augmentation of text tractable AND useful for transfer.
   - Independent R/N split (100 docs, 19 R) + Claude rationales: **R ≈ N (+0.09 both)** — reasoning-dependent
     docs show NO continuation-perplexity drop. The 12%≈warrant match was coincidence. **Continuation-perplexity
     can't show it** (raw next-web-text isn't the reasoning's output) — verified across 4 configs.
-  - Probe target (reasoning-determined answers), leakage-guarded: raw drop −0.358 (70.6%) — BUT the
-    **placebo control refutes it**: an irrelevant rationale drops it −0.333 too (real−placebo = −0.024, noise).
-    So the probe drop is a **format/priming artifact, not reasoning**. `data/probe_results.jsonl`.
-  - **Honest conclusion: zero-shot perplexity (continuation OR probe) does NOT show a reasoning-specific
-    benefit from rationales.** The real test is the training experiment (needs sign-off). → `PERPLEXITY_HUNT.md`.
+  - Probe target (reasoning-determined answers), leakage-guarded: raw drop −0.358 (70.6%). Placebo control
+    (another doc's rationale): −0.333 too → **mean is mostly format/priming, not reasoning** (real−placebo −0.024).
+  - **But per-probe**, the mean washes out a real split: **8/17 show a genuine reasoning-specific drop**
+    (real≪placebo) on **specific answers** (id444 "spoilers never deployed" real −1.66 / placebo −0.00; id458 −1.21/−0.41;
+    id89 −0.61/−0.22); vague answers ("worse") are pure priming and drag the mean to 0. `data/probe_placebo_perprobe.jsonl`.
+  - **Honest state: continuation-ppl never drops; probe-ppl shows a real reasoning-specific signal on
+    specific-answer probes, but noisy/washed in the mean.** Clean test = pre-registered specific-answer probe
+    set; real test = training experiment (needs sign-off). → `PERPLEXITY_HUNT.md`.

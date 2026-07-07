@@ -39,7 +39,7 @@ def nll_answer(prefix, answer):
     logp = torch.log_softmax(logits[n_pre - 1:-1].float(), dim=-1)
     return -logp[torch.arange(len(labels)), labels].mean().item()
 
-real, plac = [], []
+real, plac, rows = [], [], []
 for k, i in enumerate(ids):
     ctx, rat = doc[i]["context"], doc[i]["rationale"]
     q, a = probe[i]["question"], probe[i]["answer"]
@@ -52,10 +52,19 @@ for k, i in enumerate(ids):
     if None in (b, r, p):
         continue
     real.append(r - b); plac.append(p - b)
+    rows.append({"id": i, "answer": a, "real": round(r - b, 3), "placebo": round(p - b, 3),
+                 "real_minus_placebo": round((r - b) - (p - b), 3)})
 
+with open("data/probe_placebo_perprobe.jsonl", "w") as f:
+    for x in rows:
+        f.write(json.dumps(x) + "\n")
 mean = lambda xs: sum(xs) / len(xs)
 print(f"\n=== PROBE placebo control (n={len(real)}) ===")
 print(f"real rationale     delta: {mean(real):+.3f}  ({100*sum(d<0 for d in real)/len(real):.0f}% drop)")
 print(f"placebo rationale  delta: {mean(plac):+.3f}  ({100*sum(d<0 for d in plac)/len(plac):.0f}% drop)")
 print(f"real − placebo (isolates RELEVANT reasoning): {mean(real)-mean(plac):+.3f}")
+print("\n-- per-probe, sorted by real-minus-placebo (most reasoning-specific first) --")
+for x in sorted(rows, key=lambda z: z["real_minus_placebo"]):
+    tag = "REASONING" if x["real_minus_placebo"] < -0.1 else ("priming" if x["real"] < -0.1 else "flat")
+    print(f"  [{x['id']:4d}] real {x['real']:+.2f} placebo {x['placebo']:+.2f} r-p {x['real_minus_placebo']:+.2f} {tag:9s}| {x['answer'][:26]}")
 print("DONE", flush=True)
