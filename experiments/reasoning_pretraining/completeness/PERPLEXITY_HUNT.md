@@ -23,7 +23,7 @@ insertion × target (`perplexity_hunt.py`, judge = `1ep_dclm_step14672_hf`, n=39
 | nosep | full | +0.157 | 11.6% | −0.061 |
 
 - **Mean is still positive** — over ALL docs, adding a rationale raises perplexity.
-- **But ~12% of docs drop** — and that ≈ the **11.6% warrant rate** from `RATIONALE_WARRANT_AUDIT.md`.
+- **But ~12% of docs drop** — and that ≈ the **11.6% warrant rate** from `docs/RATIONALE_WARRANT_AUDIT.md`.
 - No memorization (`noctx` 3.98). Base judge likes `bracketed` (the "natural is better" effect was a Qwen-*instruct* artifact).
 
 **Hypothesis this points to:** rationales lower perplexity *on the reasoning-dependent docs* and raise it on
