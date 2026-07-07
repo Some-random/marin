@@ -48,6 +48,34 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## July 6: reorg into experiments/reasoning_pretraining/code_ladder; 300M/600M cross-scale battery added to EVALUATION.md (§2 + §3c); eval-trustworthiness audit (46% of tasks noise/degenerate)
+
+No new training today — infrastructure reorg + eval integration + a critical read of the eval suite. Canonical docs (EVALUATION.md, this log) now live under `code_ladder/docs/`. (Gap note: June 18–July 5 work — the 300M/600M runs themselves, evaluated June 19–22 — is not separately logged; today's entry covers integrating those results + the reorg + the audit.)
+
+### 1. Directory reorg + cut from data_efficiency
+- Moved the code→text ladder + smallscale scripts out of `experiments/data_efficiency/` into a self-contained `experiments/reasoning_pretraining/code_ladder/` with subpackages `models/ scripts/ data/ eval/ orchestration/ docs/ archive/ logs/` (sibling to `completeness/`, the reasoning-completeness thread).
+- Cut all `experiments.data_efficiency` imports/paths (202 rewrites across 108 files); copied `gated_deltanet.py` into `models/`; fixed `.secrets` depth `parents[2]→[4]` (files 2 levels deeper); repointed `eval_section3.py` to `docs/EVALUATION.md` + `eval/*.sh`. Verified: `py_compile` clean on all 90 `.py`, `model_dict` imports via the new path, `.secrets` resolves, `eval_section3 validate` passes.
+- Committed + pushed to origin/main (`887860446`). Notes: old `data_efficiency/` still tracked (being retired); `code_ladder/archive/` (20 dead threads — H1/OpenThoughts/OWM/probes/smokes) is gitignored by the repo `archive/` rule (local-only, nothing committed imports from it); `completeness/` left untracked. Tokenized caches stay at `outputs/tokenized/data_efficiency/…` (physical data, intentionally not renamed).
+
+### 2. 300M/600M cross-size scaling battery → EVALUATION.md
+- Added §2 descriptions + a new **§3c** results table for the 300M/600M battery (9× 300M, 7× 600M): a5, a5sp, code_p1_half (½-budget code-only base), c5v3, c5v4 (300M-only), c5v2cont (300M-only), c5v6, c5v6_strict, c5v7. Chinchilla-optimal (~6B/12B total tokens, 20×params), same AdamW recipe as the 1.4B runs. The smallscale SP-NL runs use **row-proportional** SlimPajama-NL, fixing the 1.4B part-uniform ⚠ bug (so these SP-NL numbers are on the intended distribution).
+- Extracted via `eval_section3` metric logic from `outputs/eval_results/{v2,paloma,gsm,aryabumi_nl,quac}_{300m,600m}_*`; validated against the `COMPARISON_*.md` writeups. Coverage 29–31/32 (mmlu missing on the pre-NCCL-fix runs — only recovered for the four 600M u-shape models; dclm bpb not run at these sizes).
+- **Cross-scale finding:** the two *positive* 1.4B code→text findings do NOT replicate downward — (1) the "30% replay sweet spot" is a monotonic Code↑/NL↓ trade-off at 600M (no peak); (2) "SP-NL > DCLM over a code prior" flips at 300M (c5v3 DCLM ≥ c5v4 SP-NL). What DOES replicate: DCLM > SP-NL single-phase (a5 > a5sp); continuous-cosine-wins-Code / separate-cosine-wins-NL (c5v2cont Code 0.097 vs c5v6 0.024). The §3a/§3b column-split of the 1.4B table is deferred pending review.
+
+### 3. Eval-trustworthiness audit (raw-sample content, all §3 tasks)
+Audited ~28 tasks by reading raw per-example `resps`/predictions across models (not `filtered_resps`). **13 of 28 (46%) are noise-floor or degenerate at 300M–1.4B.**
+- **boolq is degenerate AND manufactures a fake "code helps open-book" effect.** Gold is 62% "yes" → majority baseline 0.622 (not 0.50). Code models emit "yes" ~99% (300M code_p1_half 3242/3270) → score 0.62 = the baseline by collapse; a text model that actually reads (a5sp) scores 0.535, BELOW the constant. Removing boolq: code_p1_half Open-book −0.044 vs a5 −0.012 — the "code advantage" on Open-book was largely this artifact.
+- **commonsense_qa / mmlu = position bias.** commonsense_qa: 300M code_p1_half picks choice #0 on all 1221/1221 items → 0.196 = P(gold@pos0); c5v6 still 85% first-choice. mmlu: 83% pile on choice A. wsc/cb collapse to a constant class.
+- **Math floor is REAL, not broken scoring** — extraction works 88–90%; models produce well-formed CoT with wrong arithmetic (ceiling if every `[invalid]` were correct ≈ 13.6% ≪ phi-1.5's 27.2%). Both Math category means are constants ~0.01/0.005 → meaningless as metrics; gsm_noop's 117 items quantize scores.
+- **bigcode HumanEval is deflated for weak models** by an empty-stub generation artifact (`max_length_generation=512`), not stricter scoring — for our models lm-eval HE is the better number, opposite of the doc's framing. Doc labeling bugs found: gsm8k[5] "logprob" and humaneval lm-eval "regex-match" are both wrong (both execute). cb phi-1.5 cell is mis-filled (0.464 = phi-1's value; real acc from samples = 0.643).
+- **Trust tier A (8 tasks):** lambada_openai, arc_easy, sciq (read as attend+extract, not knowledge), piqa, storycloze, copa (±N=100 jitter), mbpp, humaneval (lm-eval); hellaswag joins at 1.4B. Category-mean verdict: both Math means meaningless; Aggregate ~50% chance-offset (gpqa + agieval); Closed-book NL carried by lambada + arc_easy with ~12 near-constant riders; Open-book biased by boolq.
+- Recommendations (NOT applied — §3 table edits gated on review): drop the noise/degenerate tasks from the category means; re-score the cb phi-1.5 cell; re-run bigcode HE with a larger gen budget or drop it; report raw acc next to acc_norm for logiqa/arc_challenge; enable log_samples for quac.
+
+### Pending
+- §3a/§3b column-split of the 1.4B §3 table (deferred pending review).
+- Apply the eval fixes above if/when approved.
+- Retire `experiments/data_efficiency/` (still tracked) once confident.
+
 ## June 17: C5-v8r completes + evaluates; code25b completes + evaluates; sharded v2-suite first real-runtime test (3.3× speedup confirmed); two screwups acknowledged
 
 ### C5-v8r complete and evaluated
