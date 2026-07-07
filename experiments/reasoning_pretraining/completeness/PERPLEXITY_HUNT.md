@@ -67,7 +67,7 @@ from the context by reasoning), not the raw continuation. If making the reasonin
 probe-answer's NLL (with a leakage guard: answer not verbatim in the rationale), that's a genuine
 "+rationale lowers perplexity" — on the thing reasoning is supposed to make predictable. Trying this next.
 
-### RESULT — a perplexity DROP, once the target is reasoning-determined ✅
+### RESULT — a raw probe drop, but the placebo control REFUTES it as reasoning-specific ⚠️
 19 probes (one per R doc; `perplexity_probe.py`), leakage-guarded (2 removed where the answer appeared
 verbatim in the rationale/context), DCLM-1.4B base judge. NLL of the reasoning-derived answer, **with** the
 rationale vs **without**:
@@ -88,10 +88,25 @@ next-web-text. The rationale's value is real but only visible on a reasoning-dep
 why BoLT/Quiet-STaR only pay off *after* training on the format: zero-shot, the reasoning predicts the
 reasoning-derived answer, not the raw continuation.)
 
-**Caveats (honest):** n=17 is small (effect is large & consistent though); the probes were written by agents
-that saw the rationale, so they're reasoning-dependent *by construction* — a stricter test uses
-independently-authored probes; the leakage guard removes verbatim-answer probes, but the rationale still
-makes the answer *semantically* inferable — that is the mechanism, not a bug. The precise claim is **"explicit
-reasoning lowers the perplexity of reasoning-determined answers,"** NOT "of raw continuations" (shown 4× it
-cannot). The real end-to-end test remains the training experiment.
+### PLACEBO CONTROL — the probe drop is a FORMAT artifact, not reasoning ❌
+Re-ran the probes with a third arm: `context + ANOTHER doc's (irrelevant) rationale + Q` (`perplexity_probe_placebo.py`).
+
+| arm | mean delta | %drop |
+|---|---:|---:|
+| real rationale | −0.358 | 71% |
+| **placebo** (irrelevant rationale) | **−0.333** | 71% |
+| **real − placebo** (the reasoning-specific effect) | **−0.024** | — |
+
+An *irrelevant* rationale lowers the answer's perplexity **essentially as much** as the real one. So the
+−0.358 "drop" is a **format/priming effect** — inserting *any* rationale-length prose before a short "Answer:"
+makes short answers more predictable — **not** the specific reasoning. The reasoning-specific contribution is
+**−0.024 (n=17), i.e. noise.** The apparent win is retracted.
+
+### Honest bottom line for the night
+- **Continuation target:** no drop (4 configs). Raw next-web-text isn't the reasoning's output.
+- **Probe target:** a raw drop, but the placebo shows it's format/priming, **not** reasoning (real−placebo ≈ 0).
+- **Conclusion: zero-shot perplexity — continuation OR probe — does NOT demonstrate a reasoning-specific
+  benefit from added rationales.** This is consistent with BoLT/Quiet-STaR only paying off *after* training on
+  the format. **The real test is the training experiment**, which is the only measure not confounded by
+  zero-shot format/priming effects. (Needs Dongwei's sign-off — not launched.)
 

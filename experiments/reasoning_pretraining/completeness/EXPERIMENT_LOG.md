@@ -79,6 +79,8 @@ completeness-augmentation of text tractable AND useful for transfer.
   - Independent R/N split (100 docs, 19 R) + Claude rationales: **R ≈ N (+0.09 both)** — reasoning-dependent
     docs show NO continuation-perplexity drop. The 12%≈warrant match was coincidence. **Continuation-perplexity
     can't show it** (raw next-web-text isn't the reasoning's output) — verified across 4 configs.
-  - **Probe target (reasoning-determined answers), leakage-guarded: mean delta −0.358 nats/tok, 70.6% drop
-    (12/17).** So `+rationale` DOES lower perplexity — of what the reasoning *determines*, not raw
-    continuations. `data/probe_results.jsonl`.
+  - Probe target (reasoning-determined answers), leakage-guarded: raw drop −0.358 (70.6%) — BUT the
+    **placebo control refutes it**: an irrelevant rationale drops it −0.333 too (real−placebo = −0.024, noise).
+    So the probe drop is a **format/priming artifact, not reasoning**. `data/probe_results.jsonl`.
+  - **Honest conclusion: zero-shot perplexity (continuation OR probe) does NOT show a reasoning-specific
+    benefit from rationales.** The real test is the training experiment (needs sign-off). → `PERPLEXITY_HUNT.md`.
