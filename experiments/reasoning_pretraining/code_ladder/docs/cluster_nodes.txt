@@ -1,0 +1,28 @@
+# GPU nodes I have direct ssh access to (no Slurm allocation required).
+# /fsx is shared across all of them.
+# One node per line. Lines starting with # are skipped.
+#
+# Tip on naming:
+#   gpu-st-*   = static (always on)
+#   gpu-dy-*   = dynamic (scaled-down when idle, may take time to wake up)
+#
+# Static (preferred — instant ssh):
+gpu-st-p4d24xlarge-1
+gpu-st-p4d24xlarge-2
+gpu-st-p4d24xlarge-3
+gpu-st-p4d24xlarge-4
+# Dynamic (may take a minute to come up if powered down):
+gpu-dy-p4d24xlarge-1
+gpu-dy-p4d24xlarge-2
+gpu-dy-p4d24xlarge-3
+gpu-dy-p4d24xlarge-4
+gpu-dy-p4d24xlarge-5
+gpu-dy-p4d24xlarge-6
+gpu-dy-p4d24xlarge-7
+gpu-dy-p4d24xlarge-8
+gpu-dy-p4d24xlarge-9
+gpu-dy-p4d24xlarge-10
+gpu-dy-p4d24xlarge-11
+gpu-dy-p4d24xlarge-12
+gpu-dy-p4d24xlarge-13
+gpu-dy-p4d24xlarge-14

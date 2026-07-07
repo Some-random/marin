@@ -1,0 +1,25 @@
+task: quac_first_turn
+dataset_path: allenai/quac
+dataset_kwargs:
+  trust_remote_code: true
+validation_split: validation
+output_type: generate_until
+doc_to_text: !function quac_utils.doc_to_text
+doc_to_target: !function quac_utils.doc_to_target
+process_results: !function quac_utils.process_results
+generation_kwargs:
+  until:
+    - "\nQ:"
+    - "\n\n"
+  max_gen_toks: 64
+  do_sample: false
+metric_list:
+  - metric: em
+    aggregation: mean
+    higher_is_better: true
+  - metric: f1
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0
+  description: "First-turn QUAC: 1000 single-shot QA examples (1 per dialogue), F1/EM via SQuAD metrics."

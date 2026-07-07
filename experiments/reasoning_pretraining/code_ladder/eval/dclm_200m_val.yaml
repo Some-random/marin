@@ -1,0 +1,13 @@
+task: dclm_200m_val
+dataset_path: json
+dataset_kwargs:
+  data_files:
+    test: /fsx/users/dongweij/marin/outputs/raw/dclm_5000docs.jsonl
+test_split: test
+output_type: loglikelihood_rolling
+doc_to_text: ""
+doc_to_target: "{{text}}"
+metric_list:
+- metric: bits_per_byte
+  aggregation: bits_per_byte
+  higher_is_better: false

@@ -1,0 +1,27 @@
+Motivation
+Standard pretraining on internet text teaches next-token prediction, but computational thinking — entity understanding, relational reasoning, causal logic — emerges latently and unreliably. Existing synthetic data approaches (REWIRE, megadocs, SBP) improve coverage through rewriting and aggregation, but they don't change what the model is forced to learn. Rephrasing a document still trains next-token prediction on surface text.
+We propose a different objective: instead of rewriting documents, force the model to construct the causal and relational connections between them. Given two documents where one causally precedes the other, generate the bridge. You might notice this approach shares the spirit of rationale generation during pretraining (RLP, BoLT), but it operates at a much wider gap — spanning across documents and potentially long stretches of time rather than within a single document. To succeed in this task, the model needs to understand entity relationships and causal logic — not just predict probable next tokens. The data efficiency gain is a natural consequence: anchors represent a tiny fraction of the corpus, so the real-to-synthetic ratio improves dramatically. But the primary hypothesis is that this trains a different and more structured kind of understanding.
+
+Implementation
+We take two real documents where one causally and temporally precedes the other — for example, Wall Street Crash of 1929 ("...the Dow Jones Industrial Average lost almost 25% of its value in two days") and Great Depression ("Unemployment reached 25% of the workforce, with over 11,000 banks having failed since 1930...") — and use them as anchors. A bridge paragraph connecting them is generated: "Bank lending collapsed as institutions called in loans to cover losses. Businesses unable to access credit laid off workers en masse..." The model trains on the full sequence: [real text from doc A] → [generated bridge] → [real text from doc B].
+
+Concretely, at each training step, the model being trained generates K bridge candidates between doc A and doc B. A stronger external model then generates one additional candidate and scores all K+1 candidates on how coherently each one connects doc A to doc B. The model trains on the highest-scoring candidate via standard next-token prediction. Early in training the external model's own bridge tends to win; as the model improves its own generated bridges increasingly win. This approach shares the spirit of self-improving pre-training, where a post-trained model helps a weak pre-training model at the beginning of its learning.
+
+One natural way to construct causally structured pairs at scale is Wikipedia's wikilink structure: when an article cites another inline, it's typically because the cited article describes something that causally preceded the current one — Wikipedia's editors have already made that judgment. The paragraph containing the citation becomes the effect anchor; the opening of the cited article becomes the cause anchor. Within-document pairs, where cause and effect appear in different sections of the same article, can be extracted the same way without following the link.
+
+Experimental Setup
+We follow the exact setting from Kim et al. (2026) — a 300M parameter model trained on 200M unique real tokens from DCLM, using the asymptotically infinite compute regime. The bridge generator and judge is a stronger external frontier model — it both generates one bridge candidate and scores all K+1 candidates (including the training model's K rollouts) on how coherently each connects doc A to doc B. The model trains on the highest-scoring candidate via standard next-token prediction.
+
+The primary baseline is latent thoughts from megadocs — which inserts rationales between spans within a single document. A secondary baseline is standard rephrasing from the same paper. Comparing against these two isolates the specific contribution of cross-document causal anchoring over within-document rationale insertion.
+
+Following megadocs and SBP, we evaluate on i.i.d. validation loss on DCLM and downstream benchmark accuracy on ARC-Challenge, SciQ, Winogrande, TriviaQA, and MMLU. 
+
+
+Open Problems
+Coverage of Wikipedia wikilinks — the resulting pairs may be too concentrated in history and politics, which raises questions about whether the model learns general causal reasoning or just domain-specific patterns. Complementary sources like scientific literature or news archives may be needed for broader coverage.
+
+Curriculum design — the model needs sufficient background knowledge to generate coherent bridges early in training. Starting with pairs where the causal gap is small and the required background knowledge is minimal, before scaling to complex multi-event chains, seems necessary but the right ordering is unclear.
+
+Bridge quality sensitivity — even with a stronger external model scoring candidates and real text constraining both ends, the winning bridge may still introduce factual inaccuracies. It is unclear how sensitive downstream performance is to bridge quality, and whether noisy bridges hurt more than they help at small data scales.
+
+
