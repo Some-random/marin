@@ -38,6 +38,13 @@ completeness-augmentation of text tractable AND useful for transfer.
 ---
 
 ## 2026-07-08
+- **Completeness test (Dongwei: raise the bar to COMPLETE multi-step reasoning)** → `docs/COMPLETENESS_RESULTS.md`.
+  Mined DCLM (1.5M-doc raw pool) for real docs whose continuation needs a ≥3-step chain; wrote a COMPLETE
+  rationale + a gap-broken INCOMPLETE one (1-2 load-bearing middle steps deleted). Score the real target under
+  1.4B (n=44): **complete−placebo −0.698 (relevant reasoning helps, placebo hurts +0.745), but complete−incomplete
+  +0.004 (17/41) — COMPLETENESS makes ~no difference; the model fills the deleted step.** So on zero-shot ppl the
+  active ingredient is relevance/presence, NOT gap-freeness; completeness is a TRAINING question. Wave-2 mining
+  (→~88 docs) hit the account token limit (reset 9:30 UTC) — dataset stayed at 44. 72B confirm running.
 - **Perplexity drop on ORIGINAL data (no Q&A)** → `docs/CONCLUSION_RESULTS.md`. Selected real DCLM docs whose
   continuation IS the doc's own conclusion (strong marker re-split; only ~1% qualify — 30/3000, 22 kept after
   agent-confirming genuine argument→conclusion). Score the **real conclusion** under DCLM-1.4B base:
