@@ -8,7 +8,7 @@ description: Chain a Levanter training run with its full §3 eval pipeline (v2 s
 ```
 /train-and-eval \
   --nodes "<comma-sep-node-list>" \
-  --config experiments/data_efficiency/<train_script>.py \
+  --config experiments/reasoning_pretraining/code_ladder/scripts/<train_script>.py \
   --run-tag "<unique-tag>" \
   --label "<§3-column-label>" \
   --compare-against "<col-substr-1>" \
@@ -19,7 +19,7 @@ Example:
 ```
 /train-and-eval \
   --nodes "gpu-st-p4d24xlarge-1,gpu-st-p4d24xlarge-2,gpu-dy-p4d24xlarge-1,gpu-dy-p4d24xlarge-4" \
-  --config experiments/data_efficiency/run_1_4b_c5v6_strict_phase2.py \
+  --config experiments/reasoning_pretraining/code_ladder/scripts/run_1_4b_c5v6_strict_phase2.py \
   --run-tag c5v6-strict-8n \
   --label c5v6_strict_step14671 \
   --compare-against "C5-v6 final" \
@@ -54,10 +54,10 @@ For the `--config` script, extract and print:
 After the table, also print an **explicit "Key file paths" block** so the user can directly open any of the referenced files in a separate terminal / editor for review. This includes:
 
 - The training script itself (the value of `--config`).
-- The model spec file (e.g. `experiments/data_efficiency/models.py` — wherever `model_dict[MODEL_KEY]` is defined).
+- The model spec file (e.g. `experiments/reasoning_pretraining/code_ladder/models/models.py` — wherever `model_dict[MODEL_KEY]` is defined).
 - The init checkpoint path (resolved absolute, e.g. `/fsx/users/dongweij/marin/checkpoints/<run-id>/step-<N>`). Print `ls -la` of the dir so the user can see the actual ckpt files.
 - Every non-zero-weighted data cache (absolute path; one line per cache).
-- The launcher script path (`experiments/data_efficiency/multi_node_launch.sh`).
+- The launcher script path (`experiments/reasoning_pretraining/code_ladder/orchestration/multi_node_launch.sh`).
 - The eval scripts that will be fired in Stage 3 (`convert_and_eval_v2.sh`, `run_paloma_for_model.sh`, etc.) — so user knows what eval pipeline this run will go through.
 - The §3 EVALUATION.md path so the user can preview the target column structure / baselines.
 
@@ -65,18 +65,18 @@ Format example:
 
 ```
 Key file paths (review any before launching):
-  Training script:        experiments/data_efficiency/run_1_4b_c5v6_strict_phase2.py
-  Model spec:             experiments/data_efficiency/models.py (model_dict["1_4b4k"])
-  Launcher:               experiments/data_efficiency/multi_node_launch.sh
+  Training script:        experiments/reasoning_pretraining/code_ladder/scripts/run_1_4b_c5v6_strict_phase2.py
+  Model spec:             experiments/reasoning_pretraining/code_ladder/models/models.py (model_dict["1_4b4k"])
+  Launcher:               experiments/reasoning_pretraining/code_ladder/orchestration/multi_node_launch.sh
   Init checkpoint:        /fsx/users/dongweij/marin/checkpoints/1_4b_c5v3_phase1/8dtdcear/step-14671/
                           (84G, 5 shard files, last modified 2026-06-11)
   Eval pipeline scripts:
-    experiments/data_efficiency/convert_and_eval_v2.sh
-    experiments/data_efficiency/run_paloma_for_model.sh
-    experiments/data_efficiency/run_gsm_for_model.sh
-    experiments/data_efficiency/run_aryabumi_nl_extras.sh
-    experiments/data_efficiency/run_quac_for_model.sh
-  EVALUATION.md (§3):     experiments/data_efficiency/EVALUATION.md   (target col label: c5v6_strict_step14671)
+    experiments/reasoning_pretraining/code_ladder/eval/convert_and_eval_v2.sh
+    experiments/reasoning_pretraining/code_ladder/eval/run_paloma_for_model.sh
+    experiments/reasoning_pretraining/code_ladder/eval/run_gsm_for_model.sh
+    experiments/reasoning_pretraining/code_ladder/eval/run_aryabumi_nl_extras.sh
+    experiments/reasoning_pretraining/code_ladder/eval/run_quac_for_model.sh
+  EVALUATION.md (§3):     experiments/reasoning_pretraining/code_ladder/EVALUATION.md   (target col label: c5v6_strict_step14671)
   Data caches (% of mix):
     70.00% dclm_baseline (7 shards):
       /fsx/users/dongweij/marin/outputs/tokenized/dclm_baseline-0206f1/train/part-00006
@@ -162,7 +162,7 @@ If user says no or doesn't answer in a reasonable window — abort, leave a mark
 ## Stage 1: launch training
 
 ```bash
-nohup bash experiments/data_efficiency/multi_node_launch.sh \
+nohup bash experiments/reasoning_pretraining/code_ladder/orchestration/multi_node_launch.sh \
   --nodes "<nodes>" --config "<config>" --run-tag "<run-tag>" \
   > "$LOG_DIR/launch.log" 2>&1 < /dev/null &
 disown
@@ -199,27 +199,27 @@ for n in gpu-dy-p4d24xlarge-{1..9} gpu-st-p4d24xlarge-{1..4}; do
 done
 ```
 
-Graceful degrade based on `${#FREE[@]}`:
+**SINGLE-NODE ONLY (user preference, 2026-06-23).** Do NOT fan eval across multiple nodes — the cross-node coordination + partial-failure handling is not worth the wall-clock saving. Pick ONE free node and run everything on it sequentially. Waiting longer is fine; predictability and one log to watch is the point.
 
 | Free | Plan |
 |------|------|
-| ≥ 5 | v2 on FREE[0]; paloma FREE[1]; gsm FREE[2]; aryabumi-nl-extras FREE[3]; quac FREE[4]. Parallel. ~1h total. |
-| 3–4 | v2 on FREE[0]; aux split across FREE[1..N]; one node may handle 2 aux sequentially. ~1h 20min. |
-| 1–2 | v2 first on FREE[0] (~45 min), then 4 aux sequentially on same node (~30 min). ~1.5h total. |
+| ≥ 1 | Pick FREE[0]. Run v2 first (~45–60 min), then the 4 aux runners (paloma → gsm → aryabumi-nl → quac) sequentially on the SAME node (~30 min). ~1.5h total, one node, one chain. |
 | 0 | Abort eval. Write `{stage: "eval_blocked_no_nodes"}` to state file. Alert user with the marker file path so they can manually fire later via `/eval-for-section3`. |
 
-For each task fired, capture ssh PID + log path in `$LOG_DIR/CHAIN_STATE.json` under `eval_runners: [{kind: "v2", node, log_path, pid, started_at}, ...]`.
+Fire v2 via `convert_and_eval_v2.sh` (pass `--model-key` for non-1.4B models; default `1_4b4k` is correct for 1.4B). Then chain the 4 aux runners on the same node. Capture ssh PID + log path in `$LOG_DIR/CHAIN_STATE.json` under `eval_runners: [{kind, node, log_path, pid, started_at}, ...]`.
 
-Arm a Monitor on every eval log with the `ALL DONE | tasks=.*DONE | FAILED-CONTINUE | Traceback | RESOURCE_EXHAUSTED` regex.
+Arm a Monitor on every eval log with `ALL DONE | WITH FAILURES | tasks=.*DONE | FAILED-CONTINUE | Traceback | RESOURCE_EXHAUSTED`.
 
 ## Stage 4: collect eval completion
 
-For each eval log, watch for `ALL DONE`. Update state file as each lands.
+For each eval log, watch for the terminal marker. As of 2026-06-22 the runners emit a **truthful** marker — distinguish the two cases (do NOT just grep `ALL DONE`, since both contain it):
+- **`ALL DONE (0 failures)` / `ALL DONE (N/N ok)`** → clean, proceed to fill.
+- **`ALL DONE WITH FAILURES (...)`** → the runner already auto-ran `analyze_eval_failures.py` and wrote `FAILURES.md` into the result dir. **Do NOT fill §3 from this run.** Read `FAILURES.md`, surface the per-task diagnosis (class + transient/permanent + fix) to the user, fix any `permanent` cause, and **resume** with `OUT_ROOT=<existing_dir> bash run_<x>_for_model.sh ...` (skips done tasks, re-runs only the failed ones). Only proceed once it lands clean. Update state: `{stage: "eval_failed", failures_md: <path>}`.
 
-When ALL 5 (v2 + 4 aux) report ALL DONE:
-- Run `eval_section3.py fill-from-results <v2-results-dir> "<label>"` (the v2 fill).
-- For aux results, the helper `fill-from-results` may not pick them up (per current eval_section3.py limitations). Use `eval_section3.py fill-cell` for any aux task you can extract from the result JSONs (paloma_macro mean, gsm_symbolic_main, gsm_noop, storycloze, cb, quac, etc.).
-- Update state: `{stage: "section3_filled", filled_cells: <count>}`.
+When ALL 5 (v2 + 4 aux) report a CLEAN terminal marker:
+- **Do NOT auto-fill §3 (user preference, 2026-06-23).** Eval and §3-fill are decoupled. Instead: compute the comparison (Stage 5 — read-only, from the result dirs) and **REPORT the eval numbers + comparison to the user for review.** Update state: `{stage: "eval_done_awaiting_review"}`.
+- **Then STOP and wait** for the user to explicitly say "fill the columns" (or equivalent). EVALUATION.md is the canonical table — never write to it before the user has reviewed and approved the numbers.
+- Only AFTER that go-ahead: run `eval_section3.py fill-from-results <v2-results-dir> "<label>"` (v2 fill) + `eval_section3.py fill-cell` for aux tasks (paloma_macro mean, gsm_symbolic_main, gsm_noop, storycloze, cb, quac). Update state: `{stage: "section3_filled", filled_cells: <count>}`.
 
 ## Stage 5: comparison against EACH declared baseline
 

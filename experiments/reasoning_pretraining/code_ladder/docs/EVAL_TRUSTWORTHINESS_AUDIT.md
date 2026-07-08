@@ -64,10 +64,21 @@ The user's core question, answered from raw resps: extraction works, the arithme
 
 ## The bigcode-vs-lm-eval HumanEval artifact (Tier E)
 
-Both harnesses execute **byte-identical** HumanEval unit tests (proven from `humaneval.yaml` `check({{entry_point}})` + `code_eval`). The gap is a **generation-config artifact**, not scoring strictness:
-- c5v6: lm-eval HE **0.213** vs bigcode **0.012** (17.8×). On **29 of 35** problems lm-eval passes, the bigcode generation ends at `"""\n\n` with **no function body** (bigcode's `max_length_generation=512` total vs lm-eval's 1024 generation tokens).
-- The ratio shrinks with model strength (code25b_clean 1.8×) and **INVERTS for phi-1** (bigcode 0.543 > lm 0.494) — the empty-stub fingerprint. At 300M, 6/9 bigcode scores are exactly 0.000.
-- **So for our weak models, lm-eval HE is the better number — the opposite of EVALUATION.md's "bigcode is the trustworthy one"** (which only holds at phi scale, where the two converge). Fix: re-run bigcode with `max_length_generation` matching lm-eval's budget, or drop it.
+Both harnesses execute **byte-identical** unit tests — bigcode's `custom_metrics/execute.py` is a vendored copy of HF `code_eval` (which lm-eval loads via `evaluate.load('code_eval')`); both build `candidate + "\n" + test_case`, run the same `check()`, same `estimate_pass_at_k` (byte-diffed). **bigcode is NOT stricter about what constitutes passing** — the common assumption is wrong. The gap is entirely a **prompt-format artifact**:
+- **Root cause = a stripped trailing newline.** bigcode's `get_prompt` returns `doc['prompt'].strip()`; lm-eval uses `{{prompt}}` unstripped. The HumanEval prompt ends `…    """\n`; stripped, it ends `…    """`. For a weak/undertrained base model that removed newline flips it from *continuing inside the indented body* to *emitting `\n\n` then a de-indented top-level token that hits a stop word → empty body → auto-fail*. **49% (81/164) of c5v6's bigcode generations are empty stubs.** Same checkpoint, same problem (HumanEval/0): lm-eval = an 810-char working body; bigcode = `\n\n` and nothing.
+- c5v6: lm-eval HE **0.213** vs bigcode **0.012** (17.5×). The ratio shrinks with model strength (code25b_clean 1.8×) and **INVERTS for phi-1** (bigcode 0.543 > lm 0.494) — strong models write an indented body regardless of the newline, so the harnesses converge. It is a capability-dependent artifact concentrated on weak models.
+- **Secondary, NOT the driver:** bigcode `max_length_generation=512` is total prompt+gen vs lm-eval's 1024 generation-only; bigcode has 8 stop words vs 5. These matter only for long prompts; HumanEval/0's prompt is ~100 tokens, so they don't cause its empty stub.
+- **So for our weak base models, lm-eval HE is the more faithful number.** Fix: use lm-eval HE for these models, or re-run bigcode with `strip_prompt=False`.
+
+## Why the MC collapse happens — it's the scoring, not the few-shot examples
+
+The position/letter collapse and length bias are a **loglikelihood-over-surface-forms artifact at weak scale**, NOT a few-shot-diversity problem (tested):
+- The worst collapse (**commonsense_qa, 99.3% position-0** on 300m_c5v6) is **0-shot** — no demonstrations exist, so few-shot cannot be the cause.
+- Where demos exist (**mmlu 5-shot**), they are **balanced** (A=67/B=69/C=71/D=78 across 57 subjects) and the model's letter bias is **anti-correlated** with them (world_religions demos = 3×B, model picks B only 6/171). If few-shot drove it, the model would over-pick the demo-frequent letter; it does the opposite.
+- **arc_easy (25-shot) has no letter key at all** yet still collapses — raw loglikelihood favors the **shortest** continuation (45.6% vs 11.3% longest; chance 25%).
+- Severity is **independent of shot count** (0-shot commonsense_qa collapses harder than 25-shot arc).
+
+Mechanism: at weak scale the model can't discriminate answer *content*, so per-choice loglikelihood is set by *surface form* — for single-letter answers, the highest-frequency letter token wins (content-independent, e.g. 300M→'A'/pos-0, 600M→'B'); for text answers, the shortest/most-frequent string wins. **More or more-diverse few-shot would not fix this.** acc_norm helps only the text/length case, not the equal-length letter case (where the model is genuinely uninformative).
 
 ## Doc / scoring bugs found
 - **cb phi-1.5 cell = 0.464 is mis-filled** with phi-1's value; the real acc from samples is **0.643** (phi-1.5 is the only model that discriminates 3-way).

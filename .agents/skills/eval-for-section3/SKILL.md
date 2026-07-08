@@ -1,6 +1,6 @@
 ---
 name: eval-for-section3
-description: Evaluate a model for §3 of `experiments/data_efficiency/EVALUATION.md` and fill its column without breaking the table. Use whenever the user asks to evaluate a model for the EVALUATION.md table, fill missing §3 cells, refresh historical mbpp/humaneval, or compute Mean rows. Always delegate to `experiments/data_efficiency/eval_section3.py` (NOT raw scripts) — that tool has the canonical task config, all metric fallbacks, Mean row computation, and table-structure validation built in.
+description: Evaluate a model for §3 of `experiments/reasoning_pretraining/code_ladder/EVALUATION.md` and fill its column without breaking the table. Use whenever the user asks to evaluate a model for the EVALUATION.md table, fill missing §3 cells, refresh historical mbpp/humaneval, or compute Mean rows. Always delegate to `experiments/reasoning_pretraining/code_ladder/eval/eval_section3.py` (NOT raw scripts) — that tool has the canonical task config, all metric fallbacks, Mean row computation, and table-structure validation built in.
 ---
 
 # QUICK PATH — ONE COMMAND FOR A NEW MODEL
@@ -8,7 +8,7 @@ description: Evaluate a model for §3 of `experiments/data_efficiency/EVALUATION
 ```bash
 # End-to-end: pick 3 free nodes, insert §3 column + §2 row, run v2-suite + paloma + gsm in parallel,
 # extract dclm_200m_val from training log, fill every fillable cell, strict-validate.
-.venv/bin/python experiments/data_efficiency/eval_section3.py add-model \
+.venv/bin/python experiments/reasoning_pretraining/code_ladder/eval/eval_section3.py add-model \
   --label <LABEL> \
   --src <LEVANTER_OR_HF_DIR> \
   --train-log <PATH/TO/levanter_stdout.log> \
@@ -27,7 +27,7 @@ When 4 GPU nodes are free, the v2-suite can be split across them. Each
 shard runs ~25% of task groups in parallel into the SAME OUT_ROOT:
 
 ```bash
-nohup bash /fsx/users/dongweij/marin/experiments/data_efficiency/convert_and_eval_v2_sharded.sh \
+nohup bash /fsx/users/dongweij/marin/experiments/reasoning_pretraining/code_ladder/eval/convert_and_eval_v2_sharded.sh \
   --label <LABEL> \
   --src <LEVANTER_DIR> \
   --hf-dst /fsx/users/dongweij/marin/checkpoints/<LABEL>_hf \
@@ -45,17 +45,17 @@ identical to single-node mode).
 
 ```bash
 # v2-suite only (no paloma / gsm / column insert):
-.venv/bin/python experiments/data_efficiency/eval_section3.py run <LABEL> <LEVANTER_OR_HF_DIR> [--node NODE]
+.venv/bin/python experiments/reasoning_pretraining/code_ladder/eval/eval_section3.py run <LABEL> <LEVANTER_OR_HF_DIR> [--node NODE]
 # Then when 'ALL DONE' appears in the log:
-.venv/bin/python experiments/data_efficiency/eval_section3.py fill-from-results <RESULTS_DIR> "<COLUMN_LABEL_SUBSTR>"
+.venv/bin/python experiments/reasoning_pretraining/code_ladder/eval/eval_section3.py fill-from-results <RESULTS_DIR> "<COLUMN_LABEL_SUBSTR>"
 # Strict-fail by default if any v2-suite task is missing. Add --allow-missing
 # only for intentional partial backfill (e.g. one cell from one re-run).
 # Manual cell fill (e.g. from grepped training log):
-.venv/bin/python experiments/data_efficiency/eval_section3.py fill-cell --row "<ROW_LABEL>" --col "<COL_SUBSTR>" --value 1.234
+.venv/bin/python experiments/reasoning_pretraining/code_ladder/eval/eval_section3.py fill-cell --row "<ROW_LABEL>" --col "<COL_SUBSTR>" --value 1.234
 # Validate after manual edits:
-.venv/bin/python experiments/data_efficiency/eval_section3.py validate
+.venv/bin/python experiments/reasoning_pretraining/code_ladder/eval/eval_section3.py validate
 # Strict — fails on any (model, task) cell missing a value (excluding documented blanks):
-.venv/bin/python experiments/data_efficiency/eval_section3.py validate --strict
+.venv/bin/python experiments/reasoning_pretraining/code_ladder/eval/eval_section3.py validate --strict
 ```
 
 The full procedure (only as backup when the tool can't handle a case):
@@ -87,7 +87,7 @@ If >1000 MiB, find another free node or abort. Do not start an eval on a node th
 ```bash
 TS=$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M%S)
 LOG=/fsx/users/dongweij/marin/logs/v2_${LABEL}_${TS}.log
-nohup bash /fsx/users/dongweij/marin/experiments/data_efficiency/convert_and_eval_v2.sh \
+nohup bash /fsx/users/dongweij/marin/experiments/reasoning_pretraining/code_ladder/eval/convert_and_eval_v2.sh \
   --label <LABEL> \
   --src <LEVANTER_DIR> \
   --hf-dst /fsx/users/dongweij/marin/checkpoints/<LABEL>_hf \
@@ -107,7 +107,7 @@ disown
 - `run_aryabumi_nl_extras.sh <LABEL> <HF_DIR>` — storycloze_2018_local + cb (super_glue/CB).
 - `run_quac_for_model.sh <LABEL> <HF_DIR>` — quac_first_turn (F1, 1000 single-shot QA).
 
-**ALWAYS use the absolute path to the script when ssh-invoking on a remote node.** SSH starts you in `$HOME` on the remote, not in the marin checkout — `bash experiments/data_efficiency/run_xxx.sh` will fail with `No such file or directory` because it looks for `$HOME/experiments/...`. The script itself does `cd /fsx/users/dongweij/marin` internally on line 7, but bash never finds the script in the first place. Canonical copy-paste snippet for ALL aux runners:
+**ALWAYS use the absolute path to the script when ssh-invoking on a remote node.** SSH starts you in `$HOME` on the remote, not in the marin checkout — `bash experiments/reasoning_pretraining/code_ladder/eval/run_xxx.sh` will fail with `No such file or directory` because it looks for `$HOME/experiments/...`. The script itself does `cd /fsx/users/dongweij/marin` internally on line 7, but bash never finds the script in the first place. Canonical copy-paste snippet for ALL aux runners:
 
 ```bash
 LABEL=<LABEL>
@@ -116,19 +116,19 @@ TS=$(TZ='America/Los_Angeles' date +%Y%m%d_%H%M%S)
 MARIN=/fsx/users/dongweij/marin
 
 # paloma (set BATCH_SIZE=4 inline before "bash" for 4B+ models)
-nohup ssh <NODE_A> "bash $MARIN/experiments/data_efficiency/run_paloma_for_model.sh $LABEL $HF" \
+nohup ssh <NODE_A> "bash $MARIN/experiments/reasoning_pretraining/code_ladder/eval/run_paloma_for_model.sh $LABEL $HF" \
   > $MARIN/logs/paloma_${LABEL}_${TS}.log 2>&1 < /dev/null & disown
 
 # gsm
-nohup ssh <NODE_B> "bash $MARIN/experiments/data_efficiency/run_gsm_for_model.sh $LABEL $HF" \
+nohup ssh <NODE_B> "bash $MARIN/experiments/reasoning_pretraining/code_ladder/eval/run_gsm_for_model.sh $LABEL $HF" \
   > $MARIN/logs/gsm_${LABEL}_${TS}.log 2>&1 < /dev/null & disown
 
 # aryabumi-nl-extras (storycloze + cb)
-nohup ssh <NODE_C> "bash $MARIN/experiments/data_efficiency/run_aryabumi_nl_extras.sh $LABEL $HF" \
+nohup ssh <NODE_C> "bash $MARIN/experiments/reasoning_pretraining/code_ladder/eval/run_aryabumi_nl_extras.sh $LABEL $HF" \
   > $MARIN/logs/aryabumi_nl_extras_${LABEL}_${TS}.log 2>&1 < /dev/null & disown
 
 # quac (single task)
-nohup ssh <NODE_D> "bash $MARIN/experiments/data_efficiency/run_quac_for_model.sh $LABEL $HF" \
+nohup ssh <NODE_D> "bash $MARIN/experiments/reasoning_pretraining/code_ladder/eval/run_quac_for_model.sh $LABEL $HF" \
   > $MARIN/logs/quac_${LABEL}_${TS}.log 2>&1 < /dev/null & disown
 ```
 
@@ -161,12 +161,12 @@ The full v2 suite takes ~45 min. Don't end the loop until the log emits the term
 
 On any `WITH FAILURES`, the runner **automatically** runs `analyze_eval_failures.py "$OUT_ROOT"`, which writes `FAILURES.md` into the result dir and prints a per-task diagnosis: the root-cause class (`NCCL_GATHER_OOM` / `CUDA_OOM` / `OFFLINE_MODE` / `HUB_CONN` / `CODE_EVAL_CACHE` / `KILLED` / `UNKNOWN` / …), whether it's `transient` (safe to retry) or `permanent` (fix the config first), the suggested fix, and the first real traceback. **Read `FAILURES.md` before re-running.** Retry only the `transient` classes; for `permanent` ones, apply the suggested fix (e.g. lower batch, set OFFLINE=0) and only then re-run. Run it manually on any result dir with:
 ```bash
-.venv/bin/python experiments/data_efficiency/analyze_eval_failures.py <RESULTS_DIR> --now "$(TZ='America/Los_Angeles' date '+%H:%M %Z')"
+.venv/bin/python experiments/reasoning_pretraining/code_ladder/eval/analyze_eval_failures.py <RESULTS_DIR> --now "$(TZ='America/Los_Angeles' date '+%H:%M %Z')"
 ```
 
 **Resume instead of redo.** All runners accept `OUT_ROOT` via env and **skip any task that already has a `results_*.json`**. So after you fix the cause, re-run into the SAME dir to re-execute only the failed tasks — completed ones are skipped:
 ```bash
-OUT_ROOT=<existing_result_dir> bash experiments/data_efficiency/run_paloma_for_model.sh <LABEL> <HF_DIR>
+OUT_ROOT=<existing_result_dir> bash experiments/reasoning_pretraining/code_ladder/eval/run_paloma_for_model.sh <LABEL> <HF_DIR>
 # (run_eval_v2.sh already honored OUT_ROOT; paloma/gsm/aryabumi/quac now do too)
 ```
 
@@ -182,6 +182,8 @@ Results live under `outputs/eval_results/v2_<LABEL>_<TS>/`. Each task group has 
 
 ### Step 6: Update §3 of EVALUATION.md
 
+**REVIEW GATE (user preference, 2026-06-23).** EVALUATION.md §3 is canonical — never write to it as an automatic step. First REPORT the extracted numbers (and the comparison vs the relevant baseline, computed read-only from the result dirs) to the user and **wait for an explicit "fill the columns" go-ahead.** Only after the user has reviewed and approved do the writes below. This catches an off result, a missing task, or a misextraction before it's committed.
+
 If the model is a NEW column:
 - Insert the column header between `C5-v2 final ‖` and `4B final ª` (or wherever logically fits).
 - Add a row to §2 describing the model (params, tokens, FLOPs, recipe).
@@ -190,7 +192,7 @@ If the model is a NEW column:
 
 If filling cells in an EXISTING column:
 - Run the Python helper at `/tmp/fill_c5v3_small_final.py` (model template — copy + change `RESULTS_DIR` + column index).
-- Validate after: `grep "^| sciq\[0\]" experiments/data_efficiency/EVALUATION.md` — confirm new value present.
+- Validate after: `grep "^| sciq\[0\]" experiments/reasoning_pretraining/code_ladder/EVALUATION.md` — confirm new value present.
 
 ### Step 7: Recompute Mean rows
 
@@ -199,7 +201,7 @@ After any cell update, the 5 Mean rows (Mean Open-book, Mean Closed-book NL, Mea
 ### Step 8: Commit and push
 
 ```bash
-git add experiments/data_efficiency/EVALUATION.md
+git add experiments/reasoning_pretraining/code_ladder/EVALUATION.md
 git commit -m "EVALUATION.md: <what changed>"
 git push origin main
 ```
