@@ -40,7 +40,7 @@ hellaswag[10] is tier A at 1.4B (→0.50) but **tier C at 300M** (all models 0.2
 - Only phi-1.5 (balanced 1411/1859) shows real discrimination → 0.746.
 - **Impact:** boolq inflates code-model Open-book. Removing it: code_p1_half Open-book 0.485 → 0.441 (**−0.044**) vs a5 0.551 → 0.539 (**−0.012**). The "code prior helps open-book QA" read was largely this artifact.
 
-**commonsense_qa — first-choice degeneracy.** Un-normalized `acc` on variable-length 5-way answers → the model returns the highest-raw-logprob (shortest / most-frequent, first-listed) choice.
+**commonsense_qa — letter-frequency collapse.** The prompt lists `A. … B. … … E. …` then `Answer:`, and the model is scored on P(' A')…P(' E') — single **letter** tokens, all equal length (so acc_norm/length is moot). At weak scale it collapses to the highest in-context-frequency letter (' A' / position-0) — the **same mechanism as mmlu**, NOT a text-length effect. (Correction: an earlier audit pass mis-described this as variable-length *text* scoring; verified from the samples it is letter-scored.)
 - 300M code_p1_half predicts **choice #0 on ALL 1221/1221 items** → acc 239/1221 = **0.196 = exactly P(gold at position 0)**.
 - c5v6 (1.4B) still 85% first-choice: PRED positions {0:1039, 1:8, 2:133, 3:41} — never picks option 4.
 - Example: "When drinking booze what can you do to stay busy?" gold=D ("examine thing"), model picks [0] ("reach tentative agreement", lp −1.18 > −1.93).
@@ -101,5 +101,5 @@ Mechanism: at weak scale the model can't discriminate answer *content*, so per-c
 - **Drop from category means at this scale:** commonsense_qa, wsc, cb, winogrande, mmlu (Closed-book NL); boolq (Open-book, or report only vs its 0.622 baseline); gpqa_diamond + agieval_lsat_ar (Aggregate).
 - **Both Math means:** collapse to a single footnote ("all 300M–1.4B recipes floor, EM 0.000–0.028"); don't compute a perturbation drop from a floor.
 - **Code:** report lm-eval HE + mbpp as the code signal; do not average bigcode HE into the same mean.
-- **Fixes:** re-score cb phi-1.5 cell (0.464 → 0.643); re-run or drop bigcode HE; report raw acc next to acc_norm for logiqa/arc_challenge; consider acc_norm for commonsense_qa; enable `log_samples` for quac; correct the gsm8k "logprob" and humaneval "regex-match" descriptions in §1.
+- **Fixes:** re-score cb phi-1.5 cell (0.464 → 0.643); re-run or drop bigcode HE; report raw acc next to acc_norm for logiqa/arc_challenge; enable `log_samples` for quac; correct the gsm8k "logprob" and humaneval "regex-match" descriptions in §1.
 - **Trustworthy headline set (tier A):** lambada_openai, arc_easy, sciq (as attend+extract), piqa, storycloze, copa (±N=100), mbpp, lm-eval humaneval; hellaswag joins at 1.4B.
