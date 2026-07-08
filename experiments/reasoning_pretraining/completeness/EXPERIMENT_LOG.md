@@ -28,10 +28,26 @@ completeness-augmentation of text tractable AND useful for transfer.
    OUR ladder, **N3** cheap "found-completeness" gate. → `docs/PRETRAIN_AUGMENTATION_LIT.md`, `docs/LITERATURE_REVIEW.md`
 3. **Stopping rule is THE unsolved problem**; 6 implementable rules enumerated. → `docs/STOPPING_RULES.md`
 4. **Found-completeness gate (N3):** only **11.6%** of DCLM warrants a rationale (347/3000). → `docs/RATIONALE_WARRANT_AUDIT.md`
-5. **Zero-shot perplexity does NOT show rationale value** (2026-07-07, thorough): raw drops are format/priming
-   artifacts (placebo-matched); the reasoning-specific effect is faint & rare. The real test is training. → `PERPLEXITY_HUNT.md`, `docs/PROBE_RESULTS.md`
+5. **Zero-shot perplexity is confounded on raw/synthetic targets, BUT a clean reasoning-specific drop DOES
+   exist on real reasoning-conclusions** (2026-07-08). On raw continuation / synthetic Q&A: no reasoning-specific
+   drop (placebo-matched). On the ~1% of DCLM docs whose real continuation IS the doc's own conclusion
+   (re-split at "Thus/Therefore/…"): **adding the correct rationale lowers the real conclusion's perplexity —
+   real<placebo on 22/22 docs, placebo HURTS (+0.399)**. Genuinely the reasoning, not priming. → `PERPLEXITY_HUNT.md`,
+   `docs/CONCLUSION_RESULTS.md`, `docs/PROBE_RESULTS.md`
 
 ---
+
+## 2026-07-08
+- **Perplexity drop on ORIGINAL data (no Q&A)** → `docs/CONCLUSION_RESULTS.md`. Selected real DCLM docs whose
+  continuation IS the doc's own conclusion (strong marker re-split; only ~1% qualify — 30/3000, 22 kept after
+  agent-confirming genuine argument→conclusion). Score the **real conclusion** under DCLM-1.4B base:
+  **real−base −0.055 (68% drop), placebo−base +0.399, real−placebo −0.454, real<placebo 22/22.** An irrelevant
+  rationale *raises* the conclusion's perplexity; the correct reasoning lowers it. First clean, reasoning-specific,
+  non-priming drop — on real text. Confirming on 72B judge; caveats: n=22, rare docs, rationale saw the conclusion.
+- Judge calibration (Q from Dongwei): reasoning-specific gain on Q&A probes vanishes/reverses as judge strengthens
+  (1.4B −0.024 → 7B −0.171 → 72B-base −0.015/strict +0.238; Qwen3-32B +0.142) — Q&A drops were noise; the
+  conclusion result is the real signal. `scripts/perplexity_judges.py`.
+- Cron switched back to CronCreate (Dongwei's choice) — accepts the 7-day expiry / session-only.
 
 ## 2026-07-07
 - Reorganized the folder into `docs/ scripts/ data/` (mirroring `code_ladder/`); this log flipped to newest-first.

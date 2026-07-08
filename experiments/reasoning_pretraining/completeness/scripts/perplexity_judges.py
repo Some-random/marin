@@ -7,11 +7,14 @@ import json, glob, gc, argparse
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-JUDGES = [
-    ("DCLM-1.4B-base", "/fsx/users/dongweij/marin/checkpoints/1ep_dclm_step14672_hf"),
-    ("Llama-2-7B-base", "NousResearch/Llama-2-7b-hf"),
-    ("Qwen2.5-72B-base", "Qwen/Qwen2.5-72B"),
+import sys
+DEFAULT = [
+    ("Qwen3-32B", "Qwen/Qwen3-32B"),
+    ("Qwen3.5-27B", "Qwen/Qwen3.5-27B"),
+    ("Qwen3-235B-A22B", "Qwen/Qwen3-235B-A22B"),
 ]
+# allow name:path pairs on the cmdline; else the stronger/newer set
+JUDGES = [(a.split(":", 1)[0], a.split(":", 1)[1]) for a in sys.argv[1:]] or DEFAULT
 
 def load(p):
     return [json.loads(l) for l in open(p) if l.strip()]
@@ -56,14 +59,24 @@ def measure(model, tok, dev, probes):
 results = []
 for name, path in JUDGES:
     print(f"\n=== loading {name} ({path}) ===", flush=True)
-    tok = AutoTokenizer.from_pretrained(path)
-    model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=torch.bfloat16, device_map="auto").eval()
-    dev = model.device
-    n_pt, r_pt, p_pt, rp_pt = measure(model, tok, dev, pt)
-    n_st, r_st, p_st, rp_st = measure(model, tok, dev, st)
-    results.append((name, n_pt, r_pt, p_pt, rp_pt, n_st, r_st, p_st, rp_st))
-    print(f"  {name}: probe-target real {r_pt:+.3f} placebo {p_pt:+.3f} real-placebo {rp_pt:+.3f} | strict real-placebo {rp_st:+.3f}", flush=True)
-    del model; gc.collect(); torch.cuda.empty_cache()
+    model = None
+    try:
+        tok = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            path, torch_dtype=torch.bfloat16, device_map="auto", trust_remote_code=True).eval()
+        dev = model.device
+        n_pt, r_pt, p_pt, rp_pt = measure(model, tok, dev, pt)
+        n_st, r_st, p_st, rp_st = measure(model, tok, dev, st)
+        results.append((name, n_pt, r_pt, p_pt, rp_pt, n_st, r_st, p_st, rp_st))
+        print(f"  {name}: probe-target real {r_pt:+.3f} placebo {p_pt:+.3f} real-placebo {rp_pt:+.3f} | strict real-placebo {rp_st:+.3f}", flush=True)
+    except Exception as e:
+        print(f"  {name}: FAILED — {type(e).__name__}: {str(e)[:200]}", flush=True)
+    finally:
+        try:
+            del model
+        except Exception:
+            pass
+        gc.collect(); torch.cuda.empty_cache()
 
 print("\n\n=== JUDGE CALIBRATION COMPARISON ===")
 print(f"{'judge':18s} | probe-target: real / placebo / real−placebo | strict: real−placebo")
