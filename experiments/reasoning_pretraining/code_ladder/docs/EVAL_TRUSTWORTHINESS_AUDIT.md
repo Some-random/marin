@@ -75,7 +75,7 @@ Both harnesses execute **byte-identical** unit tests — bigcode's `custom_metri
 The position/letter collapse and length bias are a **loglikelihood-over-surface-forms artifact at weak scale**, NOT a few-shot-diversity problem (tested):
 - The worst collapse (**commonsense_qa, 99.3% position-0** on 300m_c5v6) is **0-shot** — no demonstrations exist, so few-shot cannot be the cause.
 - Where demos exist (**mmlu 5-shot**), they are **balanced** (A=67/B=69/C=71/D=78 across 57 subjects) and the model's letter bias is **anti-correlated** with them (world_religions demos = 3×B, model picks B only 6/171). If few-shot drove it, the model would over-pick the demo-frequent letter; it does the opposite.
-- **arc_easy (25-shot) has no letter key at all** yet still collapses — raw loglikelihood favors the **shortest** continuation (45.6% vs 11.3% longest; chance 25%).
+- **arc_easy (25-shot) scores the answer TEXT, not letters** (`doc_to_choice = choices.text`; the dataset's A/B/C/D labels are never shown to the model or scored — unlike mmlu, which scores the letters), yet it still collapses — raw loglikelihood favors the **shortest** continuation (45.6% vs 11.3% longest; chance 25%).
 - Severity is **independent of shot count** (0-shot commonsense_qa collapses harder than 25-shot arc).
 
 Mechanism: at weak scale the model can't discriminate answer *content*, so per-choice loglikelihood is set by *surface form* — for single-letter answers, the highest-frequency letter token wins (content-independent, e.g. 300M→'A'/pos-0, 600M→'B'); for text answers, the shortest/most-frequent string wins. **More or more-diverse few-shot would not fix this.** acc_norm helps only the text/length case, not the equal-length letter case (where the model is genuinely uninformative).
