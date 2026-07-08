@@ -43,7 +43,13 @@ completeness-augmentation of text tractable AND useful for transfer.
   agent-confirming genuine argument→conclusion). Score the **real conclusion** under DCLM-1.4B base:
   **real−base −0.055 (68% drop), placebo−base +0.399, real−placebo −0.454, real<placebo 22/22.** An irrelevant
   rationale *raises* the conclusion's perplexity; the correct reasoning lowers it. First clean, reasoning-specific,
-  non-priming drop — on real text. Confirming on 72B judge; caveats: n=22, rare docs, rationale saw the conclusion.
+  non-priming drop — on real text. Caveats: n=22, rare docs (~1%), rationale saw the conclusion.
+  - **72B-base confirms** the reasoning-specificity: real−placebo −0.353, placebo hurts on 100% of docs. (real−base
+    goes to +0.085 on the strong judge — the raw net-drop is format-dependent, but the reasoning signal is robust.)
+  - **Marker-free confirmation** (Dongwei's point: filtering "thus/therefore" selects already-explicit docs). On
+    real DCLM docs with NO marker, where the target follows from *implicit* reasoning: **real−placebo −0.463,
+    real<placebo 14/15, placebo hurts +0.448** — essentially identical. So the drop is the rationale filling a
+    genuine implicit gap, not signposting. → `docs/IMPLICIT_RESULTS.md`
 - Judge calibration (Q from Dongwei): reasoning-specific gain on Q&A probes vanishes/reverses as judge strengthens
   (1.4B −0.024 → 7B −0.171 → 72B-base −0.015/strict +0.238; Qwen3-32B +0.142) — Q&A drops were noise; the
   conclusion result is the real signal. `scripts/perplexity_judges.py`.
