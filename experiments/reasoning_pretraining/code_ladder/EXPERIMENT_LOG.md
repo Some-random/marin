@@ -48,6 +48,20 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## July 8: overnight verified-numbers run + systematic eval-suite audit — only 13/30 tasks trustworthy at our 300M–1.4B scale
+
+**Overnight verified numbers (5 models, idle GPUs, `outputs/overnight_evals.sh`).**
+- **commonsense_qa shot-ladder (0/5/25-shot × 300M/600M/1.4B c5v6, 1.4B A5, phi-1.5):** accuracy pinned at chance (~19–21%) for every one of our models at every shot count; only phi-1.5 is real (~0.51–0.54). More shots reshuffle *which* letter the model collapses to (1.4B A5 got worse: A 45%→98% at 5-shot) but never produce signal — the collapse is a letter-frequency artifact decoupled from capability, not a shot-count problem.
+- **bigcode HumanEval-unstripped (strip_prompt=False, max_len 1024):** corrected pass@1 converges to lm-eval HE (1.4B c5v6 0.012→0.201 ≈ lm-eval 0.213; code25b_clean 0.128→0.238; 300m c5v2cont 0.079→0.122). The entire bigcode↔lm-eval gap was the trailing-newline `prompt.strip()`. Use lm-eval HE as headline; keep bigcode only as a phi-scale reference.
+- **arc_easy length bias:** raw acc picks the shortest answer 37–41% (chance 25%); acc_norm cuts that to 10–17% (over-corrects toward longer). eval_section3 arc_easy → acc_norm (§3 re-fill pending).
+
+**Systematic eval-suite audit (objective rubric: baseline-relative + phi-anchored + collapse-based — NOT "does it rank our models" — plus 300M→600M→1.4B scale-calibration).**
+- **13/30 USABLE (43%); 47% scale-limited/degenerate/dead.** Trustworthy core: lambada, sciq, arc_easy, hellaswag(acc_norm), piqa, social_iqa, storycloze, openbookqa_fact(acc_norm), mbpp, humaneval-lm (+ quac F1-caveat, copa N=100-caveat).
+- **Category Means:** Code 3/3 and Open-book 3/4 salvageable; **Aggregate 0/4 and Math 0/5 meaningless**; Closed-book NL 7/14 half-noise.
+- **Collapse traps** (our model is global-best AND beats phi-1.5, yet the score is pure artifact): wsc DEAD (always-"no"), agieval_lsat_ar DEAD (option-A 82%), gpqa_diamond DEGENERATE ("(A)" 98.5%). commonsense_qa/cb DEGENERATE (letter/class collapse); mmlu/boolq/gsm8k SCALE-LIMITED (real, phi clears, we're at floor); **bbh DEAD** (0.037→0.235 "scaling" is parseable-emit rate below the ~0.26 chance floor, not reasoning).
+- **Data bugs:** storycloze phi-1.5 §3a cell 0.531 is phi-1's value (true = 0.785); cb phi-1.5 already fixed (→0.643).
+- **Action plan (pending review before touching §3):** drop Aggregate + both Math Means, trim Closed-book NL to USABLE + move mmlu→scale-limited + drop boolq, report acc_norm+raw for length-sensitive MC, rescore commonsense_qa/mmlu/gpqa off letter-tokens, fix storycloze cell, use lm-eval HE.
+
 ## July 6: reorg into experiments/reasoning_pretraining/code_ladder; 300M/600M cross-scale battery added to EVALUATION.md (§2 + §3c); eval-trustworthiness audit (46% of tasks noise/degenerate)
 
 No new training today — infrastructure reorg + eval integration + a critical read of the eval suite. Canonical docs (EVALUATION.md, this log) now live under `code_ladder/docs/`. (Gap note: June 18–July 5 work — the 300M/600M runs themselves, evaluated June 19–22 — is not separately logged; today's entry covers integrating those results + the reorg + the audit.)
