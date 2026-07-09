@@ -1,0 +1,6 @@
+# editor / swap junk (keeps the nightly auto-commit clean)
+*.swp
+*.swo
+*.swn
+*~
+.*.swp
