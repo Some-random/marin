@@ -48,9 +48,9 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
-## July 8: overnight verified-numbers run + systematic eval-suite audit — only 13/30 tasks trustworthy at our 300M–1.4B scale
+## July 8
 
-**Overnight verified numbers (5 models, idle GPUs, `outputs/overnight_evals.sh`).**
+**Verified numbers (5 models, `outputs/overnight_evals.sh`).**
 - **commonsense_qa shot-ladder (0/5/25-shot × 300M/600M/1.4B c5v6, 1.4B A5, phi-1.5):** accuracy pinned at chance (~19–21%) for every one of our models at every shot count; only phi-1.5 is real (~0.51–0.54). More shots reshuffle *which* letter the model collapses to (1.4B A5 got worse: A 45%→98% at 5-shot) but never produce signal — the collapse is a letter-frequency artifact decoupled from capability, not a shot-count problem.
 - **bigcode HumanEval-unstripped (strip_prompt=False, max_len 1024):** corrected pass@1 converges to lm-eval HE (1.4B c5v6 0.012→0.201 ≈ lm-eval 0.213; code25b_clean 0.128→0.238; 300m c5v2cont 0.079→0.122). The entire bigcode↔lm-eval gap was the trailing-newline `prompt.strip()`. Use lm-eval HE as headline; keep bigcode only as a phi-scale reference.
 - **arc_easy length bias:** raw acc picks the shortest answer 37–41% (chance 25%); acc_norm cuts that to 10–17% (over-corrects toward longer). eval_section3 arc_easy → acc_norm (§3 re-fill pending).
