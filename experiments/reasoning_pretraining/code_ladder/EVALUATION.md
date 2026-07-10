@@ -203,6 +203,9 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 
 ### G. Collapse (removed from the kept suite)
 
+<details>
+<summary>Dropped tasks + rationale — click to expand.</summary>
+
 Tasks pulled from the suite because, at our scale (≤1.4B), they don't produce a trustworthy signal — the model floors at chance, collapses onto a scoring prior, or the metric is too noisy to read. Full per-task rationale + 0/5/10-shot numbers + answer-choice distributions in [`docs/REMOVED_TASKS.md`](docs/REMOVED_TASKS.md).
 
 **From closed-book QA (B):**
@@ -217,6 +220,8 @@ Tasks pulled from the suite because, at our scale (≤1.4B), they don't produce 
 **Aggregate / multi-domain (former section E)** — bbh, mmlu_pro, agieval_lsat_ar, gpqa_diamond. Heterogeneous subtask means; each is at/near chance for our models and averages out any remaining signal. None are used by the scale-matched references (phi-1.5, Aryabumi, Suhas); bbh + mmlu_pro are Marin-8B-lineage tasks meant for 8B+.
 
 The kept **mmlu** and **commonsense_qa** were *rescued* (not collapsed) by switching from letter-scoring to **text-scoring** — see their entries in B.
+
+</details>
 
 </details>
 
@@ -304,51 +309,53 @@ The kept **mmlu** and **commonsense_qa** were *rescued* (not collapsed) by switc
 
 ## 3. Canonical results — all models
 
-> **Structure:** three tables — **§3a** original 1.4B/30B recipe ablations, **§3b** the code↔text budget-scaling grid, and **§3c** smaller-scale (300M/600M). C5-v6 appears in both §3a (as a replay ablation) and §3b (as the 1× ladder anchor).
+> **Structure:** four tables — **§3a** original 1.4B/30B recipe ablations, **§3b** the code↔text budget-scaling grid, **§3c** smaller-scale (300M/600M), and **§3d** (collapsible) misc / off-ramp probes. C5-v6 appears in both §3a (as a replay ablation) and §3b (as the 1× ladder anchor).
+>
+> **Symbols** (the only two kept): **★** = phase-2 code is *replay* of phase-1, not new; **⚠** = has a data-setup caveat — see §2. Everything else is spelled out in §2 or implied by which table a model sits in.
 
 All numbers from our `lm-eval-harness` pipeline (lm_eval 0.4.11). Rows = tasks (header format `task[nshot]`). Columns = models. Accuracy metrics use `acc_norm` where reported in §1; `acc` otherwise. PPL is `bits_per_byte` (lower=better) for both paloma_macro and dclm_200m_val. Bolded = best in row. `—` = not run.
 
-See §2 footnotes ¤ (code25 v2 vs v1), ¥ (A5/B4 final-step), † (C5 code→text stages + resume forensics), and ‖ (C5-v2 clean-code recipe) for column-definition caveats.
+See §2 for full per-model recipe and caveat descriptions.
 
 ### 3a. Original ablations — 1.4B / 30B (old conclusions)
 
-The founding recipe ablations at fixed ~30.8 B-token compute (text-only vs mixed vs staged code; code quality; separate vs continuous cosine; text source; replay fraction) plus external refs (phi-1/1.5, 4B) and the matched-budget "small" probes. This is the table `eval_section3.py` manages.
+The founding recipe ablations at fixed ~30.8 B-token compute (text-only vs mixed vs staged code; code quality; separate vs continuous cosine; text source; replay fraction), plus the phi-1/1.5 external refs. The matched-budget "small" / ×16 probes and the 4B tokens-vs-params point now live in **§3d**. This is the table `eval_section3.py` manages.
 
-| Task | base (x16) | code25 v2 (x16) | **C5-v2 small stage-1 ‖§** | **C5-v2 small ‖§** | A5 1ep final | B4 1ep final | C5 stage-1 † | C5-v2 stage-1 ‖ | C5 final † | C5-v2 final ‖ | **C5-v3 phase 1** ◊ | **c5v8r_p1_step14671** ◊r | **C5-v3 final** ◊ | **C5-v3-small phase 1** ◊§ | **C5-v3-small final** ◊§ | **C5-v4 final** | **A5-SP** | **C5-v6 final** ★ | **C5-v5 final** | **C5-v6-NEW final** | **c5v6_strict_step14671** ◊* | **C5-V7 final** | **c5v8r_step14671** ◊⚠ | **c5v8r_p2_step14671** ◊r | 4B final ª | phi-1 | phi-1.5 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| **Open-book** | | | | | | | | | | | | | | | | | | | | | | | | | | | |
-| sciq[0] | 0.652 | 0.590 | 0.601 | 0.601 | 0.834 | 0.829 | 0.707 | 0.727 | 0.754 | 0.715 | 0.720 | 0.683 | 0.728 | 0.541 | 0.712 | 0.782 | 0.800 | 0.806 | 0.762 | 0.814 | 0.792 | 0.797 | 0.788 | 0.798 | 0.824 | 0.707 | 0.933 |
-| boolq[0] | 0.502 | 0.567 | 0.614 | 0.614 | 0.563 | 0.598 | 0.619 | 0.593 | 0.623 | 0.580 | 0.595 | 0.622 | 0.443 | 0.618 | 0.614 | 0.598 | 0.565 | 0.546 | 0.604 | 0.582 | 0.583 | 0.589 | 0.605 | 0.601 | 0.552 | 0.450 | 0.746 |
-| piqa[0] | 0.634 | 0.606 | 0.577 | 0.577 | 0.718 | 0.709 | 0.583 | 0.584 | 0.591 | 0.600 | 0.581 | 0.587 | 0.649 | 0.554 | 0.647 | 0.688 | 0.699 | 0.688 | 0.589 | 0.684 | 0.683 | 0.678 | 0.665 | 0.687 | 0.697 | 0.562 | 0.766 |
-| openbookqa_fact[0] | 0.336 | 0.312 | 0.294 | 0.294 | 0.430 | 0.430 | 0.306 | 0.312 | 0.316 | 0.326 | 0.320 | 0.300 | 0.378 | 0.296 | 0.356 | 0.388 | 0.400 | 0.386 | 0.308 | 0.396 | 0.390 | 0.394 | 0.378 | 0.374 | 0.426 | 0.316 | 0.530 |
-| **Mean Open-book** | *0.531* | *0.519* | *0.521* | *0.521* | *0.636* | *0.642* | *0.554* | *0.554* | *0.571* | *0.555* | *0.554* | *0.548* | *0.549* | *0.502* | *0.582* | *0.614* | *0.616* | *0.607* | *0.566* | *0.619* | *0.612* | *0.615* | *0.609* | *0.615* | *0.625* | *0.509* | *0.744* |
-| **Closed-book NL** | | | | | | | | | | | | | | | | | | | | | | | | | | | |
-| arc_easy[25] | 0.401 | 0.388 | 0.350 | 0.350 | 0.630 | 0.610 | 0.373 | 0.406 | 0.389 | 0.420 | 0.397 | 0.374 | 0.536 | 0.322 | 0.485 | 0.552 | 0.576 | 0.590 | 0.415 | 0.584 | 0.574 | 0.572 | 0.529 | 0.552 | 0.612 | 0.386 | 0.802 |
-| hellaswag[10] | 0.348 | 0.321 | 0.280 | 0.280 | 0.497 | 0.464 | 0.292 | 0.304 | 0.298 | 0.311 | 0.297 | 0.288 | 0.377 | 0.276 | 0.322 | 0.415 | 0.454 | 0.427 | 0.313 | 0.428 | 0.404 | 0.400 | 0.391 | 0.419 | 0.466 | 0.301 | 0.635 |
-| winogrande[5] | 0.504 | 0.500 | 0.507 | 0.507 | 0.541 | 0.515 | 0.513 | 0.507 | 0.517 | 0.484 | 0.514 | 0.503 | 0.504 | 0.502 | 0.513 | 0.502 | 0.522 | 0.521 | 0.488 | 0.509 | 0.517 | 0.517 | 0.530 | 0.516 | 0.511 | 0.496 | 0.711 |
-| mmlu_text[0] | 0.250 | 0.248 | 0.238 | 0.244 | 0.290 | 0.286 | 0.244 | 0.251 | 0.247 | 0.250 | 0.247 | 0.241 | 0.263 | 0.241 | 0.261 | 0.273 | 0.271 | 0.277 | 0.253 | 0.280 | 0.271 | 0.276 | 0.269 | 0.276 | 0.284 | 0.243 | 0.337 |
-| commonsense_qa_text[5] | 0.339 | 0.296 | 0.254 | 0.277 | 0.523 | 0.508 | 0.290 | 0.326 | 0.305 | 0.340 | 0.309 | 0.279 | 0.432 | 0.247 | 0.387 | 0.459 | 0.450 | 0.484 | 0.342 | 0.467 | 0.446 | 0.456 | 0.431 | 0.444 | 0.524 | 0.271 | 0.609 |
-| social_iqa[0] | 0.366 | 0.362 | 0.342 | 0.342 | 0.415 | 0.400 | 0.346 | 0.360 | 0.354 | 0.359 | 0.358 | 0.346 | 0.383 | 0.346 | 0.382 | 0.387 | 0.394 | 0.396 | 0.364 | 0.396 | 0.384 | 0.389 | 0.386 | 0.386 | 0.407 | 0.364 | 0.523 |
-| lambada_openai[0] | 0.238 | 0.197 | 0.124 | 0.124 | 0.519 | 0.496 | 0.144 | 0.212 | 0.185 | 0.250 | 0.187 | 0.138 | 0.357 | 0.077 | 0.349 | 0.435 | 0.409 | 0.469 | 0.249 | 0.469 | 0.441 | 0.446 | 0.412 | 0.444 | 0.494 | 0.106 | 0.527 |
-| copa[0] | 0.620 | 0.620 | 0.540 | 0.540 | 0.740 | 0.690 | 0.550 | 0.560 | 0.540 | 0.550 | 0.550 | 0.540 | 0.680 | 0.570 | 0.660 | 0.680 | 0.690 | 0.700 | 0.510 | 0.760 | 0.670 | 0.710 | 0.750 | 0.690 | 0.740 | 0.530 | 0.800 |
-| wsc273[0] | 0.516 | 0.527 | 0.484 | 0.498 | 0.586 | 0.575 | 0.535 | 0.524 | 0.516 | 0.502 | 0.520 | 0.495 | 0.505 | 0.487 | 0.524 | 0.586 | 0.553 | 0.601 | 0.516 | 0.593 | 0.557 | 0.564 | 0.538 | 0.564 | 0.634 | 0.502 | 0.769 |
-| storycloze_2018_local[0] | 0.591 | 0.568 | 0.534 | 0.528 | 0.663 | 0.654 | 0.516 | 0.535 | 0.529 | 0.545 | 0.541 | 0.502 | 0.603 | 0.515 | 0.586 | 0.636 | 0.637 | 0.642 | 0.549 | 0.646 | 0.628 | 0.637 | 0.618 | — | 0.658 | 0.531 | 0.531 |
-| quac_first_turn[0] | 0.142 | 0.136 | 0.077 | 0.092 | 0.176 | 0.179 | 0.126 | 0.123 | 0.146 | 0.136 | 0.122 | 0.130 | 0.110 | 0.079 | 0.122 | 0.197 | 0.201 | 0.161 | 0.135 | 0.179 | 0.142 | 0.150 | 0.149 | — | 0.168 | 0.169 | 0.169 |
-| **Mean Closed-book NL** | *0.392* | *0.378* | *0.339* | *0.344* | *0.507* | *0.489* | *0.357* | *0.373* | *0.366* | *0.377* | *0.367* | *0.349* | *0.432* | *0.333* | *0.417* | *0.466* | *0.469* | *0.479* | *0.376* | *0.483* | *0.458* | *0.465* | *0.455* | *0.477* | *0.500* | *0.354* | *0.583* |
-| **Code** | | | | | | | | | | | | | | | | | | | | | | | | | | | |
-| humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.159 | 0.159 | 0.006 | 0.104 | 0.037 | 0.268 | 0.061 | 0.280 | 0.256 | 0.049 | 0.165 | 0.116 | 0.116 | 0.177 | 0.000 | 0.213 | 0.305 | 0.195 | 0.207 | 0.250 | 0.134 | 0.140 | 0.000 | 0.494 | 0.335 |
-| humaneval[0] (bigcode) | 0.000 | 0.000 | 0.098 | 0.098 | 0.000 | 0.000 | 0.012 | 0.073 | 0.037 | 0.055 | 0.122 | 0.006 | 0.024 | 0.055 | 0.030 | 0.067 | 0.000 | 0.012 | 0.061 | 0.006 | 0.043 | 0.085 | 0.073 | 0.116 | 0.000 | 0.543 | 0.341 |
-| mbpp[3] | 0.000 | 0.000 | 0.130 | 0.130 | 0.000 | 0.060 | 0.050 | 0.212 | 0.104 | 0.298 | 0.208 | 0.046 | 0.048 | 0.088 | 0.050 | 0.124 | 0.000 | 0.204 | 0.306 | 0.138 | 0.146 | 0.230 | 0.030 | 0.116 | 0.000 | 0.416 | 0.342 |
-| **Mean Code** | *0.000* | *0.004* | *0.129* | *0.129* | *0.002* | *0.055* | *0.033* | *0.184* | *0.067* | *0.211* | *0.195* | *0.034* | *0.079* | *0.086* | *0.065* | *0.123* | *0.000* | *0.143* | *0.224* | *0.113* | *0.132* | *0.188* | *0.079* | *0.124* | *0.000* | *0.484* | *0.339* |
-| **Perplexity (lower=better)** | | | | | | | | | | | | | | | | | | | | | | | | | | | |
-| dclm_200m_val (bpb) | 1.332 | 1.504 | 1.514 | 1.449 | 0.923 | 0.942 | 1.313 | 1.308 | 1.286 | 1.260 | 1.308 | 1.318 | 1.110 | 1.525 | 1.077 | 1.019 | 1.054 | 0.955 | 1.245 | 0.954 | 0.997 | 0.973 | 1.046 | — | 0.947 | 1.636 | 1.041 |
-| paloma_macro (bpb) | 1.631 | 1.824 | 1.639 | 1.566 | 1.077 | 1.074 | 1.374 | 1.370 | 1.326 | 1.326 | 1.377 | 1.376 | 1.315 | 1.582 | 1.216 | 1.098 | 1.142 | 1.087 | 1.331 | 1.082 | 1.121 | 1.099 | 1.150 | — | 1.114 | 1.738 | 1.174 |
+| Task | A5 | B4 | C5 s1 | C5-v2 s1 | C5 | C5-v2 | C5-v3 p1 | C5-v8r p1 | C5-v3 | C5-v4 ⚠ | A5-SP ⚠ | C5-v6 ★ | C5-v5 ⚠ | C5-v6-NEW ⚠ | C5-v6 strict ★ | C5-v7 ★ | C5-v8r ⚠ | C5-v8r p2 | phi-1 | phi-1.5 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Open-book** |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| sciq[0] | 0.834 | 0.829 | 0.707 | 0.727 | 0.754 | 0.715 | 0.720 | 0.683 | 0.728 | 0.782 | 0.800 | 0.806 | 0.762 | 0.814 | 0.792 | 0.797 | 0.788 | 0.798 | 0.707 | 0.933 |
+| boolq[0] | 0.563 | 0.598 | 0.619 | 0.593 | 0.623 | 0.580 | 0.595 | 0.622 | 0.443 | 0.598 | 0.565 | 0.546 | 0.604 | 0.582 | 0.583 | 0.589 | 0.605 | 0.601 | 0.450 | 0.746 |
+| piqa[0] | 0.718 | 0.709 | 0.583 | 0.584 | 0.591 | 0.600 | 0.581 | 0.587 | 0.649 | 0.688 | 0.699 | 0.688 | 0.589 | 0.684 | 0.683 | 0.678 | 0.665 | 0.687 | 0.562 | 0.766 |
+| openbookqa_fact[0] | 0.430 | 0.430 | 0.306 | 0.312 | 0.316 | 0.326 | 0.320 | 0.300 | 0.378 | 0.388 | 0.400 | 0.386 | 0.308 | 0.396 | 0.390 | 0.394 | 0.378 | 0.374 | 0.316 | 0.530 |
+| **Mean Open-book** | *0.636* | *0.642* | *0.554* | *0.554* | *0.571* | *0.555* | *0.554* | *0.548* | *0.549* | *0.614* | *0.616* | *0.607* | *0.566* | *0.619* | *0.612* | *0.615* | *0.609* | *0.615* | *0.509* | *0.744* |
+| **Closed-book NL** |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| arc_easy[25] | 0.630 | 0.610 | 0.373 | 0.406 | 0.389 | 0.420 | 0.397 | 0.374 | 0.536 | 0.552 | 0.576 | 0.590 | 0.415 | 0.584 | 0.574 | 0.572 | 0.529 | 0.552 | 0.386 | 0.802 |
+| hellaswag[10] | 0.497 | 0.464 | 0.292 | 0.304 | 0.298 | 0.311 | 0.297 | 0.288 | 0.377 | 0.415 | 0.454 | 0.427 | 0.313 | 0.428 | 0.404 | 0.400 | 0.391 | 0.419 | 0.301 | 0.635 |
+| winogrande[5] | 0.541 | 0.515 | 0.513 | 0.507 | 0.517 | 0.484 | 0.514 | 0.503 | 0.504 | 0.502 | 0.522 | 0.521 | 0.488 | 0.509 | 0.517 | 0.517 | 0.530 | 0.516 | 0.496 | 0.711 |
+| mmlu_text[0] | 0.290 | 0.286 | 0.244 | 0.251 | 0.247 | 0.250 | 0.247 | 0.241 | 0.263 | 0.273 | 0.271 | 0.277 | 0.253 | 0.280 | 0.271 | 0.276 | 0.269 | 0.276 | 0.243 | 0.337 |
+| commonsense_qa_text[5] | 0.523 | 0.508 | 0.290 | 0.326 | 0.305 | 0.340 | 0.309 | 0.279 | 0.432 | 0.459 | 0.450 | 0.484 | 0.342 | 0.467 | 0.446 | 0.456 | 0.431 | 0.444 | 0.271 | 0.609 |
+| social_iqa[0] | 0.415 | 0.400 | 0.346 | 0.360 | 0.354 | 0.359 | 0.358 | 0.346 | 0.383 | 0.387 | 0.394 | 0.396 | 0.364 | 0.396 | 0.384 | 0.389 | 0.386 | 0.386 | 0.364 | 0.523 |
+| lambada_openai[0] | 0.519 | 0.496 | 0.144 | 0.212 | 0.185 | 0.250 | 0.187 | 0.138 | 0.357 | 0.435 | 0.409 | 0.469 | 0.249 | 0.469 | 0.441 | 0.446 | 0.412 | 0.444 | 0.106 | 0.527 |
+| copa[0] | 0.740 | 0.690 | 0.550 | 0.560 | 0.540 | 0.550 | 0.550 | 0.540 | 0.680 | 0.680 | 0.690 | 0.700 | 0.510 | 0.760 | 0.670 | 0.710 | 0.750 | 0.690 | 0.530 | 0.800 |
+| wsc273[0] | 0.586 | 0.575 | 0.535 | 0.524 | 0.516 | 0.502 | 0.520 | 0.495 | 0.505 | 0.586 | 0.553 | 0.601 | 0.516 | 0.593 | 0.557 | 0.564 | 0.538 | 0.564 | 0.502 | 0.769 |
+| storycloze_2018_local[0] | 0.663 | 0.654 | 0.516 | 0.535 | 0.529 | 0.545 | 0.541 | 0.502 | 0.603 | 0.636 | 0.637 | 0.642 | 0.549 | 0.646 | 0.628 | 0.637 | 0.618 | — | 0.531 | 0.531 |
+| quac_first_turn[0] | 0.176 | 0.179 | 0.126 | 0.123 | 0.146 | 0.136 | 0.122 | 0.130 | 0.110 | 0.197 | 0.201 | 0.161 | 0.135 | 0.179 | 0.142 | 0.150 | 0.149 | — | 0.169 | 0.169 |
+| **Mean Closed-book NL** | *0.507* | *0.489* | *0.357* | *0.373* | *0.366* | *0.377* | *0.367* | *0.349* | *0.432* | *0.466* | *0.469* | *0.479* | *0.376* | *0.483* | *0.458* | *0.465* | *0.455* | *0.477* | *0.354* | *0.583* |
+| **Code** |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| humaneval[0] (lm-eval) | 0.006 | 0.104 | 0.037 | 0.268 | 0.061 | 0.280 | 0.256 | 0.049 | 0.165 | 0.177 | 0.000 | 0.213 | 0.305 | 0.195 | 0.207 | 0.250 | 0.134 | 0.140 | 0.494 | 0.335 |
+| humaneval[0] (bigcode) | 0.000 | 0.000 | 0.012 | 0.073 | 0.037 | 0.055 | 0.122 | 0.006 | 0.024 | 0.067 | 0.000 | 0.012 | 0.061 | 0.006 | 0.043 | 0.085 | 0.073 | 0.116 | 0.543 | 0.341 |
+| mbpp[3] | 0.000 | 0.060 | 0.050 | 0.212 | 0.104 | 0.298 | 0.208 | 0.046 | 0.048 | 0.124 | 0.000 | 0.204 | 0.306 | 0.138 | 0.146 | 0.230 | 0.030 | 0.116 | 0.416 | 0.342 |
+| **Mean Code** | *0.002* | *0.055* | *0.033* | *0.184* | *0.067* | *0.211* | *0.195* | *0.034* | *0.079* | *0.123* | *0.000* | *0.143* | *0.224* | *0.113* | *0.132* | *0.188* | *0.079* | *0.124* | *0.484* | *0.339* |
+| **Perplexity (lower=better)** |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| dclm_200m_val (bpb) | 0.923 | 0.942 | 1.313 | 1.308 | 1.286 | 1.260 | 1.308 | 1.318 | 1.110 | 1.019 | 1.054 | 0.955 | 1.245 | 0.954 | 0.997 | 0.973 | 1.046 | — | 1.636 | 1.041 |
+| paloma_macro (bpb) | 1.077 | 1.074 | 1.374 | 1.370 | 1.326 | 1.326 | 1.377 | 1.376 | 1.315 | 1.098 | 1.142 | 1.087 | 1.331 | 1.082 | 1.121 | 1.099 | 1.150 | — | 1.738 | 1.174 |
 
 ### 3b. Scaling — code ↔ text budget (1.4B / 30B+)
 
-The code/text budget-scaling grid: the code-only bases (code25b ⚙, code25b_clean ⚙c) and the code-budget ladder at fixed 15.4 B text — ½ (0.5×), **C5-v6** (1× anchor, = its §3a column), ⊕ (1.6×) — plus the ⊗ diagonal (24.65 B code → 5 B text). See §2 footnotes ⚙ ⚙c ½ ⊕ ⊗ ★.
+The code/text budget-scaling grid: the code-only bases (`code25b`, `code25b-clean`) and the code-budget ladder at fixed 15.4 B text — `code 0.5×`, `C5-v6 1×` (= its §3a column), `code 1.6×` — plus the `code diag` point (24.65 B code → 5 B text). See §2 for the per-model recipes.
 
-| Task | **code25b_step23746** ⚙ | **code25b_clean_step23511** ⚙c | c5v3_half_p2_step14671 ½ | **C5-v6 final** ★ | code25b_clean_p2_15bt_step14671 ⊕ | code25b_clean_p2_step4767 ⊗ |
+| Task | code25b | code25b-clean | code 0.5× | C5-v6 1× | code 1.6× | code diag |
 |---|---:|---:|---:|---:|---:|---:|
 | **Open-book** | | | | | | |
 | sciq[0] | 0.686 | 0.737 | 0.788 | 0.806 | 0.806 | 0.783 |
@@ -437,7 +444,7 @@ Cross-size replication of the code→text battery (see §2 ⬥ for recipes). Sam
 
 Column order: text-only baselines (a5, a5sp), the ½-budget code base (code_p1_half), then the code→text variants (c5v3=10%-replay/DCLM, c5v4=SP-NL, c5v2cont=continuous cosine, c5v6=30%, c5v6_strict, c5v7=50%). c5v4 and c5v2cont are 300M-only.
 
-| Task | 300m_a5 | 300m_a5sp | 300m_code_p1_half | 300m_c5v3 | 300m_c5v4 | 300m_c5v2cont | 300m_c5v6 | 300m_c5v6_strict | 300m_c5v7 | 600m_a5 | 600m_a5sp | 600m_code_p1_half | 600m_c5v3 | 600m_c5v6 | 600m_c5v6_strict | 600m_c5v7 |
+| Task | 300M a5 | 300M a5sp | 300M codeP1 | 300M c5v3 | 300M c5v4 | 300M c5v2cont | 300M c5v6 | 300M c5v6-str | 300M c5v7 | 600M a5 | 600M a5sp | 600M codeP1 | 600M c5v3 | 600M c5v6 | 600M c5v6-str | 600M c5v7 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | **Open-book** | | | | | | | | | | | | | | | | |
 | sciq[0] | 0.676 | 0.645 | 0.485 | 0.656 | 0.654 | 0.546 | 0.660 | 0.656 | 0.652 | 0.765 | 0.734 | 0.577 | 0.770 | 0.741 | 0.737 | 0.736 |
@@ -469,6 +476,43 @@ Column order: text-only baselines (a5, a5sp), the ½-budget code base (code_p1_h
 | paloma_macro (bpb) | 1.320 | 1.382 | 1.677 | 1.309 | 1.325 | 1.600 | 1.318 | 1.318 | 1.332 | 1.279 | 1.355 | 1.720 | 1.174 | 1.181 | 1.183 | 1.197 |
 
 **Cross-scale headline (see §3c vs §3):** the two *positive* 1.4B code→text findings do **not** replicate downward — (1) the "30% replay sweet spot" is a pure monotonic trade-off at 600M (Code rises 10→30→50%, NL falls; no peak); (2) "SP-NL > DCLM over a code prior" flips at 300M (c5v3 DCLM ≥ c5v4 SP-NL). What *does* replicate: DCLM > SP-NL single-phase (a5 > a5sp), and continuous-cosine-wins-Code / separate-cosine-wins-NL (c5v2cont Code 0.097 vs c5v6 0.024; c5v6 NL higher).
+
+### 3d. Misc / off-ramp probes
+
+<details>
+<summary>Matched-budget "small" scale-downs, the ×16 short-budget baselines, and the 4B tokens-vs-params point — not part of the ~30B recipe ablations. Click to expand.</summary>
+
+| Task | base | code25 v2 | C5-v2-sm s1 | C5-v2-sm | C5-v3-sm p1 | C5-v3-sm | 4B |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **Open-book** |  |  |  |  |  |  |  |
+| sciq[0] | 0.652 | 0.590 | 0.601 | 0.601 | 0.541 | 0.712 | 0.824 |
+| boolq[0] | 0.502 | 0.567 | 0.614 | 0.614 | 0.618 | 0.614 | 0.552 |
+| piqa[0] | 0.634 | 0.606 | 0.577 | 0.577 | 0.554 | 0.647 | 0.697 |
+| openbookqa_fact[0] | 0.336 | 0.312 | 0.294 | 0.294 | 0.296 | 0.356 | 0.426 |
+| **Mean Open-book** | *0.531* | *0.519* | *0.521* | *0.521* | *0.502* | *0.582* | *0.625* |
+| **Closed-book NL** |  |  |  |  |  |  |  |
+| arc_easy[25] | 0.401 | 0.388 | 0.350 | 0.350 | 0.322 | 0.485 | 0.612 |
+| hellaswag[10] | 0.348 | 0.321 | 0.280 | 0.280 | 0.276 | 0.322 | 0.466 |
+| winogrande[5] | 0.504 | 0.500 | 0.507 | 0.507 | 0.502 | 0.513 | 0.511 |
+| mmlu_text[0] | 0.250 | 0.248 | 0.238 | 0.244 | 0.241 | 0.261 | 0.284 |
+| commonsense_qa_text[5] | 0.339 | 0.296 | 0.254 | 0.277 | 0.247 | 0.387 | 0.524 |
+| social_iqa[0] | 0.366 | 0.362 | 0.342 | 0.342 | 0.346 | 0.382 | 0.407 |
+| lambada_openai[0] | 0.238 | 0.197 | 0.124 | 0.124 | 0.077 | 0.349 | 0.494 |
+| copa[0] | 0.620 | 0.620 | 0.540 | 0.540 | 0.570 | 0.660 | 0.740 |
+| wsc273[0] | 0.516 | 0.527 | 0.484 | 0.498 | 0.487 | 0.524 | 0.634 |
+| storycloze_2018_local[0] | 0.591 | 0.568 | 0.534 | 0.528 | 0.515 | 0.586 | 0.658 |
+| quac_first_turn[0] | 0.142 | 0.136 | 0.077 | 0.092 | 0.079 | 0.122 | 0.168 |
+| **Mean Closed-book NL** | *0.392* | *0.378* | *0.339* | *0.344* | *0.333* | *0.417* | *0.500* |
+| **Code** |  |  |  |  |  |  |  |
+| humaneval[0] (lm-eval) | 0.000 | 0.012 | 0.159 | 0.159 | 0.116 | 0.116 | 0.000 |
+| humaneval[0] (bigcode) | 0.000 | 0.000 | 0.098 | 0.098 | 0.055 | 0.030 | 0.000 |
+| mbpp[3] | 0.000 | 0.000 | 0.130 | 0.130 | 0.088 | 0.050 | 0.000 |
+| **Mean Code** | *0.000* | *0.004* | *0.129* | *0.129* | *0.086* | *0.065* | *0.000* |
+| **Perplexity (lower=better)** |  |  |  |  |  |  |  |
+| dclm_200m_val (bpb) | 1.332 | 1.504 | 1.514 | 1.449 | 1.525 | 1.077 | 0.947 |
+| paloma_macro (bpb) | 1.631 | 1.824 | 1.639 | 1.566 | 1.582 | 1.216 | 1.114 |
+
+</details>
 
 ## Updating this doc
 
