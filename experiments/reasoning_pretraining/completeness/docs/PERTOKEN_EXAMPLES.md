@@ -4,6 +4,8 @@ Judge tokenizer = the model's own (`AutoTokenizer.from_pretrained`). For each do
 target's tokens, NLL (nats/token) under `context` (base) vs `context + complete rationale`, and the diff.
 **diff < 0 = the rationale made that token more predictable.** The reported per-doc Δ is the mean-diff.
 
+> **Tokenizer note:** loading this checkpoint prints a `fix_mistral_regex=True` warning. **Ignore it — it's a false positive.** This is a `llama` tokenizer (Llama-3 regex, numbers grouped `\p{N}{1,3}`); the warning only fires because the config's `transformers_version` (4.57.5) lands in a gap in transformers' mistral-detector (`tokenization_utils_base.py:2466/2480`). Setting the flag would swap in the Mistral single-digit regex (`\p{N}`), splitting numbers into single digits — which is **not** how this model was trained (verified: it changes tokenization on 87/132 of our scored strings). The default (used here) is the correct, training-matched tokenization.
+
 
 ---
 
