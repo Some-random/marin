@@ -438,9 +438,9 @@ The code/text budget-scaling grid: the code-only bases (`code25b`, `code25b-clea
 
 </details>
 
-### 3c. Smaller-scale results (300M / 600M) ⬥
+### 3c. Smaller-scale results (300M / 600M)
 
-Cross-size replication of the code→text battery (see §2 ⬥ for recipes). Same lm-eval v2 pipeline + aux runners as §3, extracted from `outputs/eval_results/{v2,paloma,gsm,aryabumi_nl,quac}_{300m,600m}_*` with the same metric-fallback logic as the 1.4B table (via `code_ladder/eval/eval_section3.py`). `—` = not run: **mmlu** crashed on the pre-fix NCCL gather-OOM bug and was only recovered for the four 600M u-shape models; **dclm_200m_val bpb** was not evaluated at these sizes. Per-axis writeups live in `outputs/eval_results/COMPARISON_{300m,600m}_*.md`.
+Cross-size replication of the code→text battery (see §2 for recipes). Same lm-eval v2 pipeline + aux runners as §3, extracted from `outputs/eval_results/{v2,paloma,gsm,aryabumi_nl,quac}_{300m,600m}_*` with the same metric-fallback logic as the 1.4B table (via `code_ladder/eval/eval_section3.py`). `—` = not run: **mmlu** crashed on the pre-fix NCCL gather-OOM bug and was only recovered for the four 600M u-shape models; **dclm_200m_val bpb** was not evaluated at these sizes. Per-axis writeups live in `outputs/eval_results/COMPARISON_{300m,600m}_*.md`.
 
 Column order: text-only baselines (a5, a5sp), the ½-budget code base (code_p1_half), then the code→text variants (c5v3=10%-replay/DCLM, c5v4=SP-NL, c5v2cont=continuous cosine, c5v6=30%, c5v6_strict, c5v7=50%). c5v4 and c5v2cont are 300M-only.
 
