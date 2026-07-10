@@ -1,0 +1,17 @@
+# boolq with the passage REMOVED — tests whether the model actually reads the passage.
+# If acc ~= standard boolq, the model isn't using the passage (answers from the question alone).
+task: boolq_nopassage
+dataset_path: super_glue
+dataset_name: boolq
+output_type: multiple_choice
+training_split: train
+validation_split: validation
+doc_to_text: "Question: {{question}}?\nAnswer:"
+doc_to_target: label
+doc_to_choice: ["no", "yes"]
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0

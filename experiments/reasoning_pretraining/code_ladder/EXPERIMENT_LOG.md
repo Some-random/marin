@@ -48,6 +48,16 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## July 9
+
+**Eval-suite scoring investigation + task removal (code_ladder).**
+- **Provenance check** (papers + Marin reports): BBH and CommonSenseQA are in Marin's 8B/32B base suite but NOT in the scale-matched refs — phi-1/1.5, Aryabumi (470M–2.8B), Suhas's data-efficiency (≤1.4B) — which use SIQA/social_iqa for commonsense. Both off-scale for our 1.4B. Marin 8B Base: BBH 50.6, CSQA 79.1.
+- **wsc → wsc273** (Marin-aligned referent-choice; binary super_glue wsc removed): swapped in `eval_section3.py` + `run_eval_v2.sh`; cached `winograd_wsc` for offline. c5v6 0.601 / A5 0.586 / phi-1.5 0.769 (0-shot; no fewshot pool).
+- **Removal grid** (0/5/10-shot, c5v6 + A5 + phi-1.5) for boolq, mmlu, commonsense_qa, cb, winogrande, arc_challenge, logiqa → `docs/REMOVED_TASKS.md` (per-task rationale + answer-distribution·accuracy). Few-shot does not rescue our models. Filled only the missing cells (rest reused from prior runs).
+- **Letter-vs-text scoring (key finding):** commonsense_qa's chance-level score was a LETTER-scoring artifact. Text-scored (`commonsense_qa_text.yaml`, scores the answer text like arc_easy): c5v6 20.1→34.6%, A5 19.5→41.3% (0-shot); few-shot helps (5-shot c5v6 43.7 / A5 48.5; 10≈5). mmlu text-scored (`mmlu_text.yaml`, cais/mmlu 'all') stays 27.7–30% FLAT across 0/5/10 → genuine knowledge gap, not scoring (few-shot doesn't help; hurts phi 43.7→33.7). boolq passage-ablation (`boolq_nopassage.yaml`): the passage adds ~6pp (c5v6 48.6→54.5, A5 50.0→56.3) — model reads it, but stays below the 62% yes-majority.
+- **Docs added:** REMOVED_TASKS, COMMONSENSE_QA_SCORING_DIFF, WSC273/WSC_BINARY/BBH/COMMONSENSE_QA predictions.
+- **In progress (not finalized):** keep commonsense_qa (text-scored, 5-shot) + mmlu (text-scored); §1 EVALUATION.md Collapse reorg + final boolq/cb/arc_challenge keep-drop pending.
+
 ## July 8
 
 **Verified numbers (5 models, `outputs/overnight_evals.sh`).**

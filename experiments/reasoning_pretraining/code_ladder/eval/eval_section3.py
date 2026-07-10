@@ -87,7 +87,7 @@ TASKS: list[TaskRow] = [
     TaskRow("logiqa[0]", "logiqa", ("acc_norm,none", "acc,none")),
     TaskRow("lambada_openai[0]", "lambada_openai", ("acc,none",)),  # NOT perplexity
     TaskRow("copa[0]", "copa", ("acc,none",)),
-    TaskRow("wsc[0]", "wsc", ("acc,none",)),
+    TaskRow("wsc273[0]", "wsc273", ("acc,none",)),  # Marin-aligned coreference; replaces binary super_glue wsc (a yes/no collapse artifact at our scale)
     # Not in run_eval_v2.sh — filled by auxiliary runners
     # (run_aryabumi_nl_extras.sh for storycloze+cb, run_quac_for_model.sh for quac).
     TaskRow("storycloze_2018_local[0]", "storycloze_2018_local", ("acc,none",), runs_in_v2_suite=False),

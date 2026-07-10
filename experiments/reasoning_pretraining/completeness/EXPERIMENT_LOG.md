@@ -37,6 +37,10 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-09
+- **`docs/JUDGE_CALIBRATION.md`** — 6 judges (base+instruct across DCLM/Llama/Qwen, 1.4B–72B): rationale-vs-base positive everywhere, content effect real (complete–placebo), completeness null; base≈instruct. GLM-4.5-Air (110B) added as a 5th family (same pattern; marked partial, n<41).
+- **`docs/PERTOKEN_EXAMPLES.md`** + `scripts/pertoken.py` + `scripts/winogrande_score.py` — full per-token perplexity calc (context + rationale + continuation + per-token NLL + mean + diff) on the DCLM-1.4B judge; `fix_mistral_regex` warning flagged as a false positive (llama tokenizer, would break number tokenization).
+
 ## 2026-07-08
 - **Completeness test (Dongwei: raise the bar to COMPLETE multi-step reasoning)** → `docs/COMPLETENESS_RESULTS.md`.
   Mined DCLM (1.5M-doc raw pool) for real docs whose continuation needs a ≥3-step chain; wrote a COMPLETE

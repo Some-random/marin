@@ -32,6 +32,10 @@ export HF_HUB_OFFLINE=1
 # CUMEM IPC path and fixes it (verified: P2P on = 8/8 fail, P2P off = 6/6 pass) at full 8-GPU
 # speed. Eval is data-parallel inference + one gather, so P2P perf is irrelevant here.
 export NCCL_P2P_DISABLE=1
+# wsc273 (winograd_wsc) ships a custom dataset loading script → needs trust_remote_code.
+# Pre-cache once with: HF_DATASETS_CACHE=$HF_DATASETS_CACHE HF_DATASETS_TRUST_REMOTE_CODE=1 \
+#   python -c "import datasets; datasets.load_dataset('winograd_wsc','wsc273')"  (online, then offline works)
+export HF_DATASETS_TRUST_REMOTE_CODE=1
 
 LABEL="${1:?LABEL required}"
 HF_DST="${2:?HF_DST required}"
@@ -140,7 +144,7 @@ run_bigcode_humaneval() {
 shard_A() {
   run_lm_eval "mmlu_pro" 5 8 "--limit 0.1"
   run_lm_eval "openbookqa_fact" 0 16 ""
-  run_lm_eval "lambada_openai,copa,wsc,agieval_lsat_ar" 0 16 ""
+  run_lm_eval "lambada_openai,copa,wsc273" 0 16 ""
 }
 shard_B() {
   run_lm_eval "minerva_math" 4 8 ""

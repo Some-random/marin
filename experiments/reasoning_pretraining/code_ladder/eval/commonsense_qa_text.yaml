@@ -1,0 +1,19 @@
+# commonsense_qa scored by ANSWER TEXT (not the bare letter), mirroring arc_easy/sciq.
+# Tests whether our small models have real commonsense signal hidden by the letter-mapping step.
+task: commonsense_qa_text
+dataset_path: tau/commonsense_qa
+training_split: train
+validation_split: validation
+output_type: multiple_choice
+doc_to_text: "Question: {{question.strip()}}\nAnswer:"
+doc_to_target: "{{ choices.label.index(answerKey) }}"
+doc_to_choice: "{{choices.text}}"
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: acc_norm
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0
