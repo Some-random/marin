@@ -136,33 +136,32 @@ run_bigcode_humaneval() {
 
 # Task groups grouped by SHARD. Balanced from observed C5-v6-NEW v7 timings
 # (each shard ~16-19 min vs 67 min serial).
-# Shard A (~16 min): mmlu_pro [13] + openbookqa_fact [1] + lambada group [2]
-# Shard B (~16 min): minerva_math [12] + arc [4]
-# Shard C (~17 min): gpqa [7] + bbh [6] + hellaswag [4]
-# Shard D (~19 min): bigcode [3] + humaneval [3] + mbpp [2] + gsm8k_cot [3] +
-#                    mmlu [3] + winogrande+gsm8k [3] + piqa group [2]
+# Kept-suite shards. Collapse tasks (Math C, Aggregate E, arc_challenge, logiqa, cb,
+# binary wsc, plain letter-scored mmlu/commonsense_qa, plain closed-book openbookqa)
+# dropped 2026-07-10 — see EVALUATION.md §1 "Collapse" + docs/REMOVED_TASKS.md.
+# mmlu + commonsense_qa are now TEXT-scored (mmlu_text, commonsense_qa_text); wsc→wsc273.
+# Shard A: mmlu_text [0-shot text-scored] + openbookqa_fact + lambada group
+# Shard B: arc_easy [25] + commonsense_qa_text [5-shot text-scored]
+# Shard C: hellaswag [10]
+# Shard D: bigcode + humaneval + mbpp + winogrande + piqa group
 shard_A() {
-  run_lm_eval "mmlu_pro" 5 8 "--limit 0.1"
+  run_lm_eval "mmlu_text" 0 16 ""
   run_lm_eval "openbookqa_fact" 0 16 ""
   run_lm_eval "lambada_openai,copa,wsc273" 0 16 ""
 }
 shard_B() {
-  run_lm_eval "minerva_math" 4 8 ""
-  run_lm_eval "arc_easy,arc_challenge" 25 16 ""
+  run_lm_eval "arc_easy" 25 16 ""
+  run_lm_eval "commonsense_qa_text" 5 16 ""
 }
 shard_C() {
-  run_lm_eval "gpqa" 0 8 ""
-  run_lm_eval "bbh" 3 8 "--limit 0.1"
   run_lm_eval "hellaswag" 10 16 ""
 }
 shard_D() {
   run_bigcode_humaneval
   run_lm_eval "humaneval" 0 8 "--confirm_run_unsafe_code"
   run_lm_eval "mbpp" 3 8 "--confirm_run_unsafe_code"
-  run_lm_eval "gsm8k_cot" 8 8 "--confirm_run_unsafe_code"
-  run_lm_eval "mmlu" 5 16 ""
-  run_lm_eval "winogrande,gsm8k" 5 16 ""
-  run_lm_eval "piqa,boolq,sciq,openbookqa,commonsense_qa,social_iqa,logiqa" 0 16 ""
+  run_lm_eval "winogrande" 5 16 ""
+  run_lm_eval "piqa,boolq,sciq,social_iqa" 0 16 ""
 }
 
 case "$SHARD" in

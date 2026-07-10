@@ -3,8 +3,7 @@
 <details>
 <summary><h2>1. Taxonomy by mechanism (with examples)</h2></summary>
 
-
-Two-way split for QA: **open-book** (the answer is in the prompt; model attends and extracts) vs. **closed-book** (no passage; model uses weights). Plus four task families that don't fit the QA frame: math (with perturbation-robust variants), code generation, multi-domain aggregates, and continuous PPL.
+Two-way split for QA: **open-book** (the answer is in the prompt; model attends and extracts) vs. **closed-book** (no passage; model uses weights). Plus two task families that don't fit the QA frame: code generation and continuous PPL. (Math and the multi-domain aggregates have been **dropped** from the kept suite — see the **Collapse** subsection at the end of this taxonomy for why.)
 
 ### A. Open-book QA
 
@@ -15,7 +14,7 @@ Two-way split for QA: **open-book** (the answer is in the prompt; model attends 
 > - **choices**: oxidants / antioxidants / Oxygen / residues
 > - **correct_answer**: oxidants
 
-**boolq** — yes/no question + Wikipedia-style passage that contains the answer.
+**boolq** — yes/no question + Wikipedia-style passage that contains the answer. **Open-book**: the passage **is** in the prompt (`{{passage}}\nQuestion: …?\nAnswer:`), scored on ` no`/` yes` — identical to Marin's lm-eval default setup; 0-shot in our pipeline (Marin runs it 10-shot, which our small models don't benefit from). Our 1.4B models do read the passage (+6pp vs a no-passage ablation) but sit below the 62% yes-majority — a real reading-comprehension task that scales in (Marin-8B Base 85.9%).
 
 > - **question**: "does ethanol take more energy make that produces"
 > - **passage**: "Ethanol fuel -- All biomass goes through at least some of these steps: it needs to be grown, collected, dried, fermented, distilled, and burned. … one unit of fossil-fuel energy is required to create 1.3 energy units from the resulting ethanol. The energy balance for sugarcane ethanol produced in Brazil is more favorable, with one unit of fossil-fuel energy required to create 8 from the ethanol. …"
@@ -33,13 +32,7 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > - **choices**: A) Sunlight is the source of energy for nearly all ecosystems. / B) Most ecosystems are found on land instead of in water. / C) Carbon dioxide is more available than other gases. / D) The producers in all ecosystems are plants.
 > - **answerKey**: A
 
-**arc_challenge** — harder ARC subset.
-
-> - **question**: "An astronomer observes that a planet rotates faster after a meteorite impact. Which is the most likely effect of this increase in rotation?"
-> - **choices**: A) Planetary density will decrease. / B) Planetary years will become longer. / C) Planetary days will become shorter. / D) Planetary gravity will become stronger.
-> - **answerKey**: C
-
-**mmlu** — 4-way MC across 57 subject subtasks. 5-shot in our pipeline.
+**mmlu** — 4-way MC across 57 subject subtasks. **Text-scored** (`mmlu_text.yaml`, `cais/mmlu` `all` config): the candidates are the answer *texts*, not the bare letter ` A`/` B`/` C`/` D`. The letter-scored lm-eval default collapses weak base models onto a letter-frequency prior; text-scoring reads the actual answer. 0-shot (mmlu_text is flat across 0/5/10-shot at our scale). Kept because our models clear chance (~28–30% vs 25%) — a genuine, if small, knowledge signal, unlike the letter-scored version which floored at ~24–25%.
 
 > - **subject**: abstract_algebra
 > - **question**: "Find the degree for the given field extension Q(sqrt(2), sqrt(3), sqrt(18)) over Q."
@@ -74,19 +67,12 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > - **option2**: Maria
 > - **answer**: 2 (Maria)
 
-**commonsense_qa** — 5-way MC, ConceptNet-derived commonsense.
+**commonsense_qa** — 5-way MC, ConceptNet-derived commonsense. **Text-scored, 5-shot** (`commonsense_qa_text.yaml`): candidates are the answer *texts*, not bare letters. The letter-scored default pins weak models to ~chance (20%) via a letter-frequency prior (A5 fires ` A` ~98% of the time); text-scoring recovers real signal (c5v6 20→35%, A5 20→41% at 0-shot; 5-shot adds a few points). See [`docs/COMMONSENSE_QA_SCORING_DIFF.md`](docs/COMMONSENSE_QA_SCORING_DIFF.md).
 
 > - **question**: "A revolving door is convenient for two direction travel, but it also serves as a security measure at a what?"
 > - **question_concept**: revolving door
 > - **choices**: A) bank / B) library / C) department store / D) mall / E) new york
 > - **answerKey**: A
-
-**logiqa** — formal logical reasoning. (The `context` here is the puzzle premise, not a knowledge passage — the model has to deduce from it, which is why this is closed-book rather than open-book.)
-
-> - **context**: "In the planning of a new district in a township, it was decided to build a special community in the southeast, northwest, centered on the citizen park. These four communities are designated as cultural area, leisure area, commercial area and administrative service area. It is known that the administrative service area is southwest of the cultural area, and the cultural area is southeast of the leisure area."
-> - **question**: "Based on the above statement, which of the following can be derived?"
-> - **options**: A) Civic Park is north of the administrative service area / B) The leisure area is southwest of the cultural area / C) The cultural district is in the northeast of the business district / D) The business district is southeast of the leisure area
-> - **label**: a
 
 **copa** — Choice of Plausible Alternatives (super_glue/copa). 2-way MC: given a premise, pick the more plausible **cause** or **effect** of it. The `question` field is the literal string "cause" or "effect" and tells the model which direction to reason.
 
@@ -96,11 +82,11 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > - **choice2**: "Water flowed from the spout."
 > - **label**: 1 (choice2)
 
-**wsc** — Winograd Schema Challenge (super_glue config `wsc.fixed`). Binary coreference: given a sentence with two flagged spans, decide whether the second span (a pronoun) co-refers with the first span (a noun phrase). Adversarially constructed so that pure pattern-matching fails — the model has to use world knowledge.
+**wsc273** — Winograd Schema Challenge, 273-example **referent-choice** version (`winograd_wsc`, config `wsc273`; needs `HF_DATASETS_TRUST_REMOTE_CODE=1`). Given a sentence with an ambiguous pronoun and two candidate referents, substitute each referent for the pronoun and score the two resulting sentences; pick the higher-likelihood one. This is the version **Marin** evaluates — we switched from the SuperGLUE binary `wsc.fixed` (a yes/no "does span2 refer to span1" that our models couldn't beat its majority baseline on; moved to Collapse). See [`docs/WSC273_PREDICTIONS.md`](docs/WSC273_PREDICTIONS.md). 2-way.
 
-> - **text**: "Bernard, who had not told the government official that he was less than 21 when he filed for a homestead claim, did not consider that he had done anything dishonest. Still, anyone who knew that he was 19 years old could take his claim away."
-> - **span1_text**: "anyone"  • **span2_text**: "him"
-> - **label**: 0 (the pronoun "him" does NOT refer to "anyone")
+> - **text**: "The city councilmen refused the demonstrators a permit because they feared violence."
+> - **pronoun**: "they"  • **options**: the city councilmen / the demonstrators
+> - **label**: the city councilmen
 
 **storycloze_2018_local** — Story Cloze Test (Mostafazadeh et al 2016, 2018 split). 2-way MC: given the first 4 sentences of a 5-sentence story, pick the more plausible ending. Tests narrative coherence and commonsense expectations. We use a local custom YAML (`storycloze_2018_local.yaml`) because the canonical lm-eval `storycloze_2018` task requires manual dataset acceptance terms.
 
@@ -111,12 +97,6 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > - **ending_1**: "Karen became good friends with her roommate."
 > - **ending_2**: "Karen hated her roommate."
 > - **answer_right_ending**: 1
-
-**cb** — CommitmentBank (super_glue config `cb`). 3-way NLI: given a premise (typically a complex sentence with an embedded clause) and a hypothesis (the embedded clause taken at face value), classify entailment / contradiction / neutral. The premise often contains a presupposition trigger that may or may not project; the task tests whether the model can identify when an embedded proposition is being asserted vs hedged. Small dataset (250 train, 56 dev).
-
-> - **premise**: "He thought that one prick was enough. Now he wasn't so sure."
-> - **hypothesis**: "One prick was enough."
-> - **label**: 2 (neutral)
 
 **quac_first_turn** — Question Answering in Context (Choi et al 2018, `allenai/quac`), first-turn-only adaptation: 1000 single-shot examples (Q0 of each dialogue). Format: background + section title + context passage, then "Q: ... A:". Model generates a free-form span. Scored by token-level F1 (and EM) against ≤ 4 annotators' gold answers via transformers' `squad_metrics`. We report F1 as the canonical "Acc."-equivalent (Aryabumi et al 2024 list QUAC under their NL Reasoning suite with Acc.; F1 is the standard QUAC metric). Custom YAML at `quac_first_turn.yaml` + utility functions at `quac_utils.py`.
 
@@ -131,33 +111,6 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 > > "…'Figured if you're going to be out at night getting hit by cars, you might as well have some backup.' I look at him, feeling stunned. Like this is some sort of sign. But as I stare at Harlin, his mouth curved in a confident grin, I don't care about ___"
 >
 > Gold word: `signs`.
-
-### C. Math (multi-step generation)
-
-**gsm8k** (5-shot, free-generation exact-match on the `#### N` answer) and **gsm8k_cot** (8-shot CoT, free generation) — same problems, different prompting. (Both are exact-match on the generated number, NOT loglikelihood — the earlier "logprob" label for gsm8k[5] was wrong.)
-
-> - **question**: "Janet's ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?"
-> - **answer (CoT reference)**: "Janet sells 16 - 3 - 4 = <<16-3-4=9>>9 duck eggs a day. She makes 9 * 2 = $<<9*2=18>>18 every day at the farmer's market. #### 18"
-> - **gold**: 18
-
-**minerva_math** — competition math, free generation, scored by `math_verify`.
-
-> - **type**: Algebra (Level 3)
-> - **problem**: "How many vertical asymptotes does the graph of $y=\\frac{2}{x^2+x-6}$ have?"
-> - **solution**: "The denominator of the rational function factors into $x^2+x-6=(x-2)(x+3)$. Since the numerator is always nonzero, there is a vertical asymptote whenever the denominator is $0$, which occurs for $x = 2$ and $x = -3$. Therefore, the graph has $\\boxed{2}$ vertical asymptotes."
-> - **answer**: 2
-
-**gsm_symbolic_main** — GSM-Symbolic main split (Mirzadeh et al 2024 §3.1, `apple/GSM-Symbolic`, 5000 examples). Re-instantiations of GSM8k templates where every named entity and integer is re-sampled while keeping the underlying arithmetic structure. Compared against gsm8k, isolates "is the model solving the problem, or pattern-matching the surface form?" 8-shot CoT, greedy decoding. Headline result from the paper: phi-1.5 drops 47% from GSM8K (0.305) → GSM-Sym main (0.160) — replicates the published pattern that smaller models drop more aggressively under perturbation. Our 1.4B models floor on regular GSM8K so they floor on this row too — included for completeness.
-
-> - **original_question** (GSM8k #473): "Benny saw a 10-foot shark with 2 6-inch remoras attached to it. What percentage of the shark's body length is the combined length of the remoras?" — gold 10
-> - **question** (symbolic instance): "Rania saw a 210-foot whale with 7 72-inch remoras attached to it. What percentage of the whale's body length is the combined length of the remoras?" — gold 20
-> - Same template, name and numbers re-drawn, arithmetic structure (inches → feet conversion, then percentage) preserved.
-
-**gsm_noop** — GSM-NoOp (Mirzadeh et al 2024 §4.4). GSM8k problems with one extra clause inserted that is grammatically plausible but mathematically irrelevant. Tests whether the model can ignore irrelevant context or gets distracted into incorporating it. Our eval uses `Experimental-Orange/gsm-noop-audited`, a 117-item third-party reconstruction (the Apple-original NoOp split was not released). 8-shot CoT, greedy. Paper headline: phi-1.5 drops 89% from GSM8K to NoOp (→ 0.034). Our 1.4B models floor (consistent with their GSM8K floor).
-
-> - **original_question** (GSM8k #1223): "To make a call from a phone booth, you must pay ₣0.6 for each minute of your call. After 30 minutes, that price drops to ₣0.5 per minute. How much would a 78-minute call cost?" — gold 42
-> - **question** (with NoOp clause): "To make a call from a phone booth, you must pay ₣0.6 for each minute of your call. After 30 minutes, that price drops to ₣0.5 per minute. **If you had placed the same call on a weekend, the initial per-minute rate would have been 15% cheaper.** How much would a 78-minute call cost on a weekday?" — gold still 42.
-> - The weekend-discount clause is a hypothetical that does not apply (the question specifies a weekday call). A model that applies the 15% discount has been distracted by the no-op.
 
 ### D. Code generation
 
@@ -194,36 +147,6 @@ No passage in the prompt. The model has to recall facts, apply commonsense, or d
 >   assert remove_Occ("abcda","a") == "bcd"
 >   assert remove_Occ("PHP","P") == "H"
 >   ```
-
-### E. Aggregate / multi-domain reasoning
-
-Tasks that aggregate many subtasks across heterogeneous domains. Reported as the unweighted mean of per-subtask scores. Useful as a single "frontier reasoning" number, but a poor diagnostic since subtask composition is fixed and individual signals are averaged out.
-
-**bbh** — Big-Bench Hard. 27 subtasks (`bbh_boolean_expressions`, `bbh_causal_judgement`, `bbh_logical_deduction_five_objects`, …) that the original BIG-bench paper identified as the hardest splits. Each subtask is free-generation, scored by an answer-extraction regex (`exact_match,get-answer`). 3-shot in our pipeline.
-
-> Subtask example (`bbh_boolean_expressions`):
-> - **input**: "not ( True ) and ( True ) is"
-> - **target**: "False"
-
-**mmlu_pro** — harder MMLU successor. 10-way MC (vs. MMLU's 4-way) drawn from STEM exams and textbooks with longer, more reasoning-heavy questions; subtasks are organized by `category` (math, physics, chemistry, …). Scored by `exact_match,custom-extract` after letter extraction. 5-shot, 2048-context (phi-1/phi-1.5 cannot run this — `n/a (ctx)`).
-
-> - **category**: math
-> - **question**: "The symmetric group $S_n$ has $n!$ elements. … Find the characteristic of the ring 2Z."
-> - **options** (10): "0" / "30" / "3" / "10" / "12" / "50" / "2" / "100" / "20" / "5"
-> - **answer**: A (= "0")
-
-**agieval_lsat_ar** — LSAT Analytical Reasoning subset of AGIEval (Zhong et al 2023). Verbal logic puzzles (scheduling, grouping, ordering) with 5 candidate solutions per question; each candidate is a fully specified assignment that must satisfy the puzzle constraints.
-
-> - **query**: "Of the eight students—George, Helen, Irving, Kyle, Lenore, Nina, Olivia, and Robert—in a seminar, exactly six will give individual oral reports during three consecutive days—Monday, Tuesday, and Wednesday. Exactly two reports will be given each day … [further constraints]"
-> - **choices** (5, each a complete schedule): "(A) Mon. morning: Helen; Mon. afternoon: Robert; Tues. morning: Olivia; …" / "(B) Mon. morning: Irving; …" / …
-> - **gold**: option C
-
-**gpqa_diamond** — graduate-level physics, chemistry, biology MC questions written by domain PhDs (Rein et al 2023). "Diamond" is the highest-quality validated subset (~198 questions). 4-way MC; expert validators score >65%, non-expert validators with web access score <35%.
-
-> - **subdomain**: Physics (general)
-> - **question**: "Two quantum states with energies E1 and E2 have lifetimes of 10⁻⁹ s and 10⁻⁸ s respectively. We want to clearly distinguish these two energy levels. Which of the following could be their energy difference?"
-> - **correct answer**: 10⁻⁴ eV
-> - **distractors**: 10⁻¹¹ eV / 10⁻⁸ eV / 10⁻⁹ eV
 
 ### F. Continuous PPL
 
@@ -278,6 +201,22 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 > ```
 > ````
 
+### G. Collapse (removed from the kept suite)
+
+Tasks pulled from the suite because, at our scale (≤1.4B), they don't produce a trustworthy signal — the model floors at chance, collapses onto a scoring prior, or the metric is too noisy to read. Full per-task rationale + 0/5/10-shot numbers + answer-choice distributions in [`docs/REMOVED_TASKS.md`](docs/REMOVED_TASKS.md).
+
+**From closed-book QA (B):**
+
+- **arc_challenge** (25-shot) — hard grade-school science MC. c5v6 sits at chance (~27.6% acc_norm); only A5 clears it weakly (~31.6%). Real task, but too hard to discriminate our models.
+- **logiqa** — formal logical deduction. All our models ~26–29% (4-way chance = 25%); few-shot doesn't help, and even phi barely moves. No signal at our scale.
+- **wsc** (binary `wsc.fixed`) — yes/no coreference. **Replaced by wsc273** (referent-choice, Marin-aligned, kept in B): our models couldn't beat the binary majority baseline.
+- **cb** (CommitmentBank, 3-way NLI) — N=56 dev set (one example = 1.8%, inherently noisy); our models collapse to 2 classes and never predict "Neither", stuck ~40–48% near the ~50% majority. Not in Marin's suite (came from Aryabumi's NL set). No scoring lever (labels are the answer).
+
+**Math (former section C)** — gsm8k, gsm8k_cot, minerva_math, gsm_symbolic_main, gsm_noop. All free-generation exact-match on a final number. Our 1.4B models floor (≈0) on plain GSM8K, so every perturbation variant floors too — nothing to measure. (The GSM-Symbolic / NoOp robustness story needs a model that can do the base task first.)
+
+**Aggregate / multi-domain (former section E)** — bbh, mmlu_pro, agieval_lsat_ar, gpqa_diamond. Heterogeneous subtask means; each is at/near chance for our models and averages out any remaining signal. None are used by the scale-matched references (phi-1.5, Aryabumi, Suhas); bbh + mmlu_pro are Marin-8B-lineage tasks meant for 8B+.
+
+The kept **mmlu** and **commonsense_qa** were *rescued* (not collapsed) by switching from letter-scoring to **text-scoring** — see their entries in B.
 
 </details>
 
@@ -285,7 +224,6 @@ Tasks that aggregate many subtasks across heterogeneous domains. Reported as the
 
 <details>
 <summary><h2>2. Models tracked</h2></summary>
-
 
 | Label | HF repo (or local path) | Params (N) | Tokens trained (D) | FLOPs (≈6·N·D) | Unique tokens | Notes |
 |---|---|---|---|---:|---|---|

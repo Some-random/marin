@@ -78,49 +78,30 @@ TASKS: list[TaskRow] = [
     # to acc,none for older result JSONs that didn't log acc_norm.
     TaskRow("openbookqa_fact[0]", "openbookqa_fact", ("acc_norm,none", "acc,none")),
     TaskRow("arc_easy[25]", "arc_easy", ("acc,none",)),
-    TaskRow("arc_challenge[25]", "arc_challenge", ("acc_norm,none", "acc,none")),
     TaskRow("hellaswag[10]", "hellaswag", ("acc_norm,none", "acc,none")),
     TaskRow("winogrande[5]", "winogrande", ("acc,none",)),
-    TaskRow("mmlu[5]", "_mmlu_mean", ()),                         # special: average mmlu_<subject>
-    TaskRow("commonsense_qa[0]", "commonsense_qa", ("acc,none",)),
+    TaskRow("mmlu_text[0]", "mmlu_text", ("acc,none", "acc_norm,none")),  # text-scored 'all' task; clears chance where letter-scored mmlu floored
+    TaskRow("commonsense_qa_text[5]", "commonsense_qa_text", ("acc_norm,none", "acc,none")),  # text-scored; rescues from letter-prior collapse
     TaskRow("social_iqa[0]", "social_iqa", ("acc,none",)),
-    TaskRow("logiqa[0]", "logiqa", ("acc_norm,none", "acc,none")),
     TaskRow("lambada_openai[0]", "lambada_openai", ("acc,none",)),  # NOT perplexity
     TaskRow("copa[0]", "copa", ("acc,none",)),
     TaskRow("wsc273[0]", "wsc273", ("acc,none",)),  # Marin-aligned coreference; replaces binary super_glue wsc (a yes/no collapse artifact at our scale)
     # Not in run_eval_v2.sh — filled by auxiliary runners
-    # (run_aryabumi_nl_extras.sh for storycloze+cb, run_quac_for_model.sh for quac).
+    # (run_aryabumi_nl_extras.sh for storycloze, run_quac_for_model.sh for quac).
     TaskRow("storycloze_2018_local[0]", "storycloze_2018_local", ("acc,none",), runs_in_v2_suite=False),
-    TaskRow("cb[0]", "cb", ("acc,none",), runs_in_v2_suite=False),
     TaskRow("quac_first_turn[0]", "quac_first_turn", ("f1,none",), runs_in_v2_suite=False),
-    TaskRow("agieval_lsat_ar[0]", "agieval_lsat_ar", ("acc_norm,none", "acc,none")),
-    TaskRow("gpqa_diamond[0]", "gpqa_diamond_zeroshot", ("acc,none",)),
-    TaskRow("bbh[3] (limit=0.1)", "bbh", (
-        "exact_match,get-answer",       # current lm-eval (June 2026)
-        "exact_match,strict-match",     # older lm-eval
-        "acc,none",                     # fallback
-    )),
-    TaskRow("mmlu_pro[5] (limit=0.1)", "mmlu_pro", (
-        "exact_match,custom-extract",   # current
-        "exact_match,strict-match",     # older
-        "acc,none",                     # fallback
-    )),
-    TaskRow("gsm8k[5]", "gsm8k", ("exact_match,strict-match",)),
-    TaskRow("gsm8k_cot[8]", "gsm8k_cot", ("exact_match,strict-match",)),
-    TaskRow("minerva_math[4]", "minerva_math", (
-        "exact_match,none",             # matches existing §3 column convention
-        "math_verify,none",             # newer lm-eval default; more permissive
-    )),
     TaskRow("humaneval[0] (lm-eval)", "humaneval", ("pass@1,create_test",)),
     TaskRow("humaneval[0] (bigcode)", "_bigcode_he", ()),  # special: read bigcode metrics.json
     TaskRow("mbpp[3]", "mbpp", ("pass_at_1,none",)),
     # Perplexity rows are NOT run by run_eval_v2.sh — they come from
     # Levanter in-training eval. Listed here for completeness only.
-    TaskRow("gsm_symbolic_main[8]", "gsm_symbolic_main", ("exact_match,strict-match",), runs_in_v2_suite=False),
-    TaskRow("gsm_noop[8]", "gsm_noop", ("exact_match,strict-match",), runs_in_v2_suite=False),
     TaskRow("dclm_200m_val (bpb)", "_dclm_in_training", (), runs_in_v2_suite=False),
     TaskRow("paloma_macro (bpb)", "_paloma_macro", (), runs_in_v2_suite=False),
 ]
+# Collapse (dropped from the kept suite 2026-07-10 — see EVALUATION.md §1 "Collapse"
+# + docs/REMOVED_TASKS.md): arc_challenge, logiqa, cb, binary wsc, letter-scored mmlu +
+# commonsense_qa (→ text-scored above), Math (gsm8k/gsm8k_cot/minerva_math/gsm_symbolic/gsm_noop),
+# Aggregate (agieval_lsat_ar/gpqa_diamond/bbh/mmlu_pro). Their §3 rows are retired with the fill.
 
 
 # ====================================================================
@@ -134,18 +115,9 @@ MEAN_ROWS = [
      ["sciq[0]", "boolq[0]", "piqa[0]", "openbookqa_fact[0]"]),
     ("Mean Closed-book NL",
      "Closed-book NL",
-     ["arc_easy[25]", "arc_challenge[25]", "hellaswag[10]", "winogrande[5]", "mmlu[5]",
-      "commonsense_qa[0]", "social_iqa[0]", "logiqa[0]", "lambada_openai[0]", "copa[0]", "wsc[0]",
-      "storycloze_2018_local[0]", "cb[0]", "quac_first_turn[0]"]),
-    ("Mean Aggregate",
-     "Aggregate",
-     ["agieval_lsat_ar[0]", "gpqa_diamond[0]", "bbh[3] (limit=0.1)", "mmlu_pro[5] (limit=0.1)"]),
-    ("Mean Math (standard)",
-     "Math (standard)",
-     ["gsm8k[5]", "gsm8k_cot[8]", "minerva_math[4]"]),
-    ("Mean Math (perturbation-robust)",
-     "Math (perturbation-robust)",
-     ["gsm_symbolic_main[8]", "gsm_noop[8]"]),
+     ["arc_easy[25]", "hellaswag[10]", "winogrande[5]", "mmlu_text[0]",
+      "commonsense_qa_text[5]", "social_iqa[0]", "lambada_openai[0]", "copa[0]", "wsc273[0]",
+      "storycloze_2018_local[0]", "quac_first_turn[0]"]),
     ("Mean Code",
      "Code",
      ["humaneval[0] (lm-eval)", "humaneval[0] (bigcode)", "mbpp[3]"]),
