@@ -14,7 +14,7 @@ NLL of the real **target** given `context` (base) vs `context+complete rationale
 | Qwen3.5-35B-A3B | instruct | Qwen newest | +0.135 (41%↓) | +0.066 (41%↓) | +0.908 | **-0.773** | **+0.069** (11/41) |
 | Qwen2.5-72B | base | Qwen 2024 | +0.336 (37%↓) | +0.283 (34%↓) | +0.747 | **-0.411** | **+0.052** (13/41) |
 | Qwen2.5-72B | instruct | Qwen 2024 | +0.306 (29%↓) | +0.245 (34%↓) | +0.758 | **-0.452** | **+0.060** (18/41) |
-| GLM-4.5-Air-Base | base | Zhipu 2025 (110B) | +0.152 (33%↓) | +0.224 (0%↓) | +0.670 | **-0.518** | **-0.072** (3/3) |
+| GLM-4.5-Air-Base | base | Zhipu 2025 (110B) | *(partial: n=5, still running — ignore)* | | | | |
 
 ## What every judge agrees on
 
