@@ -34,8 +34,48 @@ completeness-augmentation of text tractable AND useful for transfer.
    (re-split at "Thus/Therefore/…"): **adding the correct rationale lowers the real conclusion's perplexity —
    real<placebo on 22/22 docs, placebo HURTS (+0.399)**. Genuinely the reasoning, not priming. → `PERPLEXITY_HUNT.md`,
    `docs/CONCLUSION_RESULTS.md`, `docs/PROBE_RESULTS.md`
+6. **The reasoning-specific perplexity drop is REAL and universal on a reasoning-determined, self-contained
+   target, but STRUCTURALLY capped on DCLM** (2026-07-10). Winogrande (200 ex, natural-prose rationale): the
+   rationale lowers the true continuation's perplexity on all 9 judges (−0.60 to −0.84), monotonic in
+   completeness, placebo≈0. DCLM has the SAME content benefit (~−0.6) yet only nets a drop for the smallest
+   models — its mid-continuation insertion penalty (+0.4–0.7) plus low base perplexity (big judges already
+   predict the continuation) cancel it. Completeness (complete−incomplete)≈0 everywhere — the model fills gaps
+   itself. So DCLM's null was **format/structure, not reasoning-poverty.** → `docs/PREPEND_VS_MID.md`,
+   `scripts/winogrande_score.py`
 
 ---
+
+## 2026-07-10
+- **Winogrande as a reasoning-perplexity probe (Dongwei: separate model-issue from dataset-issue)** →
+  `scripts/winogrande_score.py`. base/principle/full/complete/placebo partial-scoring (NLL of the shared
+  post-blank suffix under each option; accuracy + continuation perplexity). Natural-prose rationales
+  (principle = leak-free rule / full = terse binding / complete = full multi-step chain), 200 val examples,
+  Claude-generated. Scored on **9 judges** (1.4B, OLMo-2-1B, Llama-3.1-8B, Qwen3.5-35B base+instruct,
+  GLM-4.5-Air, Llama-3.1-70B, Qwen2.5-72B base+instruct): **adding a rationale LOWERS the true continuation's
+  perplexity on EVERY judge (complete−base −0.60 to −0.84), monotonic in completeness (principle<full<complete),
+  placebo ≈0 (−0.01 to −0.16 — no format penalty), accuracy +0.035 → +0.215;** base≈instruct on both pairs.
+  This is the clean reasoning-specific drop that never showed on DCLM — on a reasoning-determined, self-contained
+  target. (Mistral-7B failed on missing `sentencepiece`; Qwen3.5-2B cache had no weights.)
+- **DCLM prose re-test — was the numbered-list format masking the effect?** Rewrote the 44 DCLM numbered
+  rationales as NATURAL PROSE (content + the incomplete-gap preserved, style-only) → `data/complete_dataset_prose.jsonl`;
+  added `--dataset` / `--insert {mid,prepend}` to `scripts/perplexity_complete.py`. Scored 9 judges (mid insert):
+  **net drop (complete−base) appears ONLY for the 2 smallest models (1.4B −0.10, OLMo −0.13); every judge ≥8B is
+  ≈0 to +0.19.** Content benefit real everywhere (complete−placebo −0.22 to −0.67); **completeness NULL on all 9
+  (−0.01 to +0.04)**; insertion penalty (placebo−base) large everywhere (+0.37 to +0.71).
+- **Topology isolation (1.4B, prepend vs mid)** → `docs/PREPEND_VS_MID.md`. Prepending the rationale before the
+  context (context→target flow intact) collapses the insertion penalty (placebo−base +0.444 → +0.068) but dilutes
+  the content (complete−placebo −0.546 → −0.197); net stays small. On a continuation target you can't place the
+  rationale both near the target AND without breaking coherence.
+- **Synthesis:** content benefit ~equal on DCLM and Winogrande (~−0.6) → **DCLM IS reasoning-rich; the DCLM null
+  is STRUCTURAL, not a content deficit.** Winogrande wins because (a) self-contained sentence → no insertion
+  penalty (vs DCLM mid-continuation +0.4–0.7), and (b) base perplexity stays high even for big judges
+  (Qwen2.5-72B base ppl **18.6** on Winogrande vs **6.6** on DCLM) → headroom for the rationale. Completeness is
+  never the active ingredient; presence/relevance of reasoning is (complete≫placebo, complete≈incomplete — the
+  model fills deleted middle steps itself).
+- **Correction:** the earlier "insertion penalty grows monotonically with capability" (from 3 judges) is NOT
+  supported by 9 (large everywhere but noisy; Qwen2.5-72B has one of the smallest, +0.46). n=41 per DCLM judge.
+- Set up the nightly completeness-commit cron (CronCreate `fe5ca089`, 06:48 UTC = 23:48 PDT; session-only,
+  7-day expiry). This entry is its first run (fired 00:19 PDT, ~31 min late — session was busy at 23:48).
 
 ## 2026-07-09
 - **`docs/JUDGE_CALIBRATION.md`** — 6 judges (base+instruct across DCLM/Llama/Qwen, 1.4B–72B): rationale-vs-base positive everywhere, content effect real (complete–placebo), completeness null; base≈instruct. GLM-4.5-Air (110B) added as a 5th family (same pattern; marked partial, n<41).

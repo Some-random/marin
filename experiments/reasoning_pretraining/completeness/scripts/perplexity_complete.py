@@ -13,11 +13,18 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 ap = argparse.ArgumentParser()
 ap.add_argument("--judge", default="/fsx/users/dongweij/marin/checkpoints/1ep_dclm_step14672_hf")
 ap.add_argument("--out", default="data/complete_results.jsonl")
+ap.add_argument("--dataset", default="data/complete_dataset.jsonl")
+ap.add_argument("--insert", default="mid", choices=["mid", "prepend"],
+                help="mid = context+rationale+target (breaks context->target flow); "
+                     "prepend = rationale+context+target (flow intact, like Winogrande)")
 args = ap.parse_args()
+
+def with_rat(context, rat):
+    return (context + "\n" + rat) if args.insert == "mid" else (rat + "\n" + context)
 
 ctx = {}
 kept = {}
-for l in open("data/complete_dataset.jsonl"):
+for l in open(args.dataset):
     if not l.strip():
         continue
     r = json.loads(l)
@@ -54,9 +61,9 @@ for k, i in enumerate(ids):
         leaked += 1; continue
     placebo = kept[ids[(k + 1) % len(ids)]][1]  # another doc's complete rationale
     b = nll(c, target)
-    rc = nll(c + "\n" + comp, target)
-    ri = nll(c + "\n" + incomp, target)
-    rp = nll(c + "\n" + placebo, target)
+    rc = nll(with_rat(c, comp), target)
+    ri = nll(with_rat(c, incomp), target)
+    rp = nll(with_rat(c, placebo), target)
     if None in (b, rc, ri, rp):
         continue
     dcomp.append(rc - b); dincomp.append(ri - b); dplac.append(rp - b); dcompVincomp.append(rc - ri)
