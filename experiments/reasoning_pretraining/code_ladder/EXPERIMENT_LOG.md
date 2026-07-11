@@ -48,6 +48,16 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## July 10
+
+**Eval-suite correction + §3 recompute / restructure (code_ladder).** Acted on July 9's letter-vs-text finding; all committed + pushed.
+- **Suite surgery** (`f0d1dae38`): commonsense_qa + mmlu switched letter→**text-scoring** (`commonsense_qa_text` 5-shot acc_norm, `mmlu_text` 0-shot acc); binary wsc → **wsc273**; boolq kept open-book 0-shot. Dropped to a new §1 **Collapse** subsection (folded into `<details>`): arc_challenge, logiqa, cb, all Math (gsm8k/gsm8k_cot/minerva/gsm_symbolic/gsm_noop), all Aggregate (bbh/mmlu_pro/agieval/gpqa). `eval_section3.py` TASKS=20 rows, MEAN_ROWS = Open-book / Closed-book NL / Code; `run_eval_v2.sh` shards rewritten.
+- **72-model retest** (`4943db639`): the 3 changed tasks re-run on ALL 72 local checkpoints across dy-1..5 + st-1 (216/216 tasks, 0 fails, ~70 min) + phi-1 (external HF). Verified non-degenerate (mmlu_text real spread, varied A/B/C/D picks). Read-only `docs/SECTION3_RECOMPUTE_DRAFT.md`. Clears chance: csqa 61/72, mmlu 43/72, wsc273 62/72.
+- **§3 fill** (`fac181a09`): §3a/§3b/§3c filled with corrected numbers; every changed cell + every Mean re-derived from raw JSONs (**0 mismatches**). Coverage: §3a 27/27 (incl. phi-1/1.5), §3b 6/6, §3c 16/16. Fixed §2 doc name c5v3_p1_a6→c5v3_phase1 (confirmed same checkpoint via its original v2 eval dir).
+- **§3 restructure** (`5666e1d63`, `60d6f6a95`): symbols cut to only **★** (phase-2 replay) + **⚠** (data caveat), defined once; new collapsible **§3d "Misc / off-ramp probes"** (base×16, code25 v2, C5-v2-small ×2, C5-v3-small ×2, 4B moved out of §3a → §3a now 20 cols); short uniform column handles (fixed ragged 3–4-row header wrap). Values preserved + column-aligned (618-number multiset + 0 per-column misalignments).
+- **§2 footnote refresh** (`58316a669`): code-ladder NL deltas → text-scored — ⊗ diag −4.4%→**−7.5%**, ½ +3.7%→**−2.1%** (sign flip; NL peaks at the 1× rung), ⊕ +6.4%→**+6.8%**; dropped dead "hint of Math".
+- **Conclusions audit:** the §3a/§3b/§3c conclusions **hold** under the corrected scoring; several **strengthen** — replay sweet-spot NL plateau→clear peak (0.432 / 0.479 / 0.465); "C5-v6 dominates C5-v3" now literal on NL (+4.7pp, was ~−1pp); A5-SP×C5-v4 NL interaction +0.039→+0.072. One §3b sub-claim sign-flipped (½-rung NL, refreshed above). Big picture unchanged: **code→text doesn't beat text-only on NL at ≤1.4B; code buys Code at a small NL cost.**
+
 ## July 9
 
 **Eval-suite scoring investigation + task removal (code_ladder).**
