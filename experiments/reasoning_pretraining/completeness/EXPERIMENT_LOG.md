@@ -45,6 +45,39 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-11
+- **Winogrande scoring refinements + ground-truth-perplexity view (Dongwei methodology pushes)** →
+  `scripts/winogrande_score.py` now has `--score blank` (score option+suffix, blank included) and
+  `--score blanktoken` (score ONLY the answer token). Blank-included re-score of all 9 judges: same picture as
+  suffix-only, drops ~0.05 bigger (complete −0.65..−0.88, placebo ≈0, base≈instruct). Clean
+  ground-truth-continuation ppl table (every setup scores the SAME correct span; base is a genuine cold
+  prediction — it gets idx4 wrong): base>principle>full>complete monotone on every judge, complete ≈ halves
+  base, placebo ≈ base.
+- **Blank-token-only finding + CORRECTION (9 judges).** Scoring just the answer word: on our 1.4B `principle`
+  (leak-free) barely moves it (−0.10 ppl, −0.025 acc) — but that does NOT generalize. On all 8 capable judges
+  `principle` lowers the answer-token ppl −0.2..−0.9 AND raises pick-accuracy +0.05..+0.17 (up to +0.17 on the
+  72B). My earlier "reasoning barely helps the answer token" was a 1.4B-only artifact; corrected 9/9. full/
+  complete help most (−0.8..−1.3), partly by naming the answer.
+- **Per-token example docs** → `docs/WINOGRANDE_PERTOKEN.md` (per-token NLL of option+suffix; help concentrates
+  on the reasoning-loaded token, e.g. `easier` −4.0, not filler) and `docs/DCLM_PERTOKEN.md`
+  (base/complete/incomplete/placebo per-token on real DCLM docs — you can watch complete≈incomplete
+  (completeness null), placebo wreck it (appendix `treated` 0.04→9.2), complete≪placebo).
+- **Target-awareness investigation + `docs/GENERATION_PROMPTS.md`** (Dongwei: document the generators). Found the
+  exact DCLM rationale prompt (workflow `complete-reasoning-mine`): agents saw `{context, continuation}` and
+  extracted a verbatim target span, so they SAW the target — but were told "from the CONTEXT only; never copy the
+  target's words," imperfectly followed ("Latakia" bleeds in). Winogrande generator saw the full sentence
+  (continuation) + the answer, fully target-aware by design (principle rung is text-level answer-free). All 3
+  generators documented; clean comparisons noted (complete−incomplete; principle-vs-full/complete).
+- **Length confound ruled out on DCLM:** complete is 1.69× longer than incomplete (+58 tok) yet ties it, and
+  corr(length-gap, ppl-gap)=+0.04 ≈ 0 → completeness-null is NOT a length artifact.
+- **Reverse-filter designed + launched** (Dongwei: pick high-reasoning-value docs objectively, not by agent
+  judgment) → `scripts/score_uncertainty.py` (sharded + ids-file). Score base-NLL of the continuation's first
+  sentence with a WEAK (1.4B) and STRONG (Qwen-72B) judge; the GAP categorizes — 1.4B-high + Qwen-low =
+  reasoning/knowledge-fillable (gold), both-high = arbitrary, both-low = trivial. Measured: 1.4B 49 docs/s, Qwen
+  4 docs/s; raw pool `dclm_1500m` = 1.25M docs ≈ 1.5B tokens (~1/20 of the ~30B training set; length-filter
+  keeps ~114k usable). Pipeline (1.4B full scan → top-30k → Qwen → gold) launched ~00:11; results land in the
+  2026-07-12 entry.
+
 ## 2026-07-10
 - **Winogrande as a reasoning-perplexity probe (Dongwei: separate model-issue from dataset-issue)** →
   `scripts/winogrande_score.py`. base/principle/full/complete/placebo partial-scoring (NLL of the shared

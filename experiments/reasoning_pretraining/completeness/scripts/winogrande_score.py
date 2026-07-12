@@ -10,6 +10,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 JUDGE = sys.argv[1] if len(sys.argv) > 1 else "/fsx/users/dongweij/marin/checkpoints/1ep_dclm_step14672_hf"
 OUT = sys.argv[2] if len(sys.argv) > 2 else "data/winogrande_results.jsonl"
+SCORE = sys.argv[3] if len(sys.argv) > 3 else "suffix"  # "suffix" = score text after blank; "blank" = score option+suffix (blank INCLUDED)
 
 data = [json.loads(l) for l in open("data/winogrande_200.jsonl")]
 rat = {json.loads(l)["idx"]: json.loads(l) for l in open("data/winogrande_rationales.jsonl")}
@@ -35,8 +36,17 @@ def score(x, rationale):
     b = x["sentence"].index("_")
     pre_txt, suf = x["sentence"][:b], x["sentence"][b + 1:]
     pfx = (rationale.strip() + "\n") if rationale else ""
-    n1 = nll(pfx + pre_txt + x["option1"], suf)
-    n2 = nll(pfx + pre_txt + x["option2"], suf)
+    if SCORE == "blanktoken":
+        stem = pre_txt.rstrip(); gap = pre_txt[len(stem):]  # score ONLY the option (blank) token(s), no suffix
+        n1 = nll(pfx + stem, gap + x["option1"])
+        n2 = nll(pfx + stem, gap + x["option2"])
+    elif SCORE == "blank":
+        stem = pre_txt.rstrip(); gap = pre_txt[len(stem):]  # score option+suffix; blank token included
+        n1 = nll(pfx + stem, gap + x["option1"] + suf)
+        n2 = nll(pfx + stem, gap + x["option2"] + suf)
+    else:
+        n1 = nll(pfx + pre_txt + x["option1"], suf)
+        n2 = nll(pfx + pre_txt + x["option2"], suf)
     if n1 is None or n2 is None:
         return None
     pick = "1" if n1 < n2 else "2"
