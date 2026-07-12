@@ -48,6 +48,10 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## July 11
+
+_No code_ladder activity today (idle day). Last work: July 10's eval-suite correction + §3 recompute/restructure._
+
 ## July 10
 
 **Eval-suite correction + §3 recompute / restructure (code_ladder).** Acted on July 9's letter-vs-text finding; all committed + pushed.
