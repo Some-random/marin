@@ -45,6 +45,26 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-12
+- **Reverse-filter results — NEGATIVE: the 1.4B-vs-Qwen uncertainty gap surfaces KNOWLEDGE, not reasoning.**
+  Full pipeline ran overnight (`scripts/score_uncertainty.py`, sharded 4 nodes): the 1.4B scored **114,416** DCLM
+  docs (base-NLL of the continuation's first sentence), kept the top-30k most-uncertain (NLL 3.59..11.72), then
+  Qwen-72B re-scored those (mean NLL 1.4B **4.21** / Qwen **3.09**). **Gold** (1.4B>3.5 & Qwen<2.0) = **2,271**
+  docs (955 at 1.4B>4.0 & Qwen<2.0). **But the gold is mostly not reasoning:** the top-8 by gap are all
+  memorized/arbitrary (a botanical species name `F. natalensis Hochst.`, a Stripe API event, Turkish/Indonesian
+  UI strings, company names, EXIF metadata); a broad sample across the gap range was ~1/9 genuine reasoning
+  (a clean one: compromised PC → compromised phone → phone infects the next PC). Estimate **~10–15%** of gold is
+  real multi-step reasoning; the rest is knowledge / domain-jargon / foreign-language / boilerplate.
+- **Mechanism (the takeaway):** a weak-vs-strong (1.4B-vs-72B) perplexity gap is dominated by what the strong
+  model **memorized** — specific facts, names, code identifiers, other languages — not by reasoning ability.
+  Reasoning gaps are smaller/subtler and don't rise to the top of a gap ranking. So the two-model gap is a
+  **knowledge detector, not a reasoning detector**; it does NOT cleanly replace judgment for finding reasoning
+  docs. Gold data in gitignored `data/rf_gold_candidates.jsonl`.
+- Fixed a sharding bug in `scripts/score_uncertainty.py`: with `--ids-file`, the shard split was skipped so all
+  4 shards redundantly scored the full 30k (4× Qwen waste). Now shards split even with `--ids-file`.
+- **Open next step (Dongwei's call):** targeted agent reasoning-categorization on the 2,271 gold (cheap vs
+  judging 114k), heuristic-clean-then-judge, or accept perplexity-gap ≠ reasoning and rethink the signal.
+
 ## 2026-07-11
 - **Winogrande scoring refinements + ground-truth-perplexity view (Dongwei methodology pushes)** →
   `scripts/winogrande_score.py` now has `--score blank` (score option+suffix, blank included) and

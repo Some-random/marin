@@ -28,10 +28,9 @@ def split(t):
 
 pairs = []  # (line_index, ctx, target)
 for li, line in enumerate(open(args.src)):
-    if ids_filter is not None:
-        if li not in ids_filter:
-            continue
-    elif li % args.nshards != args.shard:
+    if ids_filter is not None and li not in ids_filter:
+        continue
+    if li % args.nshards != args.shard:  # ALWAYS shard-split (also when ids-file given), so shards don't overlap
         continue
     t = (json.loads(line).get("text") or "").strip()
     if not (400 < len(t) < 2000 and t.count("\n") < 12):
