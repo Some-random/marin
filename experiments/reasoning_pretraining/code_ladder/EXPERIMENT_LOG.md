@@ -48,6 +48,10 @@ For the canonical evaluation taxonomy (what each eval actually tests), the list 
 
 ---
 
+## July 12
+
+_No code_ladder activity today (idle day)._
+
 ## July 11
 
 _No code_ladder activity today (idle day). Last work: July 10's eval-suite correction + §3 recompute/restructure._
