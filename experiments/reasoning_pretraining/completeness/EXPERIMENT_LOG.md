@@ -45,6 +45,9 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-13
+- No completeness work today (session idle after the July-12 reverse-filter results).
+
 ## 2026-07-12
 - **Reverse-filter results — NEGATIVE: the 1.4B-vs-Qwen uncertainty gap surfaces KNOWLEDGE, not reasoning.**
   Full pipeline ran overnight (`scripts/score_uncertainty.py`, sharded 4 nodes): the 1.4B scored **114,416** DCLM
