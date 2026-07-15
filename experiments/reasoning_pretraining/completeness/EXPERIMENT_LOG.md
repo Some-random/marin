@@ -45,6 +45,30 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-14
+- **Reframed the investigation into two sub-hypotheses.** The reasoning / knowledge / arbitrary rubric
+  used for the reverse-filter triage (see 2026-07-12) does not capture the real question. The intuition
+  we actually care about: pretraining forces the model to **guess at gaps it lacks the knowledge or
+  inferential ability to fill**, and that forced-guess deficiency **persists through post-training and RL**.
+  Split into **H1 (persistence):** do pretraining-planted forced-guess deficiencies linger through SFT/RL,
+  i.e. is post-training bounded by the base model? — and **H2 (definition):** how to define/identify
+  genuinely reasoning-dependent (vs knowledge-recall vs boilerplate) content in pretraining text.
+- **Ran a deep-research pass on H1/H2** (`deep-research` workflow, run `wf_2175e331-d8d`). Fanned out
+  6 search angles → **26 sources → 109 extracted claims → 25 adversarially verified**
+  (**10 confirmed**, 8 refuted, 7 left unverified — the 7 only because their verify-votes errored when the
+  run hit the session token quota before the final synthesize step). Raw results recoverable from the
+  workflow journal (`subagents/workflows/wf_2175e331-d8d/journal.jsonl`); full write-up pending user review.
+- **Preliminary headline (from the verified claims, synthesis not yet written):** "pretraining deficiencies
+  linger through post-training/RL" is **CONTESTED, not settled.** The Yue et al. "RLVR is bounded by the base
+  model" pass@k-saturation claim was **refuted 0-3** by counter-evidence (ProRL arXiv:2505.24864;
+  boundary-aware Curriculum RL; staged-RL grokking taking a base model 0%→100% pass@k on a hard family,
+  arXiv:2509.21016). The **knowledge/extraction** side supports persistence though — superficial alignment
+  (LIMA, arXiv:2305.11206), Physics-of-LLMs 3.1 extraction failures (arXiv:2309.14316), Gekhman
+  new-knowledge-resists-SFT (arXiv:2405.05904). Provisional read: **knowledge gaps persist; reasoning-strategy
+  gaps RL can sometimes fix** — which maps onto the H1/H2 split.
+- **Cost lesson:** the workflow overran the session token quota (109 agents / ~4.0M tokens) on top of an
+  already-heavy day — do NOT launch a large agent fan-out without checking headroom / explicit consent first.
+
 ## 2026-07-13
 - No completeness work today (session idle after the July-12 reverse-filter results).
 
