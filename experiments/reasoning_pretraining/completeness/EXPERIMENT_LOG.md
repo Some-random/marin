@@ -45,6 +45,31 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-15
+- **Recovered the quota-killed deep-research pass without re-running it.** The overnight `deep-research`
+  workflow (H1 persistence / H2 useful-reasoning) had died on the session token limit before its synthesize
+  step; hand-synthesized the report from the 109 harvested claims in the workflow journal — zero re-run.
+- **Wrote `docs/PERSISTENCE_AND_USEFUL_REASONING.md`**, then **verified every one of the 26 cited papers against
+  its primary source** (26 direct fetches, no subagent fan-out), fixing two wording errors (Superfiltering:
+  perplexity *ordering* is consistent across models, *scale* varies → they use IFD not raw ppl; Physics 3.3:
+  "data signal-to-noise ratio affects capacity"). All 26 now ✅.
+- **Restructured H1 into three testable links** (flat FOR/AGAINST framing was unclear): **(A) origin** — a
+  forced-guess knowledge/inference gap is planted at pretraining (Kalai singleton lower-bound, Physics 3.1/3.2,
+  Reversal Curse) → **robust**; **(B-SFT)** — SFT can't fix it and forcing new knowledge in *backfires* (Gekhman
+  linear ↑ hallucination, LIMA/URIAL superficial-alignment) → **robust**; **(B-RL)** — RL-fixability is
+  **contested** (Yue "bounded by base", 0% AIME24-only-by-RL vs ProRL / Curriculum-RL +9.8 pass@256 / RL-Grokking
+  0%→100%). Yue demoted from "the H1 anchor" to the B-RL link only.
+- **Takeaways for the thread.** H1: knowledge-origin + SFT-can't-fix are well-established; RL moves the base
+  boundary **only with external structure** (distillation / dense-reward curriculum / prolonged RL) — the seam
+  our "augment pretraining text with complete reasoning" thesis targets (supply the structure at pretraining, in
+  the data, not via an RL teacher). H2: our reverse-filter perplexity-gap null is a **known confound** (Razeghi
+  frequency >70% gap, Small-Model Learnability Gap, Superfiltering, Perplexity-Correlations, "Perplexity Cannot
+  Tell Right from Wrong"); the field defines reasoning by **perturbation-invariance** (GSM-Symbolic NoOp −65%),
+  not loss; RHO-1's excess-loss selects for *quality* not reasoning; TPT/BoLT/Quiet-STaR augment **uniformly** →
+  N1 novelty should be the **stopping-rule/completeness** control, not a detector.
+- Report written + fully verified; **file left uncommitted pending Dongwei's review** (the log entry commits, the
+  doc does not yet).
+
 ## 2026-07-14
 - **Reframed the investigation into two sub-hypotheses.** The reasoning / knowledge / arbitrary rubric
   used for the reverse-filter triage (see 2026-07-12) does not capture the real question. The intuition
