@@ -45,6 +45,40 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-16
+- **Reframed the two hypotheses to reasoning-only after catching two scoping errors.** (a) The old H1 was a
+  *knowledge*-persistence claim mapped onto the RL-beyond-base debate (Yue/ProRL) — not what the thread is about.
+  Rephrased H1 as **under-reasoning**: in next-token prediction the model satisfies the objective by a *shortcut*
+  instead of running the full inference the text encodes, with two disjoint causes — **(C) can't** (lacks the
+  knowledge → forced guess) vs **(W) won't** (has it, but a cheaper shortcut satisfies the loss). (W) is the
+  branch completeness-augmentation can act on; (C) is the confounder to hold constant. (b) The old H2 "definition"
+  section answered the *model-eval* question (GSM-Symbolic / Reasoning-or-Reciting) — wrong. Retargeted H2 to
+  **find & exploit reasoning-rich CONTENT in pretraining text**: (4) identify, (5) augment, (6) completeness,
+  (7) perplexity/weak-vs-strong-gap detection.
+- **Ran a fresh NEUTRAL deep-research pass (zero seed papers) on both hypotheses** (run `wf_869397f2-d8b`);
+  completed after a resume (first attempt hit the session limit; account upgraded, resume replayed 93 cached
+  agents + finished the 17 that died, incl. synthesis). 6 angles → 27 sources → 125 claims → 25 adversarially
+  verified: **21 confirmed / 4 refuted**. The neutral search surfaced strong papers we never seeded.
+- **Key verified H1 findings.** Arithmetic = a "bag of heuristics" formed early in pretraining, never replaced by
+  an algorithm; long-horizon under-execution (63%→20% over 5→95 steps, faithful-execution ≠ final-answer);
+  latent multi-hop reasoning is **real but partial & asymmetric** (first hop >80%, second hop moderate, "hopping
+  too late" — back-patching fixes 66%); **exposure-bound composition is the (C)-vs-(W) separator** — 97% 1-hop
+  but ~1% 2-hop for atomically-seen entities vs 83% 2-hop for compositionally-exposed (same 1-hop ⇒ gap is
+  *exposure, not knowledge*). **Refuted (0-3):** "LLMs don't reason at all," "genuine composability only ~7-8%,"
+  and "multi-hop failure is a knowledge gap" — the honest picture is genuine-but-partial, shortcut-inflated,
+  exposure-bound.
+- **Wrote + committed `docs/REASONING_CONTENT_LIT.md`** (`3280e183a`): corrected hypotheses + all **26 papers by
+  angle with per-paper summaries + real titles + verification flags** (✅ verified-claim / ◎ search-summary /
+  📖 read), coverage gaps, and a prioritized full-read plan. Labeled a **first-pass map — full reads pending**
+  (summaries are search-derived, not yet my end-to-end reads). H2.4 (identify) and H2.7 (perplexity-gap) had no
+  *verified* claims but the papers exist (AttentionInfluence, FineWeb-Edu, PreSelect, zero-shot math classifier;
+  Perplexity-Correlations, RHO-1) — these are the priority reads.
+- **Most on-point leads for the thread:** Multi-Hop-Bound-by-Pretraining-Exposure (`2606.09338`),
+  Front-Loading-Reasoning (NVIDIA), Faithfulness-as-Information-Flow completeness (`2605.24286`), and
+  Making-Implicit-Premises-Explicit-in-Enthymemes (`2603.06114`). Full reads of these four are next.
+- Superseded the old knowledge-framing doc `PERSISTENCE_AND_USEFUL_REASONING.md` (left uncommitted on disk
+  pending review); `REASONING_CONTENT_LIT.md` is the current framing.
+
 ## 2026-07-15
 - **Recovered the quota-killed deep-research pass without re-running it.** The overnight `deep-research`
   workflow (H1 persistence / H2 useful-reasoning) had died on the session token limit before its synthesize
