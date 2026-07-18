@@ -45,6 +45,9 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-17
+- No completeness work today (session idle after the July-16 reasoning-only reframe + literature map).
+
 ## 2026-07-16
 - **Reframed the two hypotheses to reasoning-only after catching two scoping errors.** (a) The old H1 was a
   *knowledge*-persistence claim mapped onto the RL-beyond-base debate (Yue/ProRL) — not what the thread is about.
