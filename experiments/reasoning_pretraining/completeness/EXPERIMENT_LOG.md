@@ -45,6 +45,9 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-18
+- No completeness work today (session idle; full reads of the four ⭐⭐ leads still queued).
+
 ## 2026-07-17
 - No completeness work today (session idle after the July-16 reasoning-only reframe + literature map).
 
