@@ -66,13 +66,23 @@ completeness-augmentation of text tractable AND useful for transfer.
     `2503.00808`) use a **weak-vs-strong-model loss GAP on the same text**, NOT the single-model continuation
     perplexity our reverse-filter used (which never dropped — the frequency/memorization confound). Re-running the
     filter as a cross-model NLL gap (our 1.4B vs Qwen-72B, within-domain) is the cheap next experiment.
-- **Persistence (H1's core claim) — strongest evidence: Front-Loading Reasoning (NVIDIA, `2510.03264`).** Reasoning
-  in pretraining compounds: lead +9% pretrain → +9.3% SFT → **+18.5% RL**; doubling SFT (+4.09%) can't match even the
-  weakest reasoning-pretrained model. Caveat: their "reasoning data" is SFT-style long-CoT mixed at 20%, not rewritten
-  web text; "quality"≈CoT length.
-- **Can't-vs-Won't is a spectrum, not a binary** — ≥4 distinct mechanisms (shortcut-wins-first / no-algorithm-ever /
-  exposure-manufactured-can't / architectural-timing / capacity-coverage). Explicit CoT at inference reliably rescues
-  latent-composition failures (SOCRATES `2411.16679`: 7.6%→92.8%).
+- **H1 findings, mapped to the three original investigation sub-questions** (these are the doc's H1.1 / H1.2 / H1.3):
+  - **(1) reasoning shortcuts → H1.1.** The shortcut is real, mechanistic, and pretraining-laid. Arithmetic runs on a
+    "bag of heuristics" (`2410.21272`) that forms early and is *never* replaced by an algorithm (~79% of the mechanism
+    at every checkpoint); and *When LLMs Stop* (`2605.00817`) shows faithful step-execution collapses 63%→20% over
+    5→95 steps *even with the full procedure in-prompt* → isolates Won't/execution from Can't/knowledge.
+  - **(2) latent (silent, one-forward-pass) multi-hop → H1.2.** This is the *mechanistic core of H1*, because
+    pretraining reasoning IS silent reasoning (no scratchpad). Models hold the pieces but under-compose them silently:
+    Yang (`2402.16837`) — bridge recalled >80% but *used* only ~61%, flat with scale; SOCRATES (`2411.16679`) —
+    shortcut-free silent composition 2.4–8.4% vs explicit-CoT ~85–93% (GPT-4o **7.6%→92.8%**). **Can't-vs-Won't is a
+    ≥4-mechanism spectrum**, not a binary: shortcut-wins-first (Grokked `2405.15071`) / no-algorithm-ever
+    (`2410.21272`) / exposure-manufactured-Can't (Exposure `2606.09338`) / architectural-timing (Hopping-Too-Late
+    `2406.12775`, back-patch fixes 66%) / capacity-coverage (Yao `2505.17923`, data ∝ exp(k)).
+  - **(3) persistence through post-training → H1.3.** Front-Loading Reasoning (NVIDIA `2510.03264`) is the strongest
+    evidence: reasoning-in-pretraining *compounds* (+9% pretrain → +9.3% SFT → **+18.5% RL**), and doubling SFT
+    (+4.09%) can't match even the weakest reasoning-pretrained model — SFT can't substitute for a pretraining
+    foundation. RLVR-boundary (`2510.04028`) reconciles Yue-vs-ProRL: base boundary is the ceiling for ordinary
+    post-training. Caveat: Front-Loading's "reasoning data" is SFT-style long-CoT mixed at 20%, not rewritten web text.
 - **Proposed pivot (not yet acted on):** shift the thread from *completeness-per-se* toward *encoding-for-necessity*
   (does the encoding make the model actually RUN the inference — borrow Faithfulness `2605.24286`'s "chain screens off
   prompt" / necessity metric), + the cross-model-gap reverse-filter re-run. **§ EXPERIMENT_LOG "key findings" NOT yet

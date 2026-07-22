@@ -139,12 +139,59 @@ almost certainly why ours failed: one model's perplexity is dominated by word-fr
 
 ---
 
+## Paper metadata — citations, venue, first/last-author institutions
+
+*Citation counts via Semantic Scholar API (2026-07-22). **2026 preprints show 0 — too new to accrue citations, NOT a
+quality signal**; weigh recency + topical fit alongside count (per our paper-reading rules). Institutions shown are
+the **first** and **last** author's.*
+
+| Paper (id) | First author (institution) | Last author (institution) | Venue | Cites |
+|---|---|---|---|---:|
+| **H1.1 — reasoning shortcuts** | | | | |
+| Bag of Heuristics (`2410.21272`) | Yaniv Nikankin (Technion) | Yonatan Belinkov (Technion) | ICLR 2025 | 105 |
+| When LLMs Stop (`2605.00817`) | Sailesh Panda (IIT Gandhinagar) | Mayank Singh (IIT Gandhinagar) | preprint 2026 | 0† |
+| GSM-Symbolic (`2410.05229`) | Iman Mirzadeh (Apple) | Mehrdad Farajtabar (Apple) | ICLR 2025 | 591 |
+| **H1.2 — latent multi-hop** | | | | |
+| Latent Multi-Hop / Yang (`2402.16837`) | Sohee Yang (UCL / DeepMind) | Sebastian Riedel (UCL / DeepMind) | ACL 2024 | 207 |
+| Hopping Too Late (`2406.12775`) | Eden Biran (Tel Aviv U.) | Amir Globerson (Tel Aviv U. / Google) | EMNLP 2024 | 97 |
+| Grokked Transformers (`2405.15071`) | Boshi Wang (Ohio State) | Huan Sun (Ohio State) | NeurIPS 2024 | 90 |
+| SOCRATES (`2411.16679`) | Sohee Yang (UCL / DeepMind) | Mor Geva (Google Research / Tel Aviv) | ACL 2025 Findings | 33 |
+| k-hop needs data / Yao (`2505.17923`) | Yuekun Yao (Saarland U.) | Alexander Koller (Saarland U.) | EMNLP 2025 | 10 |
+| **H1.3 — persistence** | | | | |
+| Front-Loading Reasoning (`2510.03264`) | Syeda Nahida Akter (CMU / NVIDIA) | Bryan Catanzaro (NVIDIA) | preprint 2025 | 23 |
+| Yue RL-beyond-base (`2504.13837`) | Yang Yue (Tsinghua) | Gao Huang (Tsinghua) | preprint 2025 | 924 |
+| ProRL (`2505.24864`) | Mingjie Liu (NVIDIA) | Yi Dong (NVIDIA) | preprint 2025 | 156 |
+| RLVR Boundary debate (`2510.04028`) | Xinhao Yao (Renmin U. / Ant) | Yong Liu (Renmin U.) | preprint 2025 | 10 |
+| **H2.4 — identify reasoning-rich text** | | | | |
+| AttentionInfluence (`2505.07293`) | Kai Hua (ByteDance Seed) | Ke Shen (ByteDance Seed) | preprint 2025 | 5 |
+| PreSelect (`2503.00808`) | Kashun Shum (HKUST) | Junxian He (HKUST) | ICML 2025 | 20 |
+| AutoDS / AutoMathText (`2402.07625`) | Yifan Zhang (Tsinghua) | Andrew C. Yao (Tsinghua) | ACL 2025 Findings | 26 |
+| FineWeb-Edu (`2406.17557`) | Guilherme Penedo (HuggingFace) | Thomas Wolf (HuggingFace) | NeurIPS 2024 | 1029 |
+| **H2.5/6 — augment + completeness** | | | | |
+| **Exposure** (`2606.09338`) | Yannis Karmim (Inria) | Valentin Barrière (U. de Chile) | preprint 2026 | 0† |
+| Faithfulness as Info Flow (`2605.24286`) | Jinghan Jia (Michigan State / Anthropic) | Eric Easley (Anthropic) | preprint 2026 | 0† |
+| Enthymemes (`2603.06114`) | Xuyao Feng (UCL) | Anthony Hunter (UCL) | preprint 2026 | 0† |
+| TPT (`2509.20186`) | Liang Wang (Microsoft Research) | Furu Wei (Microsoft Research) | preprint 2025 | 3 |
+| BoLT (`2503.18866`) | Yangjun Ruan (U. of Toronto) | Tatsunori Hashimoto (Stanford) | preprint 2025 | 40 |
+| Quiet-STaR (`2403.09629`) | Eric Zelikman (Stanford) | Noah D. Goodman (Stanford) | COLM 2024 | 319 |
+| **H2.7 — perplexity-gap** | | | | |
+| RHO-1 (`2404.07965`) | Zhenghao Lin (Xiamen U.) | Weizhu Chen (Microsoft) | NeurIPS 2024 | 126 |
+| Perplexity Correlations (`2409.05816`) | Tristan Thrush (Stanford) | Tatsunori Hashimoto (Stanford) | ICLR 2025 | 54 |
+
+† 2026 preprint — too new to have accrued citations.
+
+*Reading the counts: the high-citation anchors (FineWeb 1029, Yue 924, GSM-Symbolic 591, Quiet-STaR 319, Yang 207)
+are the field-defining papers; the most thread-relevant results (Exposure, Faithfulness, When-LLMs-Stop, Front-Loading)
+are all 2025–2026 and thus low/zero-citation by recency, not by weakness — several are the sharpest evidence we have.*
+
+---
+
 # The papers, one by one (readable writeups)
 
 ## H1.1 — evidence that models take shortcuts instead of reasoning
 
 ### 📖 Arithmetic Without Algorithms: LLMs Solve Math With a "Bag of Heuristics"
-Nikankin, Reusch, Mueller, Belinkov · ICLR 2025 · `2410.21272`
+Yaniv Nikankin (Technion) … Yonatan Belinkov (Technion) · ICLR 2025 · **105 citations** · `2410.21272`
 
 **What it is.** A "how does the model actually do it?" study of mental arithmetic (e.g. `36 + 59 =` answered in one
 shot, no scratch-work). The question: when a model gets arithmetic right, is it running a real algorithm, is it just
@@ -169,7 +216,7 @@ authors think fixing this "may require fundamental changes to training and archi
 simply feeding better text may not dislodge an entrenched shortcut.
 
 ### 📖 When LLMs Stop Following Steps
-(authors not surfaced) · 2026 preprint · `2605.00817`
+Sailesh Panda … Mayank Singh (both IIT Gandhinagar) · 2026 preprint · **0 citations** (too new) · `2605.00817`
 
 **What it is.** A stress test of whether models actually *follow a procedure* they're given, versus just landing on a
 plausible final answer. The trick: they hand the model the complete step-by-step recipe *in the prompt*, so the
@@ -199,7 +246,7 @@ is exactly reasoning that a model must do *without writing anything down* — th
 or doesn't.
 
 ### 📖 Do Large Language Models Latently Perform Multi-Hop Reasoning?
-Yang, Gribovskaya, Kassner, Geva, Riedel · ACL 2024 · `2402.16837`
+Sohee Yang (UCL / Google DeepMind) … Sebastian Riedel (UCL / Google DeepMind) · ACL 2024 · **207 citations** · `2402.16837`
 
 **What it is.** Tests whether a model, asked something like *"the mother of the singer of 'Superstition' is ___"*,
 internally does the two hops — first figure out the singer (Stevie Wonder), then find his mother — or just jumps
@@ -219,7 +266,7 @@ there internally*, unused. And because scale doesn't fix the second hop, it hint
 *how the model is trained*, not from more parameters — which is at least consistent with a data intervention.
 
 ### 📖 Hopping Too Late: The Limitations of LLMs on Multi-Hop Queries
-Biran, Gottesman, Yang, Geva, Globerson · EMNLP 2024 · `2406.12775`
+Eden Biran (Tel Aviv University) … Amir Globerson (Tel Aviv University / Google) · EMNLP 2024 · **97 citations** · `2406.12775`
 
 **What it is.** A follow-up that asks *why* the second hop fails, focusing on the hardest, cleanest cases: questions
 where the model provably knows both facts on their own but still blows the combined question.
@@ -240,7 +287,7 @@ mechanism — but the authors note that writing the intermediate step out explic
 which is indirect support for externalizing the hidden step.
 
 ### 📖 Grokked Transformers are Implicit Reasoners
-Wang, Yue, Su, Sun (Ohio State) · NeurIPS 2024 · `2405.15071`
+Boshi Wang … Huan Sun (both Ohio State University) · NeurIPS 2024 · **90 citations** · `2405.15071`
 
 **What it is.** A controlled from-scratch study of *when* a transformer learns to reason silently versus just
 memorize — training a small model on made-up facts so they can watch the whole learning process.
@@ -262,7 +309,7 @@ the model can internalize reasoning *with no explicit chains in the data at all*
 necessary; the lever the paper found is the *ratio* of reasoning-examples to plain-facts in the mix.
 
 ### 📖 Do LLMs Perform Latent Multi-Hop Reasoning *Without Exploiting Shortcuts*? (SOCRATES)
-Yang, Kassner, Gribovskaya, Riedel, Geva (DeepMind) · 2024 · `2411.16679`
+Sohee Yang (UCL / Google DeepMind) … Mor Geva (Google Research / Tel Aviv University) · ACL 2025 Findings · **33 citations** · `2411.16679`
 
 **What it is.** The most careful version of "does the model *really* reason silently, or is it cheating?" It builds a
 test set specifically designed so the model *can't* get the answer by a memorized shortcut (e.g. because the start
@@ -285,7 +332,7 @@ supports "explicit reasoning helps," while cautioning that merely having the fac
 silent composition (in their pretraining trace, silent 2-hop reasoning emerged for only ~11% of eligible cases).
 
 ### 📖 Language Models Can Learn Implicit Multi-Hop Reasoning, But Only With Lots of Data
-Yao, Du, Zhu, Hahn, Koller (Saarland/Utrecht) · EMNLP 2025 · `2505.17923`
+Yuekun Yao (Saarland University) … Alexander Koller (Saarland University) · EMNLP 2025 · **10 citations** · `2505.17923`
 
 **What it is.** Asks the quantitative version: *how much* data does it take to teach a model to do k-step reasoning
 silently, as k grows?
@@ -308,7 +355,7 @@ lot, which is an argument for thoughtful augmentation rather than raw volume.
 ## H1.3 — does the reasoning gap persist through fine-tuning and RL?
 
 ### 📖 Front-Loading Reasoning: The Synergy between Pretraining and Post-Training Data
-Akter, Prabhumoye, Nyberg, Patwary, Shoeybi, Choi, Catanzaro (NVIDIA/CMU) · 2025 · `2510.03264`
+Syeda Nahida Akter (CMU / NVIDIA) … Bryan Catanzaro (NVIDIA) · 2025 preprint · **23 citations** · `2510.03264`
 
 **What it is.** The most direct test of your persistence claim: does reasoning ability have to be built in
 *pretraining*, or can you add it later with fine-tuning? They pretrain an 8B model from scratch with vs without
@@ -331,7 +378,7 @@ rewritten to expose its reasoning** — and their proxy for "quality" is basical
 So it strongly supports front-loading reasoning, but doesn't itself test "rewrite normal text to be more complete."
 
 ### 📖 The Debate on RLVR's Reasoning Boundary: Shrinkage, Expansion, or Both?
-(authors not surfaced) · 2025 · `2510.04028`
+Xinhao Yao (Renmin University of China / Ant Group) … Yong Liu (Renmin University of China) · 2025 preprint · **10 citations** · `2510.04028`
 
 **What it is.** Referees the fight over whether RL actually adds new reasoning ability or just sharpens what the base
 model already had. (One camp — Yue et al. — says RL narrows the model to what it could already do; another — ProRL —
@@ -354,7 +401,7 @@ specific text-augmentation question.
 ## H2.4 — how to identify reasoning-rich text in a corpus
 
 ### 📖 AttentionInfluence: Weak-to-Strong Pretraining Data Selection
-Hua, Wu, Zhang, Shen (ByteDance Seed) · 2025 · `2505.07293`
+Kai Hua … Ke Shen (both ByteDance Seed) · 2025 preprint · **5 citations** · `2505.07293`
 
 **What it is.** A trick for finding reasoning-heavy documents *without* training a classifier: use a small model, and
 see which documents get much harder for it when you deliberately damage its ability to reason.
@@ -374,7 +421,7 @@ should have been. The signal isn't one model's perplexity; it's the *difference*
 model on the same text.
 
 ### 📖 Predictive Data Selection: "The Data That Predicts Is the Data That Teaches" (PreSelect)
-Shum, Huang, Zou, Ding, Liao, Chen, Liu, He (HKUST-NLP) · ICML 2025 · `2503.00808`
+Kashun Shum … Junxian He (both HKUST) · ICML 2025 · **20 citations** · `2503.00808`
 
 **What it is.** Another "which documents are worth training on?" method, built on a neat idea: a document is valuable
 if *stronger models compress it better than weaker models, in exactly the order of the models' overall ability.*
@@ -394,7 +441,7 @@ not single-model perplexity). But it's a caution too: a two-model gap finds "gen
 the same as "reasoning-rich" — we'd have to verify the gap actually isolates reasoning.
 
 ### 📖 Autonomous Data Selection with Zero-Shot Generative Classifiers for Math (AutoDS / AutoMathText)
-Zhang, Luo, Yuan, Yao (Tsinghua) · ACL Findings 2025 · `2025.findings-acl.216`
+Yifan Zhang … Andrew Chi-Chih Yao (both Tsinghua University) · ACL Findings 2025 · **26 citations** · `2025.findings-acl.216` (arXiv 2402.07625)
 
 **What it is.** The simplest "find the reasoning text" recipe: just ask a big model whether a document is
 mathematically substantive, and keep the ones it says yes to.
@@ -412,7 +459,7 @@ the perplexity-gap question: its signal is a *single strong model's* confidence,
 weak-vs-strong gap — so it shows there's more than one way to find this text.
 
 ### 📖 The FineWeb Datasets (incl. FineWeb-Edu)
-Penedo, Kydlíček, Ben Allal, Lozhkov, Mitchell, Raffel, von Werra, Wolf (HuggingFace) · NeurIPS 2024 · `2406.17557`
+Guilherme Penedo … Thomas Wolf (both HuggingFace) · NeurIPS 2024 · **1029 citations** · `2406.17557`
 
 **What it is.** The famous web-data-cleaning paper; the relevant piece is **FineWeb-Edu**, a filter that keeps
 "educational" web pages.
@@ -433,7 +480,7 @@ we design our own signal.
 ## H2.5 / H2.6 — augmenting text with reasoning, and how *complete* it must be
 
 ### 📖 Multi-Hop Knowledge Composition is Bound by Pretraining Exposure  ← the counter-result
-(authors not surfaced) · 2026 preprint · `2606.09338`
+Yannis Karmim (Inria, Paris & Chile) … Valentin Barrière (Universidad de Chile) · 2026 preprint · **0 citations** (too new) · `2606.09338`
 
 **What it is.** The most important paper for our thread, because it directly tests "does making the reasoning
 explicit in the training text help the model reason?" — and answers *no*, for silent one-shot reasoning.
@@ -466,7 +513,7 @@ about explicit chain-of-thought at answer-time). So it *constrains* our thesis r
 single most important warning in the whole review.
 
 ### 📖 Faithfulness as Information Flow: Evaluating and Training Faithful Chain-of-Thought
-(authors not surfaced) · 2026 preprint · `2605.24286`
+Jinghan Jia (Michigan State University / Anthropic Fellows) … Eric Easley (Anthropic) · 2026 preprint · **0 citations** (too new) · `2605.24286`
 
 **What it is.** A rigorous attempt to define what it even *means* for a reasoning chain to be "complete" and
 "faithful" — and it hands us a borrowable definition plus a warning.
@@ -489,7 +536,7 @@ off the prompt; any leftover direct path is an incompleteness" — that we could
 model *uses* it. That's the pivot from "is it complete?" to "does the encoding make the model actually run it?"
 
 ### 📖 Making Implicit Premises Explicit in Enthymemes  ← completeness helps *this* regime
-Feng & Hunter (UCL) · 2026 preprint · `2603.06114`
+Xuyao Feng … Anthony Hunter (both UCL) · 2026 preprint · **0 citations** (too new) · `2603.06114`
 
 **What it is.** The paper on the *other* side of the completeness split: for explicit logical arguments, does filling
 in the unstated premise help? (An "enthymeme" is an argument with a missing premise — "Socrates is a man, therefore
