@@ -45,6 +45,39 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-21
+- **Full-read all 16 in-scope reasoning/pretraining papers** (workflow `wf_e16faf72-dc2`, 1 agent/paper, HTML/PDF
+  full text, body numbers + verbatim quotes + author/venue confirmed; 16/16, 0 failures, ~747k tokens). Upgraded
+  every catalog entry in `docs/REASONING_CONTENT_LIT.md` from abstract-only (◎) to full read (📖), then rewrote the
+  catalog a second time as plain-English per-paper narratives (what it is / what they did / what they found / why
+  it matters) so the doc reads cold. Two commits: `fdbcee655` (full-read numbers) → `be3af2015` (readable rewrite).
+- **The reads SUPPORT H1 but COMPLICATE the core H2 thesis, with one direct counter-result.** Headlines:
+  - 🔴 **Exposure paper (`2606.09338`) is a counter-result to naive completeness.** Controlled GPT-2: spelling the
+    bridge step **explicitly** (complete chain) matched the no-help baseline (2-hop **0.08**); leaving it **implicit**
+    (incomplete) drove the gains (**0.79** RDF / **0.62** NL). Logit-lens: explicit *emits* the bridge yet composes
+    8%; implicit *never emits* it yet composes 79% — *"decodability of an intermediate result does not imply its use."*
+    For latent one-shot multi-hop, making the hidden step explicit did NOT help; matching the inference distribution did.
+    The real lever was entity-level compositional **exposure**, not chain completeness (facts present at 97% 1-hop,
+    scale-invariant 124M→774M).
+  - 🟡 **Completeness DOES help a different regime.** Enthymeme paper (`2603.06114`): filling implicit premises
+    monotonically improved symbolic entailment (ANLI 0.53→0.73, ARCT 0.29→0.56). So completeness helps explicit
+    step-by-step argument but fails silent composition — *which regime the thread targets is now the key design question.*
+  - 🟢 **Fix for our reverse-filter null.** The working detectors (AttentionInfluence `2505.07293`, PreSelect
+    `2503.00808`) use a **weak-vs-strong-model loss GAP on the same text**, NOT the single-model continuation
+    perplexity our reverse-filter used (which never dropped — the frequency/memorization confound). Re-running the
+    filter as a cross-model NLL gap (our 1.4B vs Qwen-72B, within-domain) is the cheap next experiment.
+- **Persistence (H1's core claim) — strongest evidence: Front-Loading Reasoning (NVIDIA, `2510.03264`).** Reasoning
+  in pretraining compounds: lead +9% pretrain → +9.3% SFT → **+18.5% RL**; doubling SFT (+4.09%) can't match even the
+  weakest reasoning-pretrained model. Caveat: their "reasoning data" is SFT-style long-CoT mixed at 20%, not rewritten
+  web text; "quality"≈CoT length.
+- **Can't-vs-Won't is a spectrum, not a binary** — ≥4 distinct mechanisms (shortcut-wins-first / no-algorithm-ever /
+  exposure-manufactured-can't / architectural-timing / capacity-coverage). Explicit CoT at inference reliably rescues
+  latent-composition failures (SOCRATES `2411.16679`: 7.6%→92.8%).
+- **Proposed pivot (not yet acted on):** shift the thread from *completeness-per-se* toward *encoding-for-necessity*
+  (does the encoding make the model actually RUN the inference — borrow Faithfulness `2605.24286`'s "chain screens off
+  prompt" / necessity metric), + the cross-model-gap reverse-filter re-run. **§ EXPERIMENT_LOG "key findings" NOT yet
+  updated — reframe pending user decision** on (1) which reasoning regime to target, (2) green-light the gap re-run.
+
 ## 2026-07-20
 - No completeness work today (session idle; full reads of the four ⭐⭐ leads still queued).
 
