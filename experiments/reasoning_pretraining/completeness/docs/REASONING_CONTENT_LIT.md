@@ -1,199 +1,245 @@
 # Reasoning in pretraining: under-reasoning (H1) & finding/exploiting reasoning-rich text (H2)
 
-**Status: first-pass literature map. Full reads pending.** The summaries below come from a neutral
-`deep-research` survey (run `wf_869397f2-d8b`, 2026-07-16: 6 angles → 27 sources → 125 claims → 25
-adversarially verified) — **not** yet from me reading each paper end-to-end. Verification is marked per item:
+**Status: FULL READS DONE (2026-07-21).** 16 in-scope papers were read end-to-end (workflow `wf_e16faf72-dc2`,
+one agent per paper, HTML/PDF full text, body numbers + verbatim quotes + author/venue confirmed); 4 more
+(TPT, BoLT, RHO-1, Quiet-STaR) were read earlier; 2 secondary surveys were skipped. Every cited paper below is
+📖 (read), not ◎ (search-summary). Where a specific number is read off a figure rather than a table, it's flagged.
+Provenance + method at the end. This supersedes the earlier abstract-only map.
 
-- **✅ VERIFIED** — claim survived 3-vote adversarial verification (vote shown); the *specific claim* is
-  confirmed, though I have not personally read the full paper yet.
-- **◎ SEARCH-SUMMARY** — title + one-paragraph relevance from the search agent; plausible but neither
-  independently verified nor full-read. Treat as a lead, not a settled fact.
-- **📖 READ** — I have full-read this paper (in an earlier pass).
+---
 
-Per Dongwei's paper rule, before any *verdict* enters our EXPERIMENT_LOG "key findings," the in-scope papers get
-full reads. Citation counts were not collected by the workflow; venue (ICLR/NeurIPS/ACL/EMNLP) is shown as the
-credibility signal where captured.
+## TL;DR — the reads SUPPORT H1 but COMPLICATE our core thesis, with one direct counter-result
+
+The blunt finding: **almost every paper supports H1 (under-reasoning via shortcuts is real and pretraining-laid)
+but cautions or contradicts the specific H2 thesis "augment pretraining text with *explicit, complete* reasoning
+to remove the shortcut."** Three things you must not miss:
+
+1. **🔴 A direct counter-result — the Exposure paper (2606.09338).** In a controlled GPT-2 study, **EXPLICIT**
+   (complete, bridge-entity-named) formats matched the no-augmentation baseline (2-hop **0.08**), while **IMPLICIT**
+   (bridge-omitted, incomplete) formats drove the gains (**0.79** RDF / **0.62** NL). Logit-lens kicker: the explicit
+   condition *emits the bridge token strongly yet composes 8%*; the implicit condition *never emits it yet composes
+   79%*. Their words: *"decodability of an intermediate result does not imply its use."* → **For latent multi-hop,
+   making the implicit premise explicit did NOT help; matching the inference distribution mattered more.**
+
+2. **🟡 But completeness DOES help a different regime — the Enthymeme paper (2603.06114).** Filling implicit
+   premises monotonically improved logical-entailment verification: ANLI **0.53→0.73**, ARCT **0.29→0.56**, more
+   steps = more gain. So **completeness helps for explicit symbolic entailment but fails for latent
+   single-forward-pass composition.** *Which regime our thread targets is now the central design question.*
+
+3. **🟢 The correction to our own reverse-filter — the perplexity-gap papers.** AttentionInfluence and PreSelect are
+   weak-vs-strong loss-**gap** detectors that WORK for finding reasoning-rich text — **but they use a *delta between
+   two models on the same text*, NOT the single-model zero-shot continuation-perplexity our reverse-filter used
+   (which we found never drops).** That is the likely reason ours failed: single-model NLL carries the
+   frequency/memorization confound; a *cross-model gap* is the signal that actually carries reasoning value.
+
+**Net for the thread:** the naive "spell out every step" thesis is not supported and is partly contradicted for
+latent reasoning. But reasoning-in-pretraining clearly persists and compounds (Front-Loading), explicit reasoning
+reliably helps at inference (CoT), and there is a rigorous completeness definition to borrow (Faithfulness). The
+center of gravity should shift from *completeness per se* toward *whether the encoding makes the model actually run
+the inference* (necessity / inference-distribution match), plus re-running our reverse-filter as a cross-model gap.
 
 ---
 
 ## The two hypotheses (corrected, reasoning-only)
 
-**H1 — UNDER-REASONING AND ITS PERSISTENCE.** In pretraining (next-token prediction), a model can satisfy the
-objective by a **shortcut** — surface pattern-match, memorized association, plausible guess — instead of running
-the full multi-step inference the text encodes. Call that **under-reasoning**. Two disjoint causes must be kept
-separate:
-- **(C) Can't** — the inference needs knowledge/information the model lacks → forced guess (a *knowledge* gap).
-- **(W) Won't** — the model *has* what it needs, but next-token prediction is satisfied by a cheaper shortcut,
-  so it never exercises or learns the full inference (an *incentive/shortcut* gap).
+**H1 — UNDER-REASONING AND ITS PERSISTENCE.** In next-token prediction a model can satisfy the objective by a
+**shortcut** (surface pattern-match, memorized association, plausible guess) instead of running the full inference
+the text encodes. Two causes to keep separate: **(C) Can't** (lacks the knowledge → forced guess) vs **(W) Won't**
+(has it, but a cheaper shortcut satisfies the loss, so the full inference is never exercised or learned). Claim:
+under-reasoning — especially (W) — is learned in pretraining and **persists** through SFT/RL.
 
-Claim: this under-reasoning — especially the **(W)** form — is learned in pretraining and **persists** through
-SFT/RL. **(W) is the branch our completeness thread can act on** (make the reasoning explicit in the data → the
-shortcut is removed → the model must learn the inference); **(C) is the confounder to hold constant.**
-
-**H2 — FINDING & EXPLOITING REASONING-RICH CONTENT IN PRETRAINING TEXT.** Not about evaluating whether a *model*
-reasons — about whether a *piece of text* contains reasoning and whether we can use it. Three parts: **(4)
-identify** reasoning-rich content in corpora; **(5) exploit** it by augmenting text with explicit reasoning;
-**(6) completeness** — how complete a reasoning chain must be (implicit premises / enthymemes made explicit) to
-help; **(7)** can a **perplexity / weak-vs-strong-model gap** detect reasoning content?
+**H2 — FINDING & EXPLOITING REASONING-RICH CONTENT IN PRETRAINING TEXT.** (4) identify reasoning-rich content;
+(5) augment text with reasoning; (6) **completeness** — how complete must the chain be (implicit premises /
+enthymemes made explicit); (7) can a **perplexity / weak-vs-strong gap** detect reasoning content?
 
 ---
 
-## What the verification pass established (21 confirmed, 4 refuted)
+## H1 — well-supported: under-reasoning is real; can't-vs-won't is a *spectrum* of ≥4 mechanisms
 
-**Confirmed (H1 — under-reasoning is real, mechanistic, and pretraining-laid):**
-1. **Shortcuts + brittleness** — GSM-Symbolic: one irrelevant clause (NoOp) drops accuracy up to 65% (Phi-3-mini
-   88%→22.4%, GPT-4o 95.2%→63.1%). Cao et al. independently frame LMs as relying on shortcuts. ✅ 3-0.
-2. **Arithmetic = "bag of heuristics"**, not an algorithm; established early in pretraining and never replaced;
-   ablating a prompt's heuristic neurons drops accuracy ~29pp; heuristics account for ~79% of circuit
-   performance at intermediate Pythia checkpoints. ✅ 3-0.
-3. **Long-horizon under-execution** — first-answer accuracy 63% (5 steps) → 20% (95 steps) across 15 models;
-   *"strong final-answer performance does not necessarily reflect faithful execution."* ✅ 3-0 (single 2026 source).
-4. **Latent multi-hop is REAL but PARTIAL & ASYMMETRIC** — genuine internal pathway, strong first hop (>80% for
-   some relations), moderate second hop; "hopping too late" timing bottleneck, back-patching fixes 66%. ✅ 3-0.
-5. **Shortcut-inflated & category-dependent** — SOCRATES: shortcut-free composability ~5× lower; country-bridge
-   ~82% vs year-bridge ~6%; **conditioned on the model already knowing the 1-hop facts** → isolates a
-   composition gap, not a knowledge gap. ✅ 3-0.
-6. **Learnable only under extreme conditions** — implicit composition emerges only via *grokking*; required data
-   grows *exponentially in hop-count*; composition fails OOD while comparison generalizes. ✅ 3-0.
-7. **Bound by pretraining exposure (the can't-vs-won't separator)** — atomically-seen entities: 97% 1-hop but ~1%
-   2-hop; compositionally-exposed: 83% 2-hop. Same 1-hop on both ⇒ *"the compositional gap is a pretraining
-   failure, not a capacity limit."* ✅ 3-0 (quantitative claims; the universal "never under any augmentation"
-   phrasing was the lone 2-1).
+The (C)/(W) split held up as a lens, but the reads reveal it's not binary — at least four distinct failure
+mechanisms, each with different implications for whether *data* can fix it:
 
-**Refuted (do NOT believe the strong anti-reasoning framings):**
-- ✗ 0-3 "LLMs do not reason at all, only replicate memorized steps" (over-read of GSM-Symbolic).
-- ✗ 0-3 "genuine latent composability is only ~7-8%, models overwhelmingly don't compose" (over-read of SOCRATES).
-- ✗ 0-3 "multi-hop failure is a knowledge gap, not an inference deficit" (over-read of the exposure paper —
-  the correct reading is the *opposite*: facts are present, composition is missing).
-- ✗ 1-2 the strong single-forward-pass "bridge entity in early layers → second hop later" as a universal claim.
+| Mechanism | Paper | Evidence | Fixable by better data? |
+|---|---|---|---|
+| **(W) shortcut satisfies loss first** | Grokked Transformers (2405.15071) | A "memorize" circuit forms fast and fits the loss; the genuine "generalize" circuit appears only after grokking (~50× the steps to fit); pre-grok ID acc **9.2%** → ~98% after grokking | Partly — ratio (φ) of reasoning:atomic examples accelerates grokking |
+| **(W) never develops an algorithm** | Bag of Heuristics (2410.21272) | Arithmetic = a "bag of heuristics" (circuit faithfulness **0.96**; ablation −**29pp**); final heuristics = **79%** of contribution at *every* Pythia checkpoint — formed early, never replaced by an algorithm | Authors: "may require fundamental changes to training and architectures" |
+| **Exposure-manufactured (C)** | Exposure (2606.09338) | Knowledge present (**97%** 1-hop), scale-invariant (2-hop **0.01** from 124M→774M), yet uncomposed for entities never seen in compositional contexts | Only by *exposing* the entities compositionally — and implicit-format beats explicit |
+| **Architectural timing** | Hopping Too Late (2406.12775) | Model has both facts + wants to compose, but the 2nd hop starts too late in the layer stack; back-patching a later state to an earlier layer fixes **66%** of failures | No — inference-time architectural bottleneck |
+| **Capacity / data-coverage (C)** | Yao k-hop (2505.17923) | Genuinely learnable but training data grows **exponentially in k**, depth **linearly in k** (`L ≥ k/(8pdH)`); below budget the model sits at the ~1% random baseline | Only with exponentially more data — or curriculum (×100→×5) |
 
-**Net H1 read (provisional):** under-reasoning via shortcuts is well-supported and *mechanistically* traced to
-pretraining; the honest picture is **genuine-but-partial, shortcut-inflated, exposure-bound** reasoning — not
-"no reasoning." Multiple independent lines **separate (C) from (W)** and land on **(W)/exposure** — which is
-exactly the branch our completeness augmentation targets.
+**Two H1 takeaways:**
+- **Under-reasoning is genuine, mechanistically located, and pretraining-laid** — not "models can't reason at all"
+  (that framing was refuted in the earlier verification pass). The picture is *genuine-but-partial,
+  shortcut-inflated, exposure/architecture-bound.*
+- **Making reasoning explicit at *inference* (CoT) reliably rescues it**: SOCRATES latent **2.4–8.4%** → CoT
+  **~85–92.8%** (GPT-4o **7.6%→92.8%**); Yang finds the model recalls the bridge (hop-1 **>80%**) but under-uses it
+  (hop-2 **~0.61**, flat with scale). The gap our thread targets is real; the question is whether *training-text*
+  encoding can install what CoT provides at inference.
 
-**H2 coverage note:** the verification budget went to H1, so H2.4 (identify) and H2.7 (perplexity-gap) produced
-**no *verified* claims** — but the *papers exist* (below). That's an absence of verification, not absence of
-literature. These are the priority full-reads.
+**Persistence (H1's key claim) — strongest single result: Front-Loading Reasoning (NVIDIA, 2510.03264).**
+Reasoning put in *pretraining* doesn't just survive post-training, it **amplifies**: base-pretraining lead +9.09%
+→ **+9.3%** after SFT → **18.57%** after SFT+RLVR (AIME24 **12.29→45.21**). Doubling SFT data lifts the baseline
+only +4.09% (29.92→34.01) — *still below even the weakest reasoning-pretrained model* (37.33). Quote:
+*"front-loading reasoning data into pretraining is critical (19% average gain)… cannot be fully replicated by
+later-stage SFT, even with more data."* A high-quality-pretraining benefit even stays **latent** and is *unlocked*
+only by SFT (+4.25%). This is the cleanest evidence that a pretraining reasoning foundation persists and compounds
+rather than being replaced — directly supporting the value of front-loading reasoning into the base.
+*(RLVR-boundary 2510.04028 reconciles the Yue-vs-ProRL debate: standard RL can shrink coverage early — MMLU-Pro
+Pass@256 100→90.6 — and expand only under sustained/diversity-preserving training — AIME25 46.7→66.7 — so the base
+model's boundary is the binding ceiling for ordinary post-training.)*
 
 ---
 
-## Full paper catalog (26 papers, by angle)
+## H2 — identify is solved-ish; completeness is regime-dependent; the perplexity-gap needs the *cross-model* form
 
-### H1.1 — reasoning shortcuts in language modeling
-- **GSM-Symbolic** (Mirzadeh et al., Apple; ICLR'25) — `2410.05229` — 📖✅ template GSM8K variants; NoOp clause
-  drops accuracy up to 65%; accuracy varies with numeric/name changes. *(model-eval; the definitional caveat:
-  this measures the model, not text content.)*
-- **Arithmetic Without Algorithms: Bag of Heuristics** (Nikankin et al.; ICLR'25) — `2410.21272` — ✅ ⭐ sparse
-  late-layer neurons each = one interpretable heuristic; model sums them instead of computing; rules out both
-  algorithm and memorization; forms early in pretraining.
-- **Mitigating Shortcut Reasoning: A Gradient-Aware Training Approach** (2026) — `2603.20899` — ✅ ⭐ names the (W)
-  cause: *"training paradigms that optimize primarily for answer correctness structurally favor shortcuts… that
-  efficiently reduce training loss."*
-- **Shortcut Learning of LLMs in NLU** (Du et al.; CACM / `2208.11857`) — ◎ foundational survey/taxonomy of
-  shortcut learning; strong in-distribution, collapse under shift. *(secondary — skip full read.)*
-- **Opening the Black Box: Survey on Multi-Step Reasoning Mechanisms** (2026) — `2601.14270` — ◎ survey;
-  "shortcut neurons" (subject→answer, skipping hops); ablation drops perf ~3×. *(secondary — skip.)*
-- **When LLMs Stop Following Steps** (2026) — `2605.00817` — ✅ ⭐ separates can't/won't: fails *even when the full
-  procedure is given in-prompt*; 63%→20% over 5→95 steps; procedural-state failures, not arithmetic errors.
+### (4) Identify reasoning-rich content — three working recipes
+- **AttentionInfluence (2505.07293)** — classifier-free: mask a small model's retrieval heads, score docs by the
+  loss *gap* between masked and unmasked. Top-20% upsampled → 7B gains **HumanEval +3.5, GSM8K +2.7, MMLU-Pro +2.7pp**;
+  beats a FineWeb-Edu classifier on GPT-4o "reasoning score" (OpenWebMath **0.88 vs 0.52**). Caveat: within-domain
+  comparable only; also lifts pure-knowledge benchmarks.
+- **AutoDS / AutoMathText (ACL-Findings 2025)** — zero-shot: a Qwen-72B base model's normalized YES-logit on two
+  rubric questions ("mathematical intelligence?", "educational?"). Mistral-7B **MATH 12.9→16.1, GSM8K 38.8→45.4**;
+  ~2.36× token efficiency. *Signal = single strong model's targeted logit — NOT perplexity, NOT a gap.*
+- **FineWeb-Edu (2406.17557)** — LLM-labeled classifier (Llama-3-70B scores 0–5, BERT regressor F1 **82%**, 1.3T
+  tokens). MMLU **37 vs 33**, ARC **57 vs 46**. But "educational" is deliberately *grade-school* targeted and
+  *down-weights* arXiv/technical — so it's broader than and partly orthogonal to "reasoning-rich."
 
-### H1.2 — latent multi-hop reasoning vs memorization
-- **Do LLMs Latently Perform Multi-Hop Reasoning?** (Yang et al.; ACL'24) — `2402.16837` — ✅ ⭐ TwoHopFact (45,595
-  prompts, 52 types); first-hop pathway >80% for some relations; second hop only moderate; first hop scales with
-  size, second doesn't.
-- **Hopping Too Late** (Biran, Yang et al.; EMNLP'24) — `2406.12775` — ✅ ⭐ second hop starts in too-late layers;
-  back-patching a later state to an earlier layer fixes 66% of failures → causal timing bottleneck.
-- **Grokked Transformers are Implicit Reasoners** (Wang et al.; NeurIPS'24) — `2405.15071` — ✅ ⭐ implicit
-  composition only via grokking; generalizes OOD for comparison, fails for composition (distinct circuits).
-- **Do LLMs Perform Latent Multi-Hop Reasoning without Exploiting Shortcuts? (SOCRATES)** (Yang et al.; ACL'25) —
-  `2411.16679` — ✅ ⭐ shortcut-free test; country-bridge ~80% vs year-bridge ~6%; conditions on knowing 1-hop
-  facts.
-- **Multi-Hop Knowledge Composition is Bound by Pretraining Exposure** (2026) — `2606.09338` — ✅ ⭐⭐ **the
-  single most on-point paper**: 97% 1-hop / ~1% 2-hop for atomic-only entities vs 83% 2-hop for
-  compositionally-exposed; same 1-hop ⇒ gap is exposure, not knowledge → directly our (W) branch and implies
-  augmenting text *with the composition* is what helps.
-- **LMs can learn implicit multi-hop reasoning, but only with lots of data** (Yao et al.; EMNLP'25) —
-  `2505.17923` — ✅ ⭐ GPT-2-from-scratch on k-hop data; genuine single-pass k-hop is learnable but required data
-  grows exponentially in k, depth linearly in k.
+### (6) Completeness — the regime split + a formal definition + a necessity caveat
+- **The split (headline #1 and #2 above):** completeness *fails* for latent multi-hop (Exposure: explicit 0.08 vs
+  implicit 0.79) but *helps* for explicit symbolic entailment (Enthymeme: 0.53→0.73 monotonic in #steps).
+- **A rigorous definition to borrow — Faithfulness as Information Flow (2605.24286):** completeness ⟺ `I(P;A|C) ≈ 0`
+  — the chain-of-thought must "screen off" the prompt from the answer; *"a completeness failure indicates a residual
+  P→A shortcut."* This is a measurable operationalization of exactly our variable.
+- **The caveat that reshapes the thread — necessity:** their interventions make a shortcut *visible* in the CoT
+  **without removing it**; a complete-*looking* chain can still be a rationalization while the answer is computed
+  directly from the prompt. So they add a separate **Necessity** property (A must causally depend on C). Hinted-GPQA
+  verbalized-faithful rate: **89.4%** (Qwen3-8B) vs **54.3%** (DeepSeek-R1-Distill-14B). → *Surface completeness is
+  not sufficient; the encoding must make the chain actually **used**.*
+
+### (7) Perplexity-gap detection — the correction to our reverse-filter
+- **Cross-model gaps WORK:** AttentionInfluence (masked-vs-unmasked loss gap) and **PreSelect (2503.00808)** —
+  "predictive strength" = whether the loss *ranking* across a ladder of models matches their ability ranking; 30B
+  selected tokens beat 300B random (**10×**), distilled into a fastText classifier. Both are scalable, benchmark-
+  predictive selection signals.
+- **The lesson for us:** our reverse-filter used *single-model zero-shot continuation perplexity* (found to never
+  drop — the frequency/memorization confound). The working methods all use a **delta between two models on the same
+  text.** Re-running the reverse-filter as a **weak-vs-strong NLL gap** (our 1.4B vs Qwen-72B, but as a per-doc gap
+  ranked within-domain) is the concrete, cheap fix these papers point to. Caveat: PreSelect targets *general* ability
+  and AutoDS uses a single-model logit — so "gap ⇒ reasoning specifically" is not guaranteed; it must be validated.
+
+---
+
+## What this means for the thread (honest read)
+
+1. **The naive completeness thesis is not supported and is partly contradicted for *latent* reasoning.** The Exposure
+   paper is a direct counter; Faithfulness warns surface-completeness ≠ functional use.
+2. **But reasoning-in-pretraining is worth it** — Front-Loading shows it persists and compounds through SFT+RL, and
+   explicit CoT reliably rescues latent-composition failures at inference.
+3. **The sharper, more novel question** is *encoding-for-necessity / inference-distribution-match*, not completeness
+   per se: what text encoding makes the model actually **run** the inference (and *use* the chain), rather than merely
+   contain it. The Exposure result (implicit > explicit) and the Necessity property both point here.
+4. **A concrete, cheap next experiment on our own data:** re-run the reverse-filter as a **cross-model NLL gap**
+   (à la AttentionInfluence/PreSelect) instead of single-model perplexity — the reads predict this fixes our null.
+
+---
+
+## Full paper catalog (all read — real numbers)
+
+### H1.1 — reasoning shortcuts
+- **📖 Bag of Heuristics** (Nikankin et al., ICLR'25) — `2410.21272`. Arithmetic circuit faithfulness **0.96**;
+  ablating a prompt's heuristic neurons −**29pp** (from 95%); final heuristics = **79%** of contribution at every
+  Pythia-6.9B checkpoint → formed early, never replaced by an algorithm. *"neither robust algorithms nor
+  memorization… a bag of heuristics."* **Verdict: supports H1 (W-shortcut, persistent); complicates the augmentation
+  remedy** (authors say fixing it "may require fundamental changes to training and architectures").
+- **📖 When LLMs Stop Following Steps** (2026) — `2605.00817`. 15 models, 55k examples: first-answer **63%→20%** over
+  5→95 steps; exact-step exec **70.88%→46.84%**, under-execution **24.25%→50.87%**; look-back depth −**18.43pp**.
+  Procedure given *in-prompt* yet fails → isolates execution (W), not knowledge (C); **persists in RL/reasoning-tuned
+  models**. **Verdict: supports H1; complicates completeness (a complete in-context chain isn't followed over long
+  horizons).**
+- **📖 GSM-Symbolic** (Apple, ICLR'25) — `2410.05229` (read earlier). NoOp clause −up to **65%**. *Model-eval, not
+  content — kept only as shortcut/brittleness evidence.*
+
+### H1.2 — latent multi-hop reasoning
+- **📖 Do LLMs Latently Perform Multi-Hop Reasoning?** (Yang et al., ACL'24) — `2402.16837`. TwoHopFact (45,595
+  prompts, 52 types). Hop-1 recall **0.71/0.72/0.78** (7B/13B/70B, *scales*); hop-2 utilization **0.64/0.65/0.61**
+  (*flat*); "up to 23% of types show strong latent reasoning in >80% of cases." **Verdict: supports H1 — model has
+  the bridge but under-uses it, and scale doesn't fix hop-2; supports completeness intuition mechanistically.**
+- **📖 Hopping Too Late** (Biran et al., EMNLP'24) — `2406.12775`. 82,020 queries; selects cases where both hops are
+  correct in isolation but the composition fails. Back-patching fixes **66%** (Pythia-6.9B). A *third* category:
+  architectural timing bottleneck (has facts + wants to compose, runs out of layers). **Verdict: supports H1;
+  complicates "data removes the shortcut" (this failure is architectural); weakly supports externalization.**
+- **📖 Grokked Transformers are Implicit Reasoners** (Wang et al., NeurIPS'24) — `2405.15071`. Composition learned
+  only via grokking (pre-grok **9.2%** → ~98% after ~50× steps); OOD composition **~0%** (fails) but OOD comparison
+  **~98%** (succeeds). Two circuits: memorize (shortcut, first) vs generalize (grokking). Frontier models score
+  **~28–37%** (≈random) on the hard implicit task. **Verdict: supports H1 (clean W→grok + hard-C OOD); neutral/
+  complicating for augmentation (implicit reasoning internalizable WITHOUT explicit chains; some limits architectural).**
+- **📖 SOCRATES (shortcut-free latent multi-hop)** (Yang et al., DeepMind) — `2411.16679`. Latent composability
+  **2.4–8.4%** (conditioned on knowing both 1-hop facts) vs CoT **~85–92.8%** (GPT-4o **7.6→92.8**); shortcut
+  inflation **~5×** (2.4 vs 11.6); country-bridge **82–85%** vs year-bridge **6–7%** (~14×); OLMo pretraining: only
+  **~11%** of eligible cases ever show emergent latent 2-hop. **Verdict: strongly supports H1 (definition-quality
+  shortcut demo, C excluded by conditioning); supports explicit-at-inference, cautions mere fact co-presence won't
+  induce latent composition.**
+- **📖 LMs can learn implicit multi-hop, but only with lots of data** (Yao et al., EMNLP'25) — `2505.17923`. GPT-2
+  from scratch: 2-hop **99.8%** at ×1; 3-hop needs ×5–10; 4-hop needs ×20–100; **data ∝ exp(k)**, depth ∝ k
+  (`L ≥ k/(8pdH)`). Curriculum cuts 4-hop budget **×100→×5**. *"can learn… even without explicit rationales."*
+  **Verdict: mostly complicates the shortcut framing (bottleneck is C: coverage/depth); supports curriculum/
+  intermediate-supervision; neutral on perplexity-gap.**
 
 ### H1.3 — persistence through post-training
-- **Does RL Really Incentivize Reasoning Beyond the Base Model?** (Yue et al.; 2025) — `2504.13837` — 📖✅ RLVR
-  beats base at small k, base matches/exceeds at large k; RL coverage stays inside base distribution.
-- **ProRL** (NVIDIA; 2025) — `2505.24864` — 📖✅ prolonged stabilized RL beats base across pass@k incl. tasks base
-  fails entirely; the counter to Yue.
-- **The Debate on RLVR Boundary: Shrinkage, Expansion, or Both?** (2025) — `2510.04028` — ◎ ⭐ reconciles
-  Yue-vs-ProRL: boundary both shrinks (early diversity loss) and expands (later exploration) by stage;
-  single-snapshot pass@k misleads.
-- **Front-Loading Reasoning: Synergy of Pretraining & Post-Training Data** (NVIDIA) — ◎ ⭐⭐ **most direct
-  persistence evidence**: reasoning instilled in pretraining is *amplified* by SFT and survives SFT+RLVR;
-  doubling SFT data (+4.09%) still can't match reasoning-pretrained models → post-training compounds with, does
-  not replace, a pretraining foundation.
+- **📖 Front-Loading Reasoning** (NVIDIA/CMU, 2025) — `2510.03264`. *(numbers in the persistence section above)*
+  **Verdict: SUPPORTS H1 persistence — the cleanest evidence reasoning-in-pretraining compounds through SFT+RL and
+  SFT can't catch up.** Caveats: reasoning data = QA/long-CoT SFT-style mixed at 20% (not rewritten web text);
+  "quality"≈CoT length; diversity beats curation at pretraining.
+- **📖 Yue "RL beyond base?"** — `2504.13837` & **ProRL** — `2505.24864` (read earlier).
+- **📖 RLVR Boundary: Shrinkage, Expansion, or Both?** (2025) — `2510.04028`. Two-stage dynamic reconciles
+  Yue-shrinkage (MMLU-Pro Pass@256 **100→90.6**) and ProRL-expansion (AIME25 **46.7→66.7** with diversity-preserving
+  RL). **Verdict: base boundary is the binding ceiling for ordinary post-training → weakly motivates reasoning-in-base;
+  neutral on H2.**
 
-### H2.4 — identifying / selecting reasoning-rich content
-- **AttentionInfluence: Weak-to-Strong Pretraining Data Selection** (2025) — `2505.07293` — ◎ ⭐ small (1.3B)
-  model masks retrieval attention heads; docs where masking most raises loss = reasoning-rich; no supervised
-  classifier; 73B-token subset → 7B model +0.8–3.5pp on MMLU/MMLU-Pro/GSM8K/HumanEval.
-- **The FineWeb Datasets / FineWeb-Edu** — `2406.17557` — ◎ ⭐ educational-value scoring: Llama-3-70B labels 500k
-  samples 0–5, BERT regressor (F1 82% @thr 3) filters 1.3T tokens; the canonical "reasoning/edu-density"
-  classifier.
-- **PreSelect: Predictive Data Selection** (HKUST-NLP; ICML'25) — `github/hkust-nlp/PreSelect` +
-  `2025.findings-acl.216`? — ◎ ⭐ selects by "predictive strength" (per-doc loss↔benchmark correlation), then a
-  fastText classifier scales it. Bridges H2.4 (learned classifier) and H2.7 (loss signal).
-- **Autonomous Data Selection with Zero-shot Generative Classifiers for Math** (ACL Findings'25) —
-  `2025.findings-acl.216` — ◎ ⭐ LLM as zero-shot scorer judging whether a doc has genuine math reasoning →
-  continue-pretrain on high scorers. A concrete "this document requires reasoning" heuristic.
+### H2.4 — identify reasoning-rich content
+- **📖 AttentionInfluence** — `2505.07293` · **📖 AutoDS/AutoMathText** — ACL-Findings'25 · **📖 FineWeb-Edu** —
+  `2406.17557` · **📖 PreSelect** — `2503.00808`. *(numbers + the perplexity-gap correction in the H2 section above)*
 
-### H2.5/6 — augmenting text with reasoning + completeness
-- **Reasoning to Learn from Latent Thoughts (BoLT)** — `2503.18866` — 📖 augments text with inferred latent
-  thoughts via EM bootstrap; MATH 5.7%→25.4% vs raw; augments **uniformly** (no selection); corpus already
-  math-heavy (FineMath).
-- **Thinking Augmented Pre-training (TPT)** — `2509.20186` — 📖 prepends generated thinking trajectories; GSM8k
-  19.2%→50.1%, MATH 9.1%→21.8%, 3× data efficiency; no selection, but trajectories run *longer* for Math/Physics
-  (emergent density signal).
-- **Faithfulness as Information Flow** (2026) — `2605.24286` — ◎ ⭐⭐ **defines COMPLETENESS**: a faithful CoT must
-  absorb all answer-relevant prompt content into the trace; completeness failures = "residual shortcuts" (chain
-  skipped steps the model used). Directly our thread's variable.
-- **Making Implicit Premises Explicit in Enthymemes** (2026) — `2603.06114` — ◎ ⭐⭐ the **enthymeme /
-  suppressed-premise** problem our framing named: LLM generates the missing intermediate premises, neuro-symbolic
-  SAT checker verifies entailment.
+### H2.5/6 — augment + completeness
+- **📖 Faithfulness as Information Flow** (2026) — `2605.24286` — the completeness definition + necessity caveat.
+- **📖 Making Implicit Premises Explicit in Enthymemes** (Feng & Hunter, UCL, 2026) — `2603.06114` — completeness
+  helps symbolic entailment (ANLI 0.53→0.73, ARCT 0.29→0.56); LLM-generated premises beat dataset originals; verified
+  neuro-symbolically (AMR→CNF→PySAT). **Verdict: supports completeness for explicit entailment; neutral on the
+  pretraining/shortcut mechanism (no LM training, no perplexity).**
+- **📖 Multi-Hop Composition Bound by Pretraining Exposure** (2026) — `2606.09338` — the counter-result +
+  can't-vs-won't separator. *(numbers up top)* **Verdict: complicates the completeness thesis (explicit ≤ baseline,
+  implicit wins for latent composition); supports separating exposure from capacity.** Caveats: fully synthetic,
+  2 relations, GPT-2 scale, implicit-only.
+- **📖 TPT** — `2509.20186` · **📖 BoLT** — `2503.18866` (read earlier): augment uniformly (no selection); TPT 3×
+  data efficiency, BoLT MATH 5.7→25.4; both on already math-heavy corpora.
+- **📖 Quiet-STaR** — `2403.09629` (read earlier): token-level rationales, perplexity gain on *difficult* tokens.
 
-### H2.7 — perplexity-gap detection of reasoning content
-- **Improving Pretraining Data Using Perplexity Correlations** (Thrush et al.; 2024) — `2409.05816` — 📖 selects by
-  correlation of per-doc perplexity with downstream scores across many models; NOT raw low perplexity.
-- **Rho-1: Not All Tokens Are What You Need** (Lin, Gou et al.; NeurIPS'24) — `2404.07965` — 📖 excess-loss GAP
-  (reference − training model) at token level; the closest analog to our reverse-filter; but "useful" = quality,
-  NOT reasoning (authors' own framing).
+### H2.7 — perplexity-gap
+- **📖 RHO-1** — `2404.07965` (read earlier): excess-loss (reference − training) token selection; "useful" = quality,
+  not reasoning. · **📖 Perplexity Correlations** — `2409.05816` (read earlier). *(cross-model-gap lesson above)*
+
+### Skipped (secondary surveys)
+- Shortcut-Learning survey (`2208.11857`), Multi-Step-Reasoning survey (`2601.14270`).
 
 ---
 
-## Coverage gaps & open questions (from the workflow's own caveats)
+## Open questions / proposed next steps
 
-1. **Persistence through SFT/RLHF/RLVR is under-tested for *under-reasoning* specifically.** The only verified
-   "persistence" is across *pretraining* checkpoints (bag-of-heuristics). Whether the (W) shortcut habit survives
-   post-training is essentially untested here — **Front-Loading Reasoning is the lead** and needs a full read.
-2. **Generalization of mechanistic findings.** Much is arithmetic-specific (heuristics) or synthetic/controlled
-   (grokking, k-hop, atomic-biography). Whether it transfers to natural-corpus multi-hop text is an extrapolation
-   the papers don't fully establish.
-3. **Temporal sensitivity.** GSM-Symbolic brittleness (Oct 2024) may be attenuated in 2025–26 reasoning-tuned
-   frontier models; report measured effects, not "current SOTA."
-4. **Completeness threshold (our core question).** What completeness must an added rationale meet — filling
-   enthymemes, faithful vs shortcut chains — to actually help learning, and how much of an augmentation gain (e.g.
-   the 83% 2-hop for exposed individuals) is composition vs surface exposure? *Faithfulness-as-Information-Flow*
-   and *Enthymemes* are the leads.
-
-## Reading plan (in-scope full reads, priority order)
-
-**⭐⭐ first (hit the hypotheses hardest):** Multi-Hop Bound by Pretraining Exposure (`2606.09338`), Front-Loading
-Reasoning (NVIDIA), Faithfulness as Information Flow (`2605.24286`), Enthymemes (`2603.06114`).
-**⭐ next:** the H1.2 multi-hop cluster (Yang `2402.16837`, Hopping-Too-Late `2406.12775`, Grokked `2405.15071`,
-SOCRATES `2411.16679`, Yao `2505.17923`); bag-of-heuristics (`2410.21272`); When-LLMs-Stop-Following-Steps
-(`2605.00817`); the H2.4 selection set (AttentionInfluence, FineWeb-Edu, PreSelect, Zero-shot-math-classifier);
-RLVR-boundary reconciliation (`2510.04028`).
-**Skip:** the two secondary surveys (CACM `2208.11857`, `2601.14270`).
+1. **Which regime does our thread target?** Latent single-forward-pass composition (where explicit *hurt* —
+   Exposure) or explicit multi-step reasoning at inference (where completeness *helped* — Enthymeme, CoT)? This
+   decides whether "completeness augmentation" is even the right lever.
+2. **Re-run the reverse-filter as a cross-model NLL gap** (1.4B vs Qwen-72B per-doc, within-domain), not
+   single-model perplexity — the reads predict this fixes our null. Cheap, uses data already on disk.
+3. **Encoding-for-necessity, not completeness:** design an augmentation that makes the model *use* the chain (borrow
+   Faithfulness's `I(P;A|C)` / necessity metric), and test implicit-inference-distribution-matching vs fully-explicit
+   (the Exposure axis) on our ladder.
+4. **Does under-reasoning persist through *our* post-training?** Still under-tested for the (W) form specifically;
+   Front-Loading is the closest but uses SFT-style reasoning data, not rewritten text.
 
 ---
 
-*Provenance: neutral `deep-research` run `wf_869397f2-d8b` (2026-07-16), zero seed papers. Raw journal at
-`subagents/workflows/wf_869397f2-d8b/journal.jsonl`; harvested titles/summaries at scratchpad
-`paper_list.txt`. Prior knowledge-framing doc `PERSISTENCE_AND_USEFUL_REASONING.md` is superseded by this
-reasoning-only framing.*
+*Provenance: full-read workflow `wf_e16faf72-dc2` (2026-07-21), 16 agents (opus), one per paper, HTML/PDF full text,
+schema-validated structured extraction (method / numbers / quotes / can't-vs-won't / completeness / limitations /
+verdict). Raw journal: `subagents/workflows/wf_e16faf72-dc2/journal.jsonl`; full structured results in the session
+task output. Neutral-search discovery via `wf_869397f2-d8b` (zero seed papers). Prior abstract-only map and the
+knowledge-framing doc `PERSISTENCE_AND_USEFUL_REASONING.md` are both superseded by this.*
