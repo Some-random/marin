@@ -8,52 +8,38 @@ numbers. Provenance at the end. Supersedes the earlier abstract-only map.
 
 ---
 
-## TL;DR — the reads support H1; on H2 two of my earlier confident readings were WRONG and are corrected below
+## TL;DR
 
-Almost every paper supports **H1** (that language models take reasoning *shortcuts* instead of doing the full
-inference, and this is baked in during pretraining). On **H2** — whether rewriting pretraining text with explicit,
-complete reasoning helps — the evidence is genuinely **open**, and two of my earlier confident claims were wrong and
-are corrected here (🔴 and 🟢). Three things to hold onto:
+**H1 (under-reasoning is real, pretraining-laid, and persists) is well-supported. H2 (whether augmenting pretraining
+text with reasoning helps) is genuinely open.** Three things to hold onto:
 
-1. **🔴 The "Exposure" paper is NOT a counter-result to completeness (corrected 2026-07-23).** I earlier read its
-   "explicit → 0.08, implicit → 0.79" as "spelling reasoning out completely doesn't help." That was a **misread**: the
-   evaluation is *unfair to the explicit condition* because it forces a **single forward pass with no scratchpad** —
-   the bridge entity is not allowed in the context. But explicit *training* teaches `P(answer | …bridge token… )`;
-   it relies on the bridge token being physically present in the prefix, and the test deletes exactly that. So the
-   explicit condition isn't shown to be *worse at reasoning* — it's tested in a format that removes what it learned to
-   lean on. The paper never runs the fair comparison (let the explicit model emit the bridge, then score the final
-   answer); the 2×2 of {implicit, explicit} training × {direct-answer, scratchpad} test is a **missing experiment** —
-   only the direct-answer column is filled. **The defensible claim is narrow:** explicit compositional text does *not
-   automatically compile into a **latent** (no-scratchpad) direct-answer computation* — it says nothing about explicit
-   reasoning *with* a scratchpad. **What robustly holds** is *exposure-boundedness*: composition transfers only to
-   entities that appeared in compositional pretraining contexts; atomic facts alone are not enough (97% 1-hop, ~1%
-   2-hop for unexposed entities, invariant to model scale).
+1. **🔴 Composition is bound by pretraining EXPOSURE — and latent vs scratchpad reasoning are different problems.** A
+   model that knows two facts atomically (97% 1-hop) cannot chain them in one forward pass unless those entities
+   appeared in *compositional* pretraining contexts, and this is invariant to model scale (~1% 2-hop for unexposed
+   entities at 124M–774M). Exposing the composition itself — not just the facts — is what installs it. Separately,
+   explicit-bridge augmentation (0.08) loses to implicit-bridge (0.79) *on the no-scratchpad test*, but that only
+   measures train/test-format alignment: explicit training relies on the bridge token being in the prefix, and the
+   test removes it. So the narrow claim is "explicit traces don't auto-compile into *latent* one-pass computation" —
+   the fair explicit+scratchpad comparison was never run.
 
-2. **🟡 Completeness helps at least one regime; the "it fails silent reasoning" side was the misread above.** The
-   *Enthymeme* paper shows filling in unstated premises steadily improves formal logical-argument verification
-   (0.53→0.73). The apparent "completeness fails latent composition" from Exposure was a **train/test-format
-   confound**, not evidence about completeness. So the real axis is **latent (no-scratchpad) vs externalized
-   (scratchpad) inference** — a question about *inference format*, NOT about "completeness good vs bad." Which one our
-   thread targets is the open design question.
+2. **🟡 Completeness helps explicit reasoning; for latent reasoning the lever is format-match, not completeness.**
+   Filling unstated premises steadily improves formal logical-argument verification (Enthymeme, 0.53→0.73). For latent
+   (no-scratchpad) reasoning, what matters is matching the inference distribution and exposing the composition, not how
+   completely the text is spelled out. Faithfulness gives a rigorous completeness metric — the chain must "screen off"
+   the prompt from the answer — plus the key caveat that a complete-*looking* chain can still be unused, so you also
+   need *necessity* (the model actually uses the chain).
 
-3. **🟢 The reverse-filter fix I proposed is itself wrong — a two-model gap is a *documented near-failure* (corrected
-   2026-07-23, from a code-level deep-dive).** I said "re-run our filter as a weak-vs-strong two-model gap." Wrong on
-   both counts: (a) our *original* reverse-filter's gold criterion (1.4B-high AND Qwen-low) was **already** a two-model
-   gap, and it found *knowledge, not reasoning*; (b) PreSelect ran exactly this ("ScalingFilter" = big-vs-small
-   perplexity difference) as a controlled baseline — it beats random by only **+0.4**, selects **short/easy junk**, and
-   is **uncorrelated (Spearman 0.05)** with the signal that works. And AttentionInfluence — which I called a
-   "cross-model gap" — is actually **self-ablation** (one model vs. itself with reasoning heads masked; memorization
-   cancels because both losses come from the same weights). The two recipes that actually work are **not** a two-model
-   gap: **(A)** self-ablation on our own 1.4B, or **(B)** multi-model *rank-match* on a same-family size ladder
-   (Qwen 0.5B→72B).
+3. **🟢 A two-model perplexity gap does NOT find reasoning-rich text.** A big-model-minus-small-model loss gap selects
+   short, easy, memorized text (PreSelect's "ScalingFilter" baseline: +0.4 over random, Spearman 0.05 vs the signal
+   that works; and our own 1.4B-vs-72B reverse-filter found knowledge, not reasoning). The two signals that DO work are
+   **self-ablation** (one model vs. itself with reasoning heads masked — memorization cancels because both losses share
+   weights) and **multi-model rank-match** (does per-char loss rank-order across a model ladder match the models'
+   ability order?).
 
-**Bottom line (hedged — my cross-paper synthesis has been unreliable this pass):** H1 (under-reasoning is real,
-pretraining-laid, persists) is well-supported. On H2, the naive "spell everything out → model stops shortcutting"
-thesis is **neither supported nor cleanly refuted** — the one paper I cited against it was a confounded eval. What
-robustly holds: reasoning-in-pretraining pays off and compounds (Front-Loading); composition is exposure-bound
-(Exposure); a two-model perplexity gap does *not* find reasoning-rich text (PreSelect + our own result). The genuinely
-open question: does augmenting pretraining text with reasoning help, and does it hinge on whether we want **latent**
-(no-scratchpad) or **externalized** (scratchpad) reasoning at inference?
+**Bottom line:** reasoning-in-pretraining pays off and compounds (Front-Loading); composition is exposure-bound; a
+two-model perplexity gap doesn't find reasoning text. Whether augmenting pretraining text with reasoning helps — and
+whether that hinges on **latent** (no-scratchpad) vs **externalized** (scratchpad) inference — is the open question
+the thread has to settle empirically.
 
 ---
 
@@ -125,51 +111,48 @@ model. Their line: front-loading reasoning "cannot be fully replicated by later-
 - *FineWeb-Edu* trains a cheap classifier to imitate a big model's 0–5 "educational value" rating. (Caveat: "educational"
   is deliberately grade-school-flavored and *down-weights* technical/arXiv content — so it's broader than "reasoning.")
 
-**(6) Completeness — corrected reading (2026-07-23).**
-- The *Enthymeme* paper: for explicit logical arguments, filling in the unstated premises **steadily helped**
-  (0.53→0.73). Completeness helps *this* regime.
-- The *Exposure* paper does **not** show the opposite. Its "explicit did nothing (0.08)" result is a
-  **train/test-format confound** — the eval forbids the scratchpad that explicit training relies on (see 🔴 above), so
-  it is *not* evidence that completeness hurts. What it actually shows: explicit traces don't auto-compile into
-  *latent* one-pass computation, and composition is exposure-bound.
-- The *Faithfulness* paper gives us a precise, borrowable definition of completeness — a reasoning chain is complete
-  if it "screens off" the question from the answer (you can't reach the answer except through the chain) — plus a
-  crucial warning: a chain can *look* complete while the model ignores it and answers directly. So **surface
-  completeness isn't enough; the chain has to be one the model actually uses** ("necessity").
+**(6) Completeness — regime-dependent.**
+- For **explicit** reasoning, completeness helps: filling in unstated premises steadily improves formal
+  logical-argument verification (Enthymeme, 0.53→0.73).
+- For **latent** (no-scratchpad) reasoning, the lever is format-match and exposure, not completeness: what installs
+  composition is matching the no-scratchpad inference distribution and exposing the composition itself, not how
+  completely the text spells the steps out (Exposure). Making the bridge explicit does not, by itself, teach the model
+  to use it silently.
+- *Faithfulness* gives a precise, borrowable definition of completeness — a chain is complete if it "screens off" the
+  question from the answer (you can't reach the answer except through the chain) — plus the warning that a chain can
+  *look* complete while the model ignores it. So **surface completeness isn't enough; the chain must be one the model
+  actually uses** ("necessity").
 
-**(7) The perplexity-gap — corrected by a code-level deep-dive (2026-07-23).** I earlier wrote "our single-model
-perplexity failed; re-run as a two-model weak-vs-strong gap." That is **wrong on both counts:**
-- Our *original* reverse-filter already used a two-model gap (1.4B-high AND Qwen-low) and it found *knowledge, not
-  reasoning*. PreSelect's appendix runs exactly this "big-vs-small perplexity difference" (they call it **ScalingFilter**)
-  as a controlled baseline: **+0.4 over random, selects short/easy junk, uncorrelated (Spearman 0.05)** with the signal
-  that works. The two-model magnitude gap is a documented near-failure — and it *explains* our own result.
-- **AttentionInfluence is NOT a two-model gap.** It is **self-ablation**: one model vs. itself with its top-5%
-  retrieval heads masked to uniform attention. Because both losses come from the *same weights*, everything memorized
-  (frequency, n-grams) cancels in the difference — which is precisely why it isolates reasoning where a cross-model gap
-  does not.
-- The two recipes that actually work: **(A)** self-ablation on our own 1.4B (detect + mask its retrieval heads, score
-  each doc by the loss gap; one model, no tokenizer mismatch, has a same-day go/no-go sanity check), or **(B)**
-  multi-model **rank-match** on a same-family size ladder (Qwen 0.5B→72B; score by whether per-char loss ranks match
-  the models' ability order — the *sign* over many pairs, not one magnitude gap). Exact recipes in the
-  AttentionInfluence and PreSelect entries below.
+**(7) The perplexity-gap — a two-model magnitude gap is a dead end; two other signals work.**
+- **A big-model-minus-small-model loss gap does NOT find reasoning text.** PreSelect runs exactly this
+  ("ScalingFilter") as a controlled baseline: **+0.4 over random, selects short/easy junk, uncorrelated (Spearman
+  0.05)** with the signal that works. Our own reverse-filter's gold criterion (1.4B-high AND Qwen-low) was this same
+  gap and it found *knowledge, not reasoning* — the magnitude gap is maximized by text that's easy once you're big.
+- **Self-ablation works (AttentionInfluence).** One model vs. itself with its top-5% retrieval heads masked to uniform
+  attention. Because both losses come from the *same weights*, everything memorized (frequency, n-grams) **cancels** in
+  the difference — the only thing left is reliance on the reasoning heads. That cancellation is why it isolates
+  reasoning where a two-model gap does not.
+- **Multi-model rank-match works (PreSelect).** Score by whether per-char loss **rank-orders** across a model ladder in
+  the same order as the models' ability — the *sign* over many pairs, not one magnitude gap.
+- The two usable recipes for our reverse-filter: **(A)** self-ablation on our own 1.4B (one model, no tokenizer
+  mismatch, has a same-day go/no-go check), **(B)** multi-model rank-match on the Qwen size ladder (0.5B→72B, same
+  tokenizer). Exact recipes in the AttentionInfluence and PreSelect entries below.
 
 ---
 
-## What this means for our thread (honest read, corrected 2026-07-23)
+## What this means for our thread
 
-1. The naive "rewrite text to spell reasoning out completely → model stops shortcutting" thesis is **not supported and
-   not cleanly refuted.** The one result I earlier cited against it (Exposure) was a confounded eval, so it counts as
-   evidence *neither* way.
-2. **Reasoning-in-pretraining is worth it** — it persists and compounds (Front-Loading), and explicit reasoning
-   reliably helps *at answer-time* (chain-of-thought; SOCRATES ~8%→~93%). Whether that benefit can be baked into
-   *training text* is the open question.
-3. The real design fork is about **inference format**, not completeness-per-se: do we want the model to reason
-   **latently** (no scratchpad — then Exposure says match the inference distribution *and* get the entities exposed
-   compositionally) or **with a scratchpad** (chain-of-thought — untested by Exposure)? Faithfulness's "necessity"
-   (does the model actually *use* the chain?) is the metric that cuts across both.
-4. **On data-selection:** a two-model perplexity gap does NOT find reasoning-rich text (our result + PreSelect's
-   ScalingFilter). The candidates worth testing are self-ablation on our own 1.4B (one model) or multi-model
-   rank-match on a same-family ladder.
+1. **Reasoning-in-pretraining is worth it** — it persists and compounds through fine-tuning and RL (Front-Loading), and
+   explicit reasoning reliably helps *at answer-time* (chain-of-thought; SOCRATES ~8%→~93%). Whether that benefit can be
+   baked into *training text* is the open question.
+2. **The design fork is inference format, not completeness-per-se.** For **latent** (no-scratchpad) reasoning, the
+   levers are matching the no-scratchpad inference distribution and exposing the composition itself (Exposure). For
+   **externalized** (scratchpad) reasoning, completeness helps (Enthymeme) — and Exposure says nothing against it.
+   Faithfulness's *necessity* (does the model actually *use* the chain?) is the metric that cuts across both.
+3. **Composition is exposure-bound.** A corpus can contain every fact yet fail to teach the operations over them; data
+   coverage must be defined over *operations/paths*, not just facts.
+4. **For finding reasoning-rich text:** a two-model perplexity gap is ruled out (ScalingFilter + our own result). The
+   two candidates to test are self-ablation on our own 1.4B (one model) or multi-model rank-match on the Qwen ladder.
 
 ---
 
@@ -453,33 +436,44 @@ The decisive internal check (Table 6): masking the top-5% retrieval heads **coll
 0.32→0.04, while masking *random* heads barely moves them — so the ablation really is hitting reasoning machinery.
 Caveats: within-domain-comparable only; also lifts pure-knowledge benchmarks.
 
-**Why it matters here (corrected).** I earlier called this a "weak-vs-strong-*model* gap — the shape our reverse-filter
-should have been." **Wrong.** The whole reason it works is that `L_masked` and `L_base` come from the *same weights*, so
-everything the model memorized (frequency, n-grams) appears in **both** terms and **cancels** in the difference — the
-only thing left is reliance on the reasoning heads. A two-*different*-model gap (our 1.4B-vs-72B) does the opposite:
-nothing cancels, and the gap is dominated by what the 72B memorized differently = frequency/knowledge again. So this is
-the **self-ablation** recipe **(A)** for our reverse-filter: run it on our *own* 1.4B (detect + mask its retrieval
-heads, score by the gap). Cheap same-day go/no-go: replicate the Table-6 check on our 1.4B — if masking its retrieval
-heads collapses GSM8K/BBH while random-head masking doesn't, the method transfers; if not, our 1.4B lacks strong
-retrieval heads and we pivot to PreSelect's rank-match instead.
+**Why it matters here.** This is recipe **(A)** for our reverse-filter, and the reason it works is the cancellation:
+`L_masked` and `L_base` come from the *same weights*, so everything the model memorized (frequency, n-grams) appears in
+**both** terms and cancels in the difference — the only thing left is reliance on the reasoning heads. A two-*different*-
+model gap (1.4B-vs-72B) does the opposite: nothing cancels, and the gap is dominated by what the 72B memorized
+differently = frequency/knowledge again. To run it on our own 1.4B: detect + mask its retrieval heads, score each doc
+by the gap. Same-day go/no-go: replicate the Table-6 check — if masking our 1.4B's retrieval heads collapses GSM8K/BBH
+while random-head masking doesn't, the method transfers; if not, our 1.4B lacks strong retrieval heads and rank-match
+(recipe B) is the fallback.
 
 ### 📖 Predictive Data Selection: "The Data That Predicts Is the Data That Teaches" (PreSelect)
 Kashun Shum … Junxian He (both HKUST) · ICML 2025 · **20 citations** · `2503.00808`
 
-**What it is.** Another "which documents are worth training on?" method, built on a neat idea: a document is valuable
-if *stronger models compress it better than weaker models, in exactly the order of the models' overall ability.*
+**What it is.** A "which documents are worth training on?" method built on a sharp idea: a document is valuable if the
+*ranking* of several models' compression of it (per-char loss) matches the models' known *ability* ranking. Call that
+the document's **predictive strength**.
 
-**What they did.** Take a ladder of models of known ability (Llama-1-7B up to Llama-1-65B). For each document, check
-whether their perplexities line up with their ability ranking. Documents where the ranking matches perfectly get a
-high "predictive strength" score. Then train a cheap classifier to imitate that score and run it over the whole
-corpus.
+**Why it works (the mechanism — this answers "why are perplexity and capability correlated on some docs?").** Model
+capability *is*, largely, "ability to predict structured text" — a model scores higher on benchmarks because it
+captured more of the structure in its training data. So on a document whose predictability *depends* on that structure,
+better models genuinely compress better, monotonically with ability. On surface-predictable text (frequency/n-grams)
+every model does about equally well; on noise every model does equally badly — neither *rank-separates* the ladder. So
+"does the whole ladder rank-order this doc's loss by ability?" is a filter for text whose difficulty is
+*capability-shaped* — the text that capability is made of. Hence "the data that predicts is the data that teaches."
+This is also why it beats the magnitude gap: a big-minus-small gap is maximized by text that's *easy once you're big*
+(short/frequent), whereas rank-match requires the *entire* ladder to line up — a cleaner, nearly-orthogonal signal
+(they measured Spearman 0.05 between the two).
+
+**What they did.** Take a ladder of same-family models of known ability (six Llamas, 7B→65B). For each document, check
+whether their per-char losses rank-order in the same order as the models' benchmark ability. Documents where the
+ranking matches perfectly get top predictive strength. Train a cheap fastText classifier to imitate that score and run
+it over the whole corpus.
 
 **What they found.** Very effective: models trained on 30B PreSelect-chosen tokens beat models trained on **300B**
 random tokens (a 10× efficiency win), and it beats other selection methods. Caveat: the signal targets *general*
 downstream ability (knowledge, code, comprehension), **not reasoning specifically** — the word "reasoning" barely
 appears.
 
-**Why it matters here (deep-dive-verified 2026-07-23).** This is recipe **(B)** for our reverse-filter — and crucially,
+**Why it matters here.** This is recipe **(B)** for our reverse-filter — and crucially,
 it is **not a two-model magnitude gap.** It scores by whether *many* models' per-char losses **rank-match** the models'
 ability order (the *sign* over C(6,2)=15 pairs), which is a *different and nearly orthogonal signal* from "how much
 better is the big model than the small one." Their appendix runs our exact 1.4B-vs-72B idea as a controlled baseline
@@ -533,10 +527,6 @@ we design our own signal.
 ### 📖 Multi-Hop Knowledge Composition is Bound by Pretraining Exposure
 Yannis Karmim (Inria, Paris & Chile) … Valentin Barrière (Universidad de Chile) · 2026 preprint · **0 citations** (too new) · `2606.09338`
 
-**⚠️ Corrected 2026-07-23 — I first mis-read this as "completeness/explicit reasoning doesn't help." It is NOT that;
-the eval is unfair to the explicit condition (no scratchpad). Corrected reading below** (Dongwei read the paper and
-flagged the error; the key correction is merged into this entry).
-
 **What it is.** A controlled study of whether a model that has *memorized two facts separately* can chain them in one
 forward pass to answer a question whose answer isn't stored (e.g. knows "Marcus's friend is Delia" and "Delia was born
 in Ashford," but is asked "where was Marcus's friend born?"). The clean question it isolates — separate from "does the
@@ -555,9 +545,9 @@ vs. omit it). Then LoRA/full fine-tune on QA and evaluate transfer.
   formats and *all* model scales. A conditional analysis (only cases where the model answers both single hops
   correctly) confirms `P_held` still can't compose — so it's **not** missing knowledge; the composition operation was
   never installed for entities absent from compositional contexts. This is the paper's real contribution.
-- **The explicit-vs-implicit result — and why it is NOT "completeness doesn't help."** Explicit augmentation (bridge
-  entity named) gave **0.08** (= baseline); implicit (bridge omitted) gave **0.62** NL / **0.79** RDF. *But the
-  evaluation is unfair to the explicit condition:* explicit training teaches `P(Ashford | …Delia Crane was born in)` —
+- **The explicit-vs-implicit result.** Explicit augmentation (bridge entity named) gave **0.08** (= baseline); implicit
+  (bridge omitted) gave **0.62** NL / **0.79** RDF. *But the evaluation is unfair to the explicit condition:* explicit
+  training teaches `P(Ashford | …Delia Crane was born in)` —
   it relies on the bridge token *being in the prefix* — while the test forbids any scratchpad and never puts the
   bridge in context. So this measures **train/test-format alignment**, not "explicit is worse at reasoning." The paper
   never runs the fair test (let the explicit model emit the bridge first, then score the answer); the 2×2
@@ -565,10 +555,10 @@ vs. omit it). Then LoRA/full fine-tune on QA and evaluate transfer.
   bridge but composes 8%, implicit never emits it but composes 79%" shows only that *latent* one-pass composition
   isn't taught by explicit traces — it says nothing about explicit-with-scratchpad.
 
-**Why it matters here (corrected).** The defensible claim is **narrow**: explicit compositional text does *not
-auto-compile into a latent (no-scratchpad) direct-answer computation*, and composition is **exposure-bound** (you must
-expose the composition itself, atomic facts don't suffice). It is **not** evidence that completeness/explicit reasoning
-is useless — that would require the scratchpad column they never ran. For our thread the real takeaways are: (1) if we
+**Why it matters here.** The claim is **narrow**: explicit compositional text does *not auto-compile into a latent
+(no-scratchpad) direct-answer computation*, and composition is **exposure-bound** (you must expose the composition
+itself, atomic facts don't suffice). This is not evidence that explicit/complete reasoning is useless — that would
+require the scratchpad column they never ran. For our thread the real takeaways are: (1) if we
 want *latent* reasoning, the training format must match the no-scratchpad inference distribution, and the *entities/
 operations* (not just facts) must be exposed; (2) if we want *externalized* (chain-of-thought) reasoning, this paper
 says nothing against it. Heavy caveats: fully synthetic, two relation types, GPT-2 scale, silent-reasoning-only.
@@ -648,9 +638,9 @@ are explicit it finds "high-quality" tokens, not specifically "reasoning" tokens
    no-scratchpad inference distribution *and* expose the composition/operation, not just facts) or externalized
    chain-of-thought (which Exposure does not test at all)? This determines what "augmenting text with reasoning" even
    means, and it is a question about inference format, not about how completely the text is written.
-2. **Does augmenting pretraining text with reasoning actually help?** Still open — the paper I earlier cited against it
-   (Exposure) was a confounded eval, and the papers that *do* augment (TPT/BoLT) don't vary completeness. No clean
-   evidence either way yet.
+2. **Does augmenting pretraining text with reasoning actually help?** Still open — Exposure's explicit-vs-implicit
+   result is a train/test-format confound (not evidence either way), and the papers that *do* augment (TPT/BoLT) don't
+   vary completeness. No clean evidence yet.
 3. **For the data-selection side (reasoning-rich text):** the two candidates that survive the deep-dive are
    self-ablation on our own 1.4B (recipe A) and multi-model rank-match on the Qwen ladder (recipe B); the two-model
    1.4B-vs-72B gap is ruled out (ScalingFilter). Which — if either — actually surfaces *reasoning* (vs general quality)
