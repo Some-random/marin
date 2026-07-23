@@ -51,6 +51,28 @@ completeness-augmentation of text tractable AND useful for transfer.
   via `git mv` — per Dongwei it's "one of the most important things for this project," so it's now a top-level thread
   artifact rather than a buried write-up. Updated the log's layout line, the historical path references in the
   July-14/July-21 entries, and the doc's internal ref to `docs/PERSISTENCE_AND_USEFUL_REASONING.md`.
+- **Tier-3 code-level deep-dive of AttentionInfluence + PreSelect** (workflow `wf_1163664e-5a9`, read the actual repos/
+  code + appendices). It OVERTURNED two of my earlier claims: (1) **AttentionInfluence is self-ablation, NOT a
+  two-different-model gap** — one model vs. itself with top-5% retrieval heads masked to uniform attention; memorization
+  cancels because both losses share weights (that's *why* it isolates reasoning). (2) **The 1.4B-vs-72B two-model
+  magnitude gap I'd proposed is a documented near-failure** — PreSelect runs exactly it ("ScalingFilter"): +0.4 over
+  random, selects short/easy junk, Spearman 0.05 vs the rank-match that works — which also *explains* our own original
+  reverse-filter finding "knowledge not reasoning." PreSelect's working signal is a **multi-model rank-match** (sign
+  over many pairs), not a magnitude gap. Two surviving recipes: **(A)** self-ablation on our own 1.4B (with a same-day
+  Table-6-style go/no-go: does masking its retrieval heads collapse GSM8K/BBH?), **(B)** multi-model rank-match on the
+  Qwen size ladder (0.5B→72B, same tokenizer).
+- **CORRECTED the Exposure paper reading** (Dongwei read `2606.09338` and caught my error; his `correction.txt` merged
+  into the doc then deleted). My "explicit/complete reasoning doesn't help (0.08 vs implicit 0.79)" was a **misread**:
+  the eval forces a single forward pass with **no scratchpad**, so it's unfair to the explicit condition (explicit
+  training relies on the bridge token being in the prefix, which the test deletes). Defensible narrow claim: explicit
+  traces don't auto-compile into *latent* one-pass computation — says nothing about explicit + scratchpad (a **missing
+  experiment**). What robustly holds is **exposure-boundedness** (compose only for compositionally-exposed entities).
+- **Rewrote the affected `REASONING_CONTENT_LIT.md` sections** (TL;DR 🔴🟡🟢, H2.6/H2.7, Exposure + AttentionInfluence +
+  PreSelect entries, "what this means," open questions) to correct these AND to **dial back over-confident cross-paper
+  synthesis** — my synthesis was wrong three times this pass (Exposure, AttentionInfluence-as-gap, reverse-filter fix),
+  so the doc is now hedged: H2 is "genuinely open," not "our thesis is contradicted."
+- **Process lesson (Dongwei, repeated):** stop rushing to next-steps before fully reading; read the full paper/code
+  first. The Exposure and AttentionInfluence errors both came from concluding off abstracts/framing.
 
 ## 2026-07-22
 - **Enriched `REASONING_CONTENT_LIT.md` with paper metadata** (commit `e7662784f`): filled every author byline —
