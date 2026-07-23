@@ -47,6 +47,17 @@ completeness-augmentation of text tractable AND useful for transfer.
 ---
 
 ## 2026-07-23
+- **Wide zero-seed discovery sweep, rounds 1+2 → `docs/DISCOVERY_POOL_2026-07-23.md` (533 unique candidates, 126
+  must-read).** Round 1 (`wf_438a8a3c-3b1`): 12 concept angles × 4–6 hand-seeded queries, 12 searchers → 300 raw →
+  246 deduped, triaged in-workflow (67 must-read; correctly re-recognized 23 already-covered papers). Round 2 recall
+  pass (`wf_66465130-feb`), added after Dongwei asked whether the concepts had been rewritten for recall: dedicated
+  per-angle concept-expansion agents (12–15 new queries each — cross-community synonyms, sub-concepts, method-name
+  families, benchmark vocabulary, adjacent-field phrasings) + 2 searchers per angle → 490 raw → **287 new titles the
+  seed queries had missed** (~2.2× pool growth); increment triaged by `wf_6e18afd1-6ab` (59 more must-reads).
+  Combined must-read spread: H1.3 26 / H1.1 25 / H2.5 25 / H2.4 14 / H2.6 12 / H2.7 12 / H1.2 12. Gotcha logged:
+  Workflow `args` can arrive as a JSON-encoded *string* — first triage launch no-oped (0 agents, 28ms) because
+  `args.path` was undefined; fix is `typeof args === "string" ? JSON.parse(args) : args` + fail-fast guard. Next:
+  pick the adversarial full-read batch from the shortlist (awaiting Dongwei's scope call).
 - **Adversarial full re-read of ALL 24 papers in `REASONING_CONTENT_LIT.md`** (workflow `wf_13d49562-ffa`, 24 agents,
   24/24 full-text fetches, ~10.5 min) — every reader now REQUIRED to critique the paper's own eval methodology (the
   check that caught the Exposure misread), plus first full reads for the 8 papers that only had thin entries (TPT,
