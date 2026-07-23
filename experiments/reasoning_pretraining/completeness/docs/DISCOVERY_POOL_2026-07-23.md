@@ -982,3 +982,29 @@ Must-read by bucket: H1.1 25, H1.2 12, H1.3 26, H2.4 14, H2.5 25, H2.6 12, H2.7 
 - **How Can We Synthesize High-Quality Pretraining Data? A Systematic Study of Prompt Design, Generator Model, and Source Data** ((see arXiv 2604.13977), 2026) — <https://arxiv.org/abs/2604.13977>
 - **The Pragmatic Persona: Discovering LLM Persona through Bridging Inference** (unknown, 2026, arXiv) — <https://arxiv.org/html/2604.24079v1>
 - **LoRi: Low-Rank Distillation for Implicit Reasoning** (Ryan Solgi, 2026, arXiv) — <https://arxiv.org/abs/2606.05315>
+
+## Read batch 1 (launched 2026-07-23, workflow `wf_4006ecb6-289`) — 40 papers
+
+Curated from the 126 must-reads: prioritized H2.5/H2.6 (augmentation + completeness, load-bearing for open question
+#2), 2024–2026 pretraining-level evidence, and anything that could change the reverse-filter plan (H2.4/H2.7); the
+strongest H1 items included, pre-LLM background classics deferred. Curation notes: `2603.06114` in the must-reads is
+the already-read Feng & Hunter enthymemes paper (triage error → known); RATIONALYST excluded (Dongwei's own paper);
+4 within-list duplicates collapsed (Two-Hop Curse, Recycling-the-Web, Rewriting-Pre-Training-Data, EntiGraph). The
+~86 must-reads NOT in this batch remain queued above — nothing is dropped.
+
+H2.5 (10): EntiGraph 2409.07431 · ToW 2410.16235 · MIND 2410.12881 · SwallowCode/Math rewriting 2505.02881 ·
+Recycling the Web 2506.04689 · Demystifying Synthetic Data 2510.01631 · Kinetics of Reasoning 2510.25791 ·
+Provably Internalize CoT 2605.28600 · Grokking in the Wild 2504.20752 · Procedural Knowledge at Scale 2604.01348
+H2.6 (6): Skip Steps 2411.01855 · Inefficient-Reasoning Bias 2507.05362 · Synthetic Logic Corpus 2411.12498 ·
+Zipping the Thought 2605.28008 · Less is More Tokens 2509.05226 · The Model Says Walk 2603.29025
+H2.4 (6): Procedural Knowledge Drives Reasoning 2411.12580 · Influence-Function Attributes 2505.19949 ·
+Essential-Web 2506.14111 · Data-Quality Illusion 2510.00866 · Reasoning Quality Emerges Early 2606.26797 ·
+Beyond Pure Code 2605.19762
+H2.7 (5): ScalingFilter 2408.08310 · Perplexed by Perplexity 2405.20541 · rBridge 2509.21013 ·
+Generalization-vs-Memorization 2407.14985 · Signal in the Steps 2510.03988
+H1.1 (5): Pitfalls of NTP 2403.06963 · Faith and Fate 2305.18654 · Physics of LM 3.2 2309.14402 ·
+Implicit Reasoning through Shortcuts 2503.07604 · Composition Collapse 2605.26789
+H1.2 (4): Two-Hop Curse 2411.16353 · Identity Bridge 2509.24653 · SynthWorlds 2510.24427 ·
+U-Shaped Implicit-Reasoning Scaling 2504.03635
+H1.3 (4): Echo Chamber 2504.07912 · Base Models Know How 2510.07364 · Spurious Correlations Post-Training
+2505.05704 · Pre/Mid-Training × RL Interplay 2512.07783
