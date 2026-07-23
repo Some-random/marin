@@ -47,6 +47,33 @@ completeness-augmentation of text tractable AND useful for transfer.
 ---
 
 ## 2026-07-23
+- **Batch-2 adversarial full-read: top-40 discovery-pool papers → `REASONING_CONTENT_LIT.md` now covers 64 papers**
+  (workflow `wf_4006ecb6-289`; first launch lost 39/40 agents to a transient API-529 outage, resumed 15 min later
+  with the 1 completed read served from cache — resume-from-cache worked as designed). Compact per-paper entries
+  added in a new "Batch 2" section; TL;DR, synthesis, and open questions updated. What moved:
+  1. **Completeness dose-response now exists in fragments and is consistent** — difficulty-conditional (Skip-Steps,
+     Less-is-More), SFT granularity floor + RLVR re-derives skipped steps (Zipping), incrementality-beats-length
+     with padding actively harmful (Inefficient-Reasoning, token- AND data-matched), verbosity monotonically worse
+     (ToW), knowledge-gap dynamics produce the explicitness that helps while zero-gap expert dialogue gains nothing
+     (MIND), computation-order prevents shortcut formation (Implicit-Shortcut) and teacher-forced complete chains
+     can ENTRENCH the cheat via answer leakage (Pitfalls-of-NTP). All synthetic/post-training — the natural-text
+     dose-response (our N1) remains unclaimed, now with concrete design constraints.
+  2. **Distillation-confound story is now two-sided**: MIND's generator swap (8B≈70B) + same-generator rephrase
+     control, Demystify's 70B-WORSE-than-8B generator ablation, GrokWild's incorrect-facts-still-work, and the
+     no-teacher programmatic results (Kinetics, Logic-Corpus) show the structure effect is real without strong
+     teachers — while Swallow (scoring <1pt vs rewriting >14pt with the same model) and REWIRE (rewritten-alone
+     WORSE than raw; gain credited to diversity) show the channel is large where controls are missing.
+  3. **Recipe A no-go folded into the lit doc** (from the experiment session's `docs/RECIPE_A_SELF_ABLATION.md`),
+     alongside the ScalingFilter primary-source read (two-model gap validated only on commonsense, +0.6–1.1% no
+     error bars) and Perplexed-by-Perplexity (high-ppl pruning removes code/papers ~3× — anti-reasoning). H2.7
+     status: recipe B rank-match is the only candidate left standing.
+  4. **New load-bearing H1 items**: U-shape's ~0.008 vs ~2 bits/param (latent multi-hop ~250× less parameter-
+     efficient than storage — first-principles case for externalizing reasoning); Interplay's ≥1%-pretraining-
+     exposure gate on RL transfer + flat pass@128 on covered tasks; Echo Chamber's RL-amplifies-dominant-mode;
+     Composition Collapse independently corroborates Exposure on real models AND finds SFT-on-traces *worsens*
+     composition; Physics-3.2's trained-with-CoT-tested-without-fails (convergent: the chain must be EMITTED).
+  5. Triage error caught during curation: ProcScale (2604.01348) turned out to be inference-time RAG, not
+     pretraining — noted in its entry; useful only for its weak-generator-parity datapoint.
 - **Wide zero-seed discovery sweep, rounds 1+2 → `docs/DISCOVERY_POOL_2026-07-23.md` (533 unique candidates, 126
   must-read).** Round 1 (`wf_438a8a3c-3b1`): 12 concept angles × 4–6 hand-seeded queries, 12 searchers → 300 raw →
   246 deduped, triaged in-workflow (67 must-read; correctly re-recognized 23 already-covered papers). Round 2 recall

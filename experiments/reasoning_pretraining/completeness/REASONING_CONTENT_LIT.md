@@ -1,12 +1,11 @@
 # Reasoning in pretraining: under-reasoning (H1) & finding/exploiting reasoning-rich text (H2)
 
-**Status: FULL READS DONE (2026-07-23).** All 24 in-scope papers read end-to-end (one agent per paper, full
-HTML/PDF, body/table numbers + verbatim quotes + author/venue confirmed), with every reader **required to critique
-the paper's own eval methodology** — is the headline A-vs-B comparison fair? is the baseline token/compute-matched?
-what control is missing? does the metric measure what the authors claim? So every writeup below carries both the
-paper's result **and** the confounds that bound what it can prove. Written to be **read cold** — every paper has a
-plain-English "what it is / what they did / what they found / why it matters" writeup, not just numbers. Provenance
-at the end.
+**Status: 64 PAPERS FULL-READ (2026-07-23).** The 24 core papers (full writeups below) plus a 40-paper batch from
+the wide zero-seed discovery pool (`docs/DISCOVERY_POOL_2026-07-23.md`; compact entries in the Batch-2 section).
+Every reader was **required to critique the paper's own eval methodology** — is the headline A-vs-B comparison
+fair? is the baseline token/compute-matched? is an augmentation gain separable from distilling the generator? what
+control is missing? So every writeup carries both the paper's result **and** the confounds that bound what it can
+prove. Written to be **read cold**. Provenance at the end.
 
 ---
 
@@ -24,31 +23,51 @@ text with reasoning helps) is genuinely open.** Three things to hold onto:
    test removes it. The fair explicit+scratchpad comparison is never run (the paper explicitly rejects the paradigm),
    so the narrow claim is "explicit traces don't auto-compile into *latent* one-pass computation" — nothing more.
 
-2. **🟡 "Completeness helps explicit reasoning" is only suggestively supported; for latent reasoning the lever is
-   format-match, not completeness.** The best evidence for the explicit regime (Enthymeme, 0.53→0.73) is
-   **entailment-class-only accuracy** (recall) with no paired specificity control — more premise steps mechanically
-   loosen the SAT trigger — and the *gold complete human premise barely beats no premise* (0.558 vs 0.530), so part
-   of the gain is verifier plumbing; balanced metrics show a modest, threshold-sensitive gain (best-F1 0.59–0.67).
-   For latent (no-scratchpad) reasoning, what matters is matching the inference distribution and exposing the
-   composition (Exposure). Faithfulness gives the rigorous completeness metric — the chain must "screen off" the
-   prompt from the answer — plus the caveat that a complete-*looking* chain can still be unused, so you also need
-   *necessity* (the model actually uses the chain).
+2. **🟡 Completeness: the dose-response evidence now exists in fragments (batch 2), and it is consistent —
+   completeness pays off through STRUCTURE and DIFFICULTY, not volume.** Across the papers that actually vary chain
+   granularity: (a) completeness is **difficulty-conditional** — skipping steps is harmless or even helpful on easy
+   algorithmic tasks but complete chains are required where genuine multi-step inference happens (Skip-Steps,
+   Less-is-More-Tokens); (b) there is a **training-granularity floor** — SFT cannot decompose reasoning below the
+   granularity of its training traces; only RL re-derives skipped steps (Zipping); (c) **incrementality beats
+   length** — longer, locally-incremental traces beat compressed ones at matched tokens AND matched data, while pure
+   padding/redundancy hurts (Inefficient-Reasoning), trace length is uncorrelated with gain (MIND), and verbose noisy
+   thoughts are monotonically worse than concise ones (ToW); (d) explicitness that helps is produced by
+   **knowledge-gap dynamics** — dialogues between mismatched-knowledge participants force premises explicit, while
+   zero-gap expert dialogue stays surface-level and gains nothing (MIND); (e) **order matters** — computation-order
+   chains prevent the shortcut from forming (Implicit-Shortcut), and teacher-forced complete chains can *entrench* a
+   cheat when intermediate steps leak the answer (Pitfalls-of-NTP). The older explicit-regime evidence (Enthymeme
+   0.53→0.73) remains only suggestive (positive-class-only recall; gold premise barely beats none). For latent
+   (no-scratchpad) reasoning the lever is still format-match/exposure (Exposure), and Faithfulness's *necessity*
+   caveat stands: a complete-looking chain can still be unused.
 
-3. **🟢 A two-model perplexity gap does NOT find reasoning-rich text.** A big-model-minus-small-model loss gap selects
-   short, easy, memorized text (PreSelect's "ScalingFilter" baseline: +0.4 over random, Spearman 0.05 vs the signal
-   that works; and our own 1.4B-vs-72B reverse-filter found knowledge, not reasoning). The two signals that DO work are
-   **self-ablation** (one model vs. itself with reasoning heads masked — memorization cancels because both losses share
-   weights) and **multi-model rank-match** (does per-char loss rank-order across a model ladder match the models'
-   ability order?). Caveat that applies to *every* working signal: each is validated as finding *generally valuable*
-   text (quality, domain, difficulty-shape) — none has a control isolating *reasoning* content specifically.
+3. **🟢 No loss/perplexity-family signal has been shown to find *reasoning* — and our own experiments have now ruled
+   out two of them.** The two-model magnitude gap selects short/easy/memorized text (ScalingFilter — whose primary
+   source, now read, validates it only on commonsense with +0.6–1.1% no-error-bar gains and zero reasoning
+   benchmarks; PreSelect's controlled baseline; our own 1.4B-vs-72B reverse-filter found knowledge). **Self-ablation
+   (recipe A) is now empirically NO-GO on our own models** (2026-07-23, `docs/RECIPE_A_SELF_ABLATION.md`): across 5
+   base models and 6 sources, the retrieval-head gap detects *in-context copy dependence* — config files, parallel
+   translations, reference boilerplate — not reasoning; the random-head control separates as well or better; it
+   misses verbal reasoning for 3 of 4 models; and Qwen 7B→72B *inverts* which reasoning type it flags. Single-model
+   perplexity pruning actively REMOVES reasoning-dense domains (Perplexed-by-Perplexity cuts code and papers ~3×);
+   frequency/co-occurrence signals track knowledge recall, not reasoning (Generalization-vs-Memorization). What
+   remains standing, untested by us: **multi-model rank-match** (PreSelect; cousin Perplexity Correlations — whose
+   own appendix concedes plain mean loss predicts nearly as well), plus two newer self-contained variants worth
+   noting (Quiet-STaR's with-vs-without-thought gap; TEMP's noise-perturbed-vs-clean gap). Every published signal in
+   this family is validated on *general* value, none on reasoning specifically.
 
-**Bottom line:** reasoning-in-pretraining pays off and compounds (Front-Loading — though its "can't catch up later"
-claim rests on a non-token-matched comparison; the baseline is never given a post-training reasoning budget close to
-the ~200B pretraining reasoning tokens); composition is exposure-bound; a two-model perplexity gap doesn't find
-reasoning text. The augmentation papers (TPT, BoLT) show "augmenting works" — but both are
-**strong-teacher-distillation-confounded** and neither varies completeness. Whether augmenting pretraining text with
-reasoning helps *for reasons other than distillation* — and whether that hinges on **latent** (no-scratchpad) vs
-**externalized** (scratchpad) inference — is the open question the thread has to settle empirically.
+**Bottom line:** reasoning-in-pretraining pays off and compounds (Front-Loading, with its token-matching caveat;
+now reinforced by Echo Chamber — RL amplifies whatever mode dominates pretraining — and Interplay — RL cannot
+transfer to contexts below ~1% pretraining exposure, and pass@128 ceilings are set upstream). Composition is
+exposure-bound. On augmentation, the distillation-confound story is now **two-sided**: the flagship results (TPT,
+BoLT, Swallow, REWIRE) remain strong-teacher-confounded — REWIRE's rewritten text *alone* is worse than raw — but
+batch 2 adds real deconfounding evidence that the *structure* effect exists without strong teachers: MIND's
+generator swap (8B ≈ 70B) and same-generator rephrase control, Demystify's generator ablation (70B-written data
+trains WORSE than 8B-written), GrokWild (even factually *incorrect* augmentation works — the lever is the
+inferred-to-atomic ratio), and the programmatic-trace results (Kinetics, Logic-Corpus, Internalize) that have no
+teacher at all. A first-principles argument for externalizing reasoning also landed: latent multi-hop costs ~250×
+more parameters per bit than knowledge storage (U-shape, ~0.008 vs ~2 bits/param). What remains genuinely open:
+whether reasoning-augmentation of *natural, general* web text helps at pretraining scale with a weak generator —
+and the completeness dose-response on natural text, which no one has run.
 
 ---
 
@@ -164,9 +183,14 @@ information (distillation, or pretraining data), which is exactly why the base m
   self-reference ablation shows **~80% of the headline gain (+16.5pp → +3.3pp) comes from the curated reference-model
   data**, i.e. it distills a curated distribution through a token mask, and the authors never claim it finds
   *reasoning* tokens ("closely related to mathematics", "aligned with the desired distribution").
-- The two usable recipes for our reverse-filter: **(A)** self-ablation on our own 1.4B (one model, no tokenizer
-  mismatch, has a same-day go/no-go check), **(B)** multi-model rank-match on the Qwen size ladder (0.5B→72B, same
-  tokenizer). Exact recipes in the AttentionInfluence and PreSelect entries below.
+- Recipe status for our reverse-filter: **(A) self-ablation — NO-GO, empirically ruled out on our own models
+  (2026-07-23).** The go/no-go experiment was run generalized (5 base models, 3 families, 2 scales, 6 sources): the
+  retrieval-head gap ranks copyable boilerplate on top, the random-head control separates reasoning-vs-web as well
+  or better, 3 of 4 models rank verbal reasoning *below* web text, and Qwen 7B→72B inverts per-source (GSM8K AUC
+  0.955→0.051). It measures in-context-copy dependence, not reasoning. Full record: `docs/RECIPE_A_SELF_ABLATION.md`
+  (note: this does not refute AttentionInfluence's *downstream* result — their gain may come from selecting
+  structured/technical data). **(B) multi-model rank-match on the Qwen ladder (0.5B→72B, same tokenizer) — the one
+  candidate still standing, untested.** Exact recipe in the PreSelect entry below.
 
 ---
 
@@ -183,9 +207,12 @@ information (distillation, or pretraining data), which is exactly why the base m
    Faithfulness's *necessity* (does the model actually *use* the chain?) is the metric that cuts across both.
 3. **Composition is exposure-bound.** A corpus can contain every fact yet fail to teach the operations over them; data
    coverage must be defined over *operations/paths*, not just facts.
-4. **For finding reasoning-rich text:** a two-model perplexity gap is ruled out (ScalingFilter + our own result). The
-   two candidates to test are self-ablation on our own 1.4B and multi-model rank-match on the Qwen ladder — noting
-   that no published signal has yet demonstrated it surfaces *reasoning* rather than general quality.
+4. **For finding reasoning-rich text:** a two-model perplexity gap is ruled out (ScalingFilter + our own result),
+   and **self-ablation (recipe A) is now also ruled out by our own multi-model experiments** (it detects copy
+   dependence, is model/scale-dependent, and misses verbal reasoning — `docs/RECIPE_A_SELF_ABLATION.md`). The one
+   surviving candidate is multi-model rank-match on the Qwen ladder (recipe B) — with the warning that no published
+   signal in this family has demonstrated it surfaces *reasoning* rather than general quality, and Perplexity
+   Correlations' own appendix shows plain mean loss carries nearly the same information as its correlation signal.
 
 ---
 
@@ -636,14 +663,16 @@ FineWeb-Edu classifier — the "better than a classifier" claim rests on data-co
 validates the *head selection*, not the *data selection's* reasoning-vs-quality claim, and the
 retrieval-head→reasoning equivalence is inherited from Wu et al., not validated here.
 
-**Why it matters here.** This is recipe **(A)** for our reverse-filter, and the reason it works is the cancellation:
-`L_masked` and `L_base` come from the *same weights*, so everything the model memorized (frequency, n-grams) appears in
-**both** terms and cancels in the difference — the only thing left is reliance on the reasoning heads. A two-*different*-
-model gap (1.4B-vs-72B) does the opposite: nothing cancels, and the gap is dominated by what the 72B memorized
-differently = frequency/knowledge again. To run it on our own 1.4B: detect + mask its retrieval heads, score each doc
-by the gap. Same-day go/no-go: replicate the Table-6 check — if masking our 1.4B's retrieval heads collapses GSM8K/BBH
-while random-head masking mostly doesn't, the method transfers; if not, our 1.4B lacks strong retrieval heads and
-rank-match (recipe B) is the fallback.
+**Why it matters here.** This was recipe **(A)** for our reverse-filter — the cancellation logic (both losses share
+weights, so memorization cancels) made it the most principled candidate. **We ran the generalized go/no-go on
+2026-07-23 and it is a NO-GO** (`docs/RECIPE_A_SELF_ABLATION.md`): across 5 base models and 6 data sources the gap
+detects *in-context copy dependence* — it ranks config files, parallel translations, and reference boilerplate at
+the top of raw DCLM; the random-head control separates reasoning-vs-web as well or better (so the signal isn't even
+retrieval-head-specific); 3 of 4 models rank verbal reasoning *below* web text; and the same family inverts across
+scale (Qwen 7B→72B: GSM8K AUC 0.955→0.051). The mechanistic reason: retrieval heads are *copy* heads — the gap is
+high exactly where next tokens are copyable from context, which is close to the opposite of a forced inferential
+guess. This does not refute the paper's downstream pretraining result (their gain may well come from upweighting
+long/structured/technical docs — see the missing controls above); it rules the gap out as a *reasoning* detector.
 
 ### 📖 Predictive Data Selection: "The Data That Predicts Is the Data That Teaches" (PreSelect)
 Kashun Shum … Junxian He (both HKUST) · ICML 2025 · **20 citations** · `2503.00808`
@@ -1002,34 +1031,321 @@ would have to be engineered in (as PreSelect's A.7.2 steerability suggests).
 
 ---
 
-## Open questions (genuinely open — not prescriptions)
+# Batch 2 — discovery-pool full reads (40 papers, compact entries)
 
-1. **Which inference format is our thread about?** Latent, no-scratchpad reasoning (then Exposure says: match the
-   no-scratchpad inference distribution *and* expose the composition/operation, not just facts) or externalized
-   chain-of-thought (which Exposure does not test at all)? This determines what "augmenting text with reasoning" even
-   means, and it is a question about inference format, not about how completely the text is written.
-2. **Does augmenting pretraining text with reasoning actually help — and why?** Open. Exposure's explicit-vs-implicit
-   result is a train/test-format confound (not evidence either way). TPT and BoLT *do* show big gains, but both are
-   **strong-teacher-distillation-confounded** (TPT's from-scratch thinking is written by Qwen3-8B; BoLT's honest
-   isolated delta is +6 MATH over a teacher-matched WRAP-CoT baseline, and its teacher-free bootstrap is modest and
-   plateaus), both are math-heavy-corpus-only, and **neither varies completeness**. The completeness dose-response
-   experiment (fixed tokens, vary how complete the injected reasoning is) has never been run by anyone.
-3. **For the data-selection side (reasoning-rich text):** the two candidates are self-ablation on our own 1.4B
-   (recipe A) and multi-model rank-match on the Qwen ladder (recipe B); the two-model 1.4B-vs-72B gap is ruled out
-   (ScalingFilter). Which — if either — actually surfaces *reasoning* (vs general quality) on DCLM is untested — and
-   no published signal has cleared that bar either (AttentionInfluence's gain is length/upsampling-confounded;
-   PreSelect/PerpCorr validate on general ability; RHO-1's gain is ~80% its curated reference set). A RHO-1-flavored
-   idea worth holding: train a reference model on *complete-reasoning* text and the excess-loss signal points at
-   completeness.
-4. **Does under-reasoning persist through *our* post-training?** Under-tested for the Won't form specifically;
-   Front-Loading is the closest, but it uses fine-tuning-style reasoning data, not rewritten web text.
+*From the wide zero-seed discovery sweep (`docs/DISCOVERY_POOL_2026-07-23.md`), the 40 highest-priority must-reads,
+each full-read with the same adversarial protocol. Compact format: claim → numbers → fine print. The remaining ~86
+must-reads stay queued in the pool doc.*
+
+## Batch 2 · H2.5 — augmenting pretraining text with reasoning
+
+**📖 MIND: Math Informed syNthetic Dialogues (NVIDIA, `2410.12881`)** — *the best-controlled augmentation result in
+either batch.* Rewrites OpenWebMath chunks into knowledge-gap dialogues (7 styles); continued-pretrain 7B, 64B tokens,
+**token-matched**: GSM8K +13.4 abs, and 33B of dialogue-augmented OWM **beats a 3.6× larger raw corpus**. Three
+controls most augmentation papers lack: same-generator *rephrase* baseline ≈ raw (structure, not passthrough, is the
+active ingredient); generator swap 70B→8B keeps ~all the gain (weakens distillation); and the *zero-knowledge-gap*
+style (TWO PROFESSORS — experts assume shared knowledge, skip premises) gains **nothing** — the cleanest evidence yet
+that *reasoning left implicit doesn't teach*, while forced explicitation does. Fine print: dialogue *length* is
+uncorrelated with gain (completeness ≠ verbosity); their own rubric rewards "new knowledge" injection, never
+quantified; no code transfer (HumanEval flat).
+
+**📖 ToW: Thoughts of Words (`2410.16235`)** — token-level augmentation: GPT-4o writes ≤15-word inter-word rationales
+(with an information bottleneck: generator can't see the gold word), continual pretraining on 6k docs. Reasoning avg
++2.7 to +9.0 across five 7–8B models; GSM8K +22.7 on Llama-3-8B. Fine print: no token-matched plain-GPT-4o control
+(distillation unseparated); models learn to *emit* inline thoughts at eval (a learned scratchpad format, not better
+raw next-token prediction); and the built-in dose-response runs **against verbosity** — raw 67-token thoughts <
+denoised 30 < summarized 14.4 tokens/thought on all six benchmarks. Reusable ideas: the can't-see-the-answer
+bottleneck, and honestly marking *unpredictable* words as unpredictable (drives their hallucination gains).
+
+**📖 Rewriting Pre-Training Data (SwallowCode/Math, `2505.02881`)** — Llama-3.3-70B rewrites Stack-v2 Python
+(style-guide + self-containment passes) and Finemath-4+ (restore missing context, step-by-step): HumanEval +17.0,
+GSM8K +12.4 at matched 50B budget. Fine print: **purest distillation confound in the batch** — no weak-rewriter
+control, and their own model-fixed comparison (LLM *scoring* <1pt vs LLM *rewriting* >14pt) points at
+token-injection as the channel; MBPP dropped ~10pts from style-renaming and was excluded post-hoc.
+
+**📖 Recycling the Web / REWIRE (`2506.04689`)** — rewrites the *discarded* low-quality DCLM pool with 70B-Instruct;
+mix of top-raw + top-rewritten beats raw-only token-matched (+2.5pp CORE at 7B). Fine print, damning for the
+naive reading: **rewritten text alone is WORSE than raw** (1B CORE 0.270 vs 0.289) — the gain only exists in the mix
+and the authors credit *diversity/complementarity* (rank corr 0.179 between raw and rewritten quality), not
+intrinsically better reasoning text; no weak-generator control; rewrites are *shorter* than sources.
+
+**📖 Demystifying Synthetic Data (Meta, `2510.01631`)** — >1000 models, 100M–3B, up to 200B tokens: 1/3
+WRAP-style-rephrased + 2/3 raw CC reaches equal loss with 5–10× fewer tokens; optimal synthetic ratio ~30%
+(textbook-style: often <5%, and pure-textbook *hurts*). The anti-distillation datapoint: **Llama-3-70B-generated
+rephrasings train consistently WORSE than 8B-generated ones.** Fine print: sole metric is perplexity on Pile
+domains — the rephrase prompt targets Wikipedia style and Wikipedia-like domains are in the eval (style-match
+confound); zero downstream reasoning benchmarks, so it is structurally blind to the thing we care about; no
+quality-filtered natural baseline.
+
+**📖 Kinetics of Reasoning (`2510.25791`)** — from-scratch synthetic, **ground-truth templated traces (no teacher —
+no distillation possible)**: trace-supervised training flips OOD failure to success (Composition 0.00→1.00, Sorting
+k=4 0.04→0.83), while answer-only training never gets there. Two sharp caveats: the model *still* finds the answer
+shortcut early and only later aligns to the trace ("transient unfaithfulness" — CoT reshapes the trajectory, doesn't
+delete the shortcut); and on the task that exceeds per-step capacity (Intersection), no trace template rescues it —
+a true Can't. Not token/supervision-matched (CoT condition gets denser supervision).
+
+**📖 Transformers Provably Learn to Internalize CoT (`2605.28600`)** — theory: k-parity is exponentially hard
+sample-wise without CoT, polynomial with it, and the chain can then be *removed on a log-stage curriculum* leaving a
+single-forward-pass solver — a proof-of-concept for the missing "internalization" cell of Exposure's 2×2. Fine
+print: the architecture has gates *prescribed* from the parity tree (the model doesn't discover the structure), and
+the empirical section is one qualitative run — "provably learn to internalize" is doing heavy lifting.
+
+**📖 Grokking in the Wild (`2504.20752`)** — 124M model + data augmentation that raises the inferred-to-atomic fact
+ratio φ above the grokking threshold → 2WikiMultiHopQA comparison OOD 0.59→0.96. The thread-relevant twist: **even
+factually incorrect synthetic facts help** — the lever is corpus *statistics* (ratio), not teacher knowledge or
+rationale quality. Fine print: composition OOD stays at 0.07 (only comparison groks); the "beats GPT-4o" framing is
+a finetune-vs-zero-shot + format confound; grokking-scale training budgets are unrealistic for pretraining.
+
+**📖 EntiGraph / Synthetic Continued Pretraining (`2409.07431`)** — for the *knowledge* regime: entity-graph
+expansion of a 1.3M-token corpus to 600M synthetic tokens; closed-book QuALITY 39.5→56.4, log-linear in synthetic
+tokens, and the CPT'd 8B **beats its own GPT-4-turbo generator** closed-book (56.4 vs 51.3) — hard to explain as
+pure distillation. Fine print: not token-matched vs the rephrase baseline (~330× more tokens); "rearranges
+knowledge," no reasoning-completeness variable; knowledge-internalization, not reasoning.
+
+**📖 Procedural Knowledge at Scale (`2604.01348`)** — *shortlisting error (triage overreach): this is inference-time
+RAG on frozen models, not pretraining.* Still one useful signal: retrieval of decomposed (subquestion → subroutine)
+procedural memory beats generic document RAG, and the datastore-builder swap (QwQ-32B → Qwen3-8B) loses nothing —
+another weak-generator-parity datapoint.
+
+## Batch 2 · H2.6 — how complete must the reasoning be
+
+**📖 Zipping the Thought (`2605.28008`)** — *the purest granularity dose-response so far* (synthetic mod-23
+arithmetic, post-training). Explicit (every step) / Composed (ops named, values elided) / Implicit (ops+values
+skipped): finer granularity learns from less data; compressed variants scale better with diverse data; and the key
+asymmetry — **SFT cannot decompose below its training granularity (a completeness floor), but RLVR can re-derive the
+skipped steps**. Fine print: measured in samples/steps, never tokens (explicit traces are longer — the efficiency
+edge is partly token budget); synthetic-only, post-training-only.
+
+**📖 Can LMs Learn to Skip Steps? (`2411.01855`)** — completeness as step-count, varied by self-training: moderate
+skipping preserves ~99–100% in-domain accuracy and *improves* OOD on three easy algorithmic tasks — but their own
+GSM8K probe shows the opposite: real reasoning "necessitates a complete reasoning chain" and skipped steps
+"frequently contain errors." Fine print: the OOD gain is confounded with iterative self-distillation volume (no
+full-step self-training control). Net: **completeness is difficulty-conditional.**
+
+**📖 Less is More Tokens (`2509.05226`)** — difficulty-aware trace compression (post-training): over-compression
+collapses hard benchmarks (SFT-only AIME 5.0, HMMT 0.0) while easy ones hold — restoring length recovers them. Same
+difficulty-conditional message from the compression side. Fine print: no same-data full-trace control; the 7B
+variant *loses* accuracy on every hard benchmark; a simpler RL length-controller (L1) beats its efficiency claim.
+
+**📖 Inefficient-Reasoning Bias / shortest-path (`2507.05362`)** — 28.5M from-scratch on layered-DAG shortest paths;
+**both token-matched AND data-matched** (rare): longer, locally-incremental DFS-style traces beat compressed DP
+traces (~87% vs ~82%), no-intermediate-step traces collapse at depth — but length-matched *padding* (repeated steps)
+does NOT help and induces repetition loops. The isolable mechanism is systematic local incrementality, not length.
+Also note for H2.7: the valuable traces are the *lower*-perplexity ones here — opposite to loss-gap intuitions.
+
+**📖 Principled Synthetic Logic Corpus / ALT (`2411.12498`)** — program-generated (no teacher) fully-explicit
+multi-step deduction corpus + SFT: +4.1/+4.4 avg over 31 benchmarks at 8B/70B, with real cross-domain transfer
+(MATH +5.2, HumanEval +10.3). Fine print: biggest gains are format-similar logic benchmarks (RobustLR +32); no
+full-proof-vs-answer-only control at matched tokens, so completeness is baked in, not isolated; whole effect
+contingent on an anti-forgetting regularizer.
+
+**📖 The Model Says Walk (`2603.29025`)** — inference-time: models key on surface cues 8.7–38× more than the goal,
+fail to use *unstated* constraints (<75% strict accuracy for all 14 frontier models — the Won't persists through
+current post-training), and a one-word hint recovers +15.3pp (knowledge present). The completeness-relevant cell:
+goal-decomposition prompting (enumerate necessary conditions first) beats generic CoT (+5.0 vs +3.1pp) — chain
+*structure* over raw reasoning tokens. Fine print: nothing token-matched; entirely inference-time.
+
+## Batch 2 · H2.4 — identifying reasoning-rich text
+
+**📖 Procedural Knowledge in Pretraining Drives Reasoning (`2411.12580`)** — influence functions over 5M docs (7B +
+35B Cohere models): for *reasoning* queries, influence is spread over procedurally-similar documents (code, worked
+solutions) and the answer is NOT in the top docs (unlike factual queries, where it is); same-task reasoning queries
+draw on correlated doc sets (p<4e-8). The best observational definition of "reasoning-rich = procedural/worked-out
+text" we have. Fine print: correlational — no ablation/upweighting retrain; 2.5B-token subsample; "procedural"
+labels are model-graded; MLP-only influence approximations.
+
+**📖 Which Data Attributes Stimulate Reasoning (`2505.19949`)** — influence-function attributes + interventions: the
+genuinely useful piece is the *exploration-truncation ablation* (strip verification/backtracking behaviors from SFT
+traces → MATH500 −3.4) — causal evidence that trace *behaviors*, not just answers, carry value. Fine print: the
+headline difficulty-flip swaps in a different source corpus (not source-matched), tokens unmatched, single-seed on
+30-problem AIME.
+
+**📖 Essential-Web v1.0 (`2506.14111`)** — 24T tokens with per-doc 12-field taxonomy incl. a 5-level
+**reasoning-depth label**, annotated by a 0.5B distilled classifier that *beats its 32B teacher* on agreement
+(κ 0.87) at 50× cheaper — reasoning-richness is a learnable, scalable annotation. Fine print: no ablation isolates
+the reasoning-depth clause (subject alone recalls 96–98% of vetted math/code); on actual math benchmarks the
+taxonomy filter *lags* FineMath (−8%); advertised wins are MMLU-knowledge subsets; and their own appendix shows the
+one LLM-*rewritten* corpus (MegaMath-Web-Pro) tops every filter-only math corpus — an incidental augmentation-beats-
+selection datapoint.
+
+**📖 The Data-Quality Illusion (`2510.00866`)** — mechanism for why classifier filtering misleads: a CQF score is
+provably a density ratio ("distance from web"), inherits the HQ set's task bias, and demonstrably latches onto
+sequence length; training on filtered data can *hurt* loss on the HQ target itself. Compute/token/repetition-matched
+comparisons (good). Directly explains FineWeb-Edu-style circularity and warns our own gate designs.
+
+**📖 Reasoning Quality Emerges Early / TEMP (`2606.26797`)** — cheap difficulty signal: loss on the first ~100
+tokens at a *noise-perturbed* checkpoint correlates r~0.9 with judged difficulty (beats length-proxy r~0.75); +1.1–1.7%
+selecting 1k SFT examples. For H2.7: their brittleness signal is a **noise-weakened-vs-clean same-model loss gap** —
+another self-contained weak-vs-strong variant. Fine print: pool is all-reasoning traces (no reasoning-vs-non-reasoning
+control); small margins, mixed per-benchmark.
+
+**📖 Beyond Pure Code (`2605.19762`)** — for our code-ladder: at a *fixed math token budget*, swapping ordinary math
+for **cognitive-scaffold-structured math** (explicit subgoals/derivations, selected by classifier — no generator, no
+distillation) gains Olympiad +47.8%, College Math +30.1%, while GSM8K *regresses* −6.3 (task-dependent optimum
+again). Fine print: the "code hurts math" headline arm is confounded (removing code proportionally upsamples math);
+the scaffold classifier tracks "external organization," i.e. structure/formatting, not verified reasoning.
+
+## Batch 2 · H2.7 — loss/perplexity-family signals
+
+**📖 ScalingFilter (`2408.08310`)** — the primary source of the two-model magnitude gap, now read directly: 124M-vs-
+774M GPT-2 perplexity ratio as "quality." Its own validation: +1.12% avg over perplexity-gating and +0.62% over a
+binary classifier on 7 *commonsense* tasks, 1.3B/25B — no error bars, no seeds, no reasoning or knowledge-intensive
+benchmark anywhere. The signal was never even claimed to find reasoning; treat "two-model gap" as validated only for
+filtering simple/repetitive text on raw pools.
+
+**📖 Perplexed by Perplexity (`2405.20541`)** — single small-reference perplexity pruning works for general
+downstream (+2.0 avg at 3B on the Pile, compute-matched vs full pool) — but the winning criterion (keep
+high-perplexity) **removes code and scientific papers ~3×**, i.e. it actively de-selects reasoning-dense domains;
+the optimal direction flips per corpus; no random-50% control. Anti-reasoning as a selector.
+
+**📖 rBridge (`2509.21013`)** — small-proxy NLL evaluated **on frontier reasoning traces** predicts large-model
+reasoning accuracy (R² 0.87 at 1B→13B vs 0.49 for standard NLL; 80.8% decision accuracy at ≥100× FLOPs savings).
+Fine print: their own ablation shows ~all the gain is the *trace target* (a distilled notion of good reasoning), not
+the weighting machinery; dataset-level not document-level; untested within a pre-filtered pool. The transferable
+lesson: *what you evaluate the loss ON matters more than which models you difference.*
+
+**📖 Generalization vs Memorization (`2407.14985`)** — corpus-frequency signals (task-gram co-occurrence over the
+Pile/Dolma): strong for TriviaQA-style recall (and rising with scale), absent for GSM8K — reasoning performance is
+not explained by task-relevant n-gram frequency. Fine print: partly a measurement floor (reasoning outputs are
+un-memorizable-as-n-grams by construction), so read as "frequency signals find knowledge, not reasoning," not as
+proof reasoning has no memorized substrate.
+
+**📖 The Signal is in the Steps (`2510.03988`)** — for selecting distillation traces, *global* sequence perplexity
+fails at long context; a *local* windowed self-perplexity (is each step justified by its immediate premises?) picks
+better traces (+9.4pp avg over global on 32B). Fine print: local-pick is length/teacher-confounded (79% of picks
+come from the two longest-CoT teachers; near-tie with just using the best single teacher). Directionally consistent
+with our thread: the reasoning signal lives in step-to-step transitions, not whole-sequence fluency.
+
+## Batch 2 · H1 — shortcuts, latent composition, persistence
+
+**📖 The Pitfalls of Next-Token Prediction (`2403.06963`)** — path-star: teacher-forced training collapses to chance
+(~1/d) because the *complete* target path lets the model cheat (later steps are trivial lookups), starving the
+pivotal first-token decision of supervision — a Won't that hardens into a Can't. The thread-critical caveat: a
+teacher-forced complete chain can *entrench* the shortcut whenever intermediate steps leak the answer — augmented
+reasoning must be left-to-right-derivable (each step inferable from prior context). They test ordering and masking
+but never the add-explicit-derivation-first condition — our exact lever remains untested. Synthetic-only.
+
+**📖 Faith and Fate (`2305.18654`)** — compositional tasks as computation graphs: models succeed by "linearized
+subgraph matching" (82.3% of correct answers contain computation *errors* — right answer, wrong process); GPT-3
+finetuned on **maximally complete scratchpads** reaches near-perfect in-distribution but still collapses on
+deeper/wider graphs. Fine print: scratchpad-vs-answer arms not compute-matched; OOD = complexity never seen in
+training, so this bounds *extrapolation*, not whether complete reasoning helps in-distribution (it does, strongly).
+
+**📖 Physics of LM 3.2: Knowledge Manipulation (`2309.14402`)** — bioS-controlled: knowledge retrieval ~97% but even
+trivial manipulation (birth-month parity) is near-random *without a test-time scratchpad*, needs ~10k samples for
+75% even fully supervised — and the killer control: **trained WITH CoT, tested without → still fails.** Convergent
+with Exposure and CompCollapse: explicit reasoning in training text does not auto-compile into latent computation;
+the deployed model must *emit* the chain. No distillation confound (fully synthetic).
+
+**📖 Implicit Reasoning through Shortcuts (`2503.07604`)** — from-scratch GPT-2 on multi-step arithmetic: trained on
+*fixed computation-order* chains → genuine, OOD-robust implicit reasoning (100%/99%/90%); trained on unfixed-order
+data → number-chaining shortcut that collapses under variable-as-subtrahend (0.92→0.03). SoTA LLMs shortcut on the
+same probe (GPT-4o ~100%→~30%). The demonstrated lever is chain ORDER/coherence — data structured so the shortcut
+is unavailable. Fine print: the LLM probe forbids CoT and filters to no-CoT outputs (unquantified selection); the
+reorder-as-intervention experiment is never run.
+
+**📖 Composition Collapse (`2605.26789`)** — independent corroboration of Exposure's theme on *real* models with a
+double-gate protocol (score composition only where atomic facts pass): failure rises to 100% by depth 8 in
+single-pass mode, CoT recovers 70–75%, activation patching null → assembly bottleneck, not lookup. Two sharp
+post-training data points: **SFT on reasoning traces *worsened* composition** (76.9% vs 69.8% baseline) while
+outcome-RL (GRPO) helped but only on trained depths (OOD/ID 0.21). Fine print: the 47pp cross-recipe gap compares
+different base models (correlational); residual-failure numbers are no-scratchpad-scored.
+
+**📖 Two-Hop Curse / Lessons (`2411.16353`)** — fully-synthetic facts learned in *separate* documents: two-hop
+no-CoT = chance with loss at the random baseline (no latent path exists — not a hidden-but-unused skill), while CoT
+works; **same-document co-occurrence produces non-zero latent composition** — the failure is partly a data-
+*arrangement* artifact. Fine print: the semi-synthetic ≈20% "success" bundles storage-depth/co-occurrence confounds
+(their own lesson); no controlled scale sweep.
+
+**📖 Identity Bridge (`2509.24653`)** — theory + toy: standard training provably settles into a shared-memory
+shortcut (Thm 2: OOD two-hop margin <0 — unrecoverable) and a small *data-side* fix (identity two-hops "who is X's
+[null-relation]") provably restores OOD composition. Fine print they under-advertise: on real pretrained LLMs the
+improvement is "not significant" — cite as mechanism, not as a working intervention; no comparison against explicit
+bridge-token supervision.
+
+**📖 SynthWorlds (`2510.24427`)** — parallel real/synthetic worlds with identical reasoning structure: in the
+knowledge-equalized reading-comprehension cell models reason *as well or better* on synthetic (KA ≤ 0) — the
+"reasoning gap" in other cells is knowledge acquisition + retriever familiarity, not reasoning. But in navigation,
+models inject memorized off-page entities in 35–48% of steps even when the correct page is in front of them — the
+recall shortcut is *chosen* even when the reasoning path is fully available. A reusable can't-vs-won't instrument
+(they suggest a code variant: rename numpy/pandas).
+
+**📖 U-shaped implicit-reasoning scaling (`2504.03635`)** — from-scratch KG study: implicit multi-hop capacity is
+**~0.008 bits/param vs ~2 bits/param for knowledge storage (~250×)**, optimal model size is a U (bigger memorizes
+composables instead of reasoning), R²=0.85 scaling fit. The cleanest first-principles argument for externalizing
+reasoning into tokens rather than expecting latent composition. Fine print: fixed-step (not convergence-matched)
+training, weight_decay=0 with no regularization sweep, no 1-hop-conditioned scoring — cite as motivation, not law.
+
+**📖 Echo Chamber (`2504.07912`)** — from-scratch 150M/1B + RL: RL collapses onto whichever solution format
+*dominated pretraining* (regardless of whether it's the better one), pass@1 up while pass@64 *declines* — RL as
+amplifier of pretraining modes, not creator. Direct persistence implication: if the dominant pretraining mode is a
+shortcut, RL will amplify the shortcut. Fine print: the more-TinyGSM→more-gain curve is not token-matched;
+format-vs-reasoning not fully separated.
+
+**📖 Base Models Know How, Thinking Models Learn When (`2510.07364`)** — steering-vector elicitation of
+reasoning behaviors from base models; headline 91% gap-recovery is the single best cell (spread 0–91%), and their
+own ablation shows random-direction steering recovers most of the lift (specific direction adds ~7pts of ~21) —
+the "base already knows how" claim is soft. Useful as a caution against strong elicitation claims, ours included.
+
+**📖 Spurious Correlations in Post-Training (`2505.05704`)** — SFT vs DPO/KTO under injected shortcuts: orderings
+flip by task; 90% contamination sometimes *helps*. Fine print that limits its use for us: no base-model or clean-data
+control, so it cannot adjudicate whether pretraining-installed shortcuts persist — it measures uptake of freshly
+planted artifacts only.
+
+**📖 Pre/Mid-Training × RL Interplay (`2512.07783`)** — 100M from-scratch on synthetic DAG math, the elicit-vs-add
+distinction done right (pass@1 vs pass@128): RL on covered tasks lifts pass@1 with **zero pass@128 gain**; RL cannot
+transfer to a context below ~1% pretraining exposure (≥1% → +60% pass@128); at fixed compute, mid-training on gold
+traces + RL beats RL-alone by +10.8% on OOD-hard. Fine print: the mid-training arm gets gold traces (information,
+not just compute, is unmatched); ID saturation is by construction; synthetic-only. The ≥1%-exposure gate is the
+sharpest quantitative version of "pretraining content bounds post-training" in either batch.
 
 ---
 
-*Provenance: papers discovered by a zero-seed neutral search (workflow `wf_869397f2-d8b`). Full reads: workflow
-`wf_13d49562-ffa` (2026-07-23) — 24 agents, one per paper, HTML/PDF full text, schema-validated extraction (method /
-body numbers / verbatim quotes / can't-vs-won't / completeness / limitations / verdict / mandatory eval-fairness
-critique); per-paper records in that session's `subagents/workflows/wf_13d49562-ffa/journal.jsonl`. An earlier
-full-read pass (`wf_e16faf72-dc2`, 2026-07-21) covered 16 of the 24. Tier-3 code deep-dive of AttentionInfluence +
-PreSelect against their repos: `wf_1163664e-5a9` (2026-07-23). The earlier abstract-only map and the knowledge-framing
-doc `docs/PERSISTENCE_AND_USEFUL_REASONING.md` are superseded by this document.*
+## Open questions (genuinely open — not prescriptions)
+
+1. **Which inference format is our thread about?** Sharper after batch 2: three independent setups converge on
+   "reasoning in training text pays off at inference only if the model *emits* the chain" (Physics-3.2's
+   trained-with-CoT-tested-without still fails; Exposure; Composition Collapse's 70–75% CoT-recovery), and
+   internalization into latent computation seems to need either compositional *exposure* (Exposure) or a staged
+   removal *curriculum* (Internalize — theory only). Targeting latent reasoning also fights a ~250×-per-bit capacity
+   penalty (U-shape); targeting externalized reasoning means the augmentation must teach chains the deployed model
+   will actually produce.
+2. **Does augmenting pretraining text with reasoning help — beyond distillation?** Partly de-confounded by batch 2:
+   the structure effect is real without strong teachers in math/synthetic regimes (MIND's generator swap 8B≈70B plus
+   same-generator rephrase control; Demystify's 70B-written-data-trains-WORSE-than-8B; GrokWild's
+   incorrect-facts-still-work; the programmatic-trace results Kinetics/Logic-Corpus/Internalize), but where controls
+   are missing the distillation channel is large (Swallow's own scoring-vs-rewriting comparison; REWIRE's
+   rewritten-alone-worse-than-raw). **Unproven: natural, general (non-math) web text at pretraining scale with a
+   weak generator.** The completeness dose-response now exists in fragments (Zipping's granularity ladder,
+   Skip-Steps' difficulty-dependence, ToW's anti-verbosity, MIND's knowledge-gap lever, Inefficient-Reasoning's
+   incrementality-not-length) — all synthetic or post-training. The natural-text version (fixed tokens, vary
+   completeness of injected reasoning) is still unclaimed, and batch 2 supplies its design constraints: vary
+   *granularity* not verbosity; respect difficulty-conditionality; keep chains computation-ordered and
+   left-to-right-derivable (no answer leakage — Pitfalls-of-NTP); expect an SFT-side granularity floor (Zipping).
+3. **For the data-selection side (reasoning-rich text):** recipe A (self-ablation) is **ruled out by our own
+   experiments** (copy-dependence detector, scale-inverting — `docs/RECIPE_A_SELF_ABLATION.md`); the two-model gap
+   was already ruled out (ScalingFilter — primary source now read: validated only on commonsense, never claimed for
+   reasoning). Still standing, untested: **recipe B, multi-model rank-match on the Qwen ladder** — with PerpCorr's
+   warning that plain mean loss predicts nearly as well, and rBridge's lesson that *what text the loss is evaluated
+   on* (frontier reasoning traces) may matter more than the model-differencing scheme. Ideas worth holding: a
+   reference model trained on complete-reasoning text pointing RHO-1's excess-loss at completeness; TEMP's
+   noise-perturbed-vs-clean same-model gap. No published signal in this family has isolated *reasoning* from
+   general quality.
+4. **Does under-reasoning persist through *our* post-training?** Batch 2 sharpens the prior: RL is bounded by
+   pretraining content (Echo Chamber's mode-amplification; Interplay's ≥1%-exposure gate and flat pass@128 on
+   covered tasks), the Won't survives frontier post-training (Model-Says-Walk <75% strict for all 14 models), and
+   Composition Collapse warns that *SFT on reasoning traces can worsen composition* while outcome-RL helps only on
+   trained depths. Still untested on our own ladder with our rewritten-web-text intervention.
+
+---
+
+*Provenance: core 24 papers discovered by a zero-seed neutral search (`wf_869397f2-d8b`) and full-read by
+`wf_13d49562-ffa` (2026-07-23; earlier pass `wf_e16faf72-dc2` covered 16). Batch 2: wide two-round discovery
+(`wf_438a8a3c-3b1` + concept-expansion recall round `wf_66465130-feb`, 533 candidates, triage `wf_6e18afd1-6ab` —
+full pool in `docs/DISCOVERY_POOL_2026-07-23.md`), top-40 full-read by `wf_4006ecb6-289`. All readers: one agent per
+paper, HTML/PDF full text, schema-validated extraction (method / body numbers / verbatim quotes / can't-vs-won't /
+completeness / limitations / verdict / mandatory eval-fairness critique); per-paper records in the session's
+`subagents/workflows/<id>/journal.jsonl`. Tier-3 code deep-dive of AttentionInfluence + PreSelect against their
+repos: `wf_1163664e-5a9` (2026-07-23). Recipe-A empirical no-go: `docs/RECIPE_A_SELF_ABLATION.md` (experiment
+session, 2026-07-23). The earlier abstract-only map and `docs/PERSISTENCE_AND_USEFUL_REASONING.md` are superseded by
+this document.*
