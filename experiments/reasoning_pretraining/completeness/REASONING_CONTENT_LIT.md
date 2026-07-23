@@ -1,10 +1,12 @@
 # Reasoning in pretraining: under-reasoning (H1) & finding/exploiting reasoning-rich text (H2)
 
-**Status: FULL READS DONE (2026-07-21).** 16 in-scope papers read end-to-end (workflow `wf_e16faf72-dc2`, one
-agent per paper, full HTML/PDF, body numbers + verbatim quotes + author/venue confirmed); 4 more (TPT, BoLT,
-RHO-1, Quiet-STaR) read earlier; 2 secondary surveys skipped. This version is written to be **read cold** — every
-paper below has a plain-English "what it is / what they did / what they found / why it matters" writeup, not just
-numbers. Provenance at the end. Supersedes the earlier abstract-only map.
+**Status: ADVERSARIAL FULL RE-READ DONE (2026-07-23).** All 24 papers read end-to-end (workflow `wf_13d49562-ffa`,
+one agent per paper, full HTML/PDF), each reader **required to critique the paper's own eval methodology** (fair
+A-vs-B? token/compute-matched? missing control?) — the check that caught the Exposure misread. This pass (a) added
+full reads for the 8 papers that previously had only thin entries (TPT, BoLT, Quiet-STaR, RHO-1, GSM-Symbolic, Yue,
+ProRL, Perplexity Correlations), and (b) surfaced new confounds in several core papers — each paper's entry now
+carries an **Adversarial re-read** note where one was found. This version is written to be **read cold**. Provenance
+at the end. Supersedes the 2026-07-21 version and the earlier abstract-only map.
 
 ---
 
@@ -22,12 +24,15 @@ text with reasoning helps) is genuinely open.** Three things to hold onto:
    test removes it. So the narrow claim is "explicit traces don't auto-compile into *latent* one-pass computation" —
    the fair explicit+scratchpad comparison was never run.
 
-2. **🟡 Completeness helps explicit reasoning; for latent reasoning the lever is format-match, not completeness.**
-   Filling unstated premises steadily improves formal logical-argument verification (Enthymeme, 0.53→0.73). For latent
-   (no-scratchpad) reasoning, what matters is matching the inference distribution and exposing the composition, not how
-   completely the text is spelled out. Faithfulness gives a rigorous completeness metric — the chain must "screen off"
-   the prompt from the answer — plus the key caveat that a complete-*looking* chain can still be unused, so you also
-   need *necessity* (the model actually uses the chain).
+2. **🟡 The "completeness helps explicit reasoning" evidence is weaker than we thought; for latent reasoning the
+   lever is format-match, not completeness.** The Enthymeme 0.53→0.73 result is **entailment-class-only accuracy**
+   (recall) with no paired specificity control — more premise steps mechanically loosen the SAT trigger — and the
+   *gold complete human premise barely beats no premise* (0.558 vs 0.530), so much of the gain is verifier plumbing;
+   balanced metrics show a modest, threshold-sensitive gain (best-F1 0.59–0.67). So "completeness helps explicit
+   reasoning" is *suggestive, not established*. For latent (no-scratchpad) reasoning, what matters is matching the
+   inference distribution and exposing the composition (Exposure). Faithfulness still gives the rigorous completeness
+   metric — the chain must "screen off" the prompt from the answer — plus the caveat that a complete-*looking* chain
+   can still be unused, so you also need *necessity* (the model actually uses the chain).
 
 3. **🟢 A two-model perplexity gap does NOT find reasoning-rich text.** A big-model-minus-small-model loss gap selects
    short, easy, memorized text (PreSelect's "ScalingFilter" baseline: +0.4 over random, Spearman 0.05 vs the signal
@@ -36,10 +41,13 @@ text with reasoning helps) is genuinely open.** Three things to hold onto:
    weights) and **multi-model rank-match** (does per-char loss rank-order across a model ladder match the models'
    ability order?).
 
-**Bottom line:** reasoning-in-pretraining pays off and compounds (Front-Loading); composition is exposure-bound; a
-two-model perplexity gap doesn't find reasoning text. Whether augmenting pretraining text with reasoning helps — and
-whether that hinges on **latent** (no-scratchpad) vs **externalized** (scratchpad) inference — is the open question
-the thread has to settle empirically.
+**Bottom line:** reasoning-in-pretraining pays off and compounds (Front-Loading — though its "can't catch up later"
+claim rests on a non-token-matched comparison; the baseline was never given a post-training reasoning budget close to
+the 200B pretraining reasoning tokens); composition is exposure-bound; a two-model perplexity gap doesn't find
+reasoning text. The augmentation papers now fully read (TPT, BoLT) show "augmenting works" — but both are
+**strong-teacher-distillation-confounded** and neither varies completeness. Whether augmenting pretraining text with
+reasoning helps *for reasons other than distillation* — and whether that hinges on **latent** (no-scratchpad) vs
+**externalized** (scratchpad) inference — is the open question the thread has to settle empirically.
 
 ---
 
@@ -92,28 +100,42 @@ answer-time (chain-of-thought) reliably rescues it** — one paper shows silent 
 once the model is allowed to write the intermediate step out. Our thread's question is whether we can bake that same
 benefit into the *training text* instead of relying on it at answer-time.
 
-**Persistence (H1's central claim) — the strongest single result.** NVIDIA's *Front-Loading Reasoning* is the
-cleanest evidence that reasoning put into *pretraining* doesn't just survive later training — it **compounds**. A
-model pretrained with reasoning data leads a plain model by ~9% before any fine-tuning, ~9.3% after fine-tuning, and
-**~18.5% after RL** — the gap *widens* at every stage. And you can't cheat your way there with more fine-tuning:
-doubling the fine-tuning data on the plain model still leaves it behind even the *weakest* reasoning-pretrained
-model. Their line: front-loading reasoning "cannot be fully replicated by later-stage SFT, even with more data."
+**Persistence (H1's central claim) — the headline result, now with a real asterisk.** NVIDIA's *Front-Loading
+Reasoning* shows reasoning put into *pretraining* doesn't just survive later training — it **compounds**. A model
+pretrained with reasoning data leads a plain model by ~9% before any fine-tuning, ~9.3% after fine-tuning, and
+**~18.5% after RL** — the gap *widens* at every stage. Their line: front-loading reasoning "cannot be fully
+replicated by later-stage SFT, even with more data." **But the "can't catch up" leg is not token-matched:** the
+reasoning-pretrained models saw ~200B reasoning tokens in pretraining *plus* 1× SFT, while the "catch-up" baseline
+got reasoning only at SFT and merely *doubled* it (far below 200B; the paper never reports the token counts) — so
+"catch-up fails" was near-preordained. Their own Table 6 also shows naive SFT-doubling with mixed-quality data
+*harms* math (−4.9%), so the failed catch-up partly reflects low-quality scaling damage. The compounding direction
+is real; the irreplaceability claim is unproven at matched reasoning-token budgets.
 
 ---
 
 ## H2 — how to find reasoning-rich text, and the completeness question that reshapes the thread
 
-**(4) Identifying reasoning-rich text is a largely solved problem — three working recipes:**
+**(4) Identifying reasoning-rich text — three recipes that work, but none cleanly isolates *reasoning* (adversarial
+re-read 2026-07-23):**
 - *AttentionInfluence* takes a small model, deliberately breaks its "retrieval" attention heads so it gets worse at
-  reasoning, and flags the documents where that breakage hurts the most — those are the reasoning-heavy ones.
+  reasoning, and flags the documents where that breakage hurts the most. Caveats now on record: the downstream gain is
+  modest (+0.75pp average, with commonsense regressions; the abstract's +1.4–3.5pp cherry-picks the reasoning subset),
+  the selected docs are ~2× longer (an un-ablated confound — no matched-upsampling control was run), and its
+  "more reasoning than the edu-classifier" advantage exists only in math/code domains.
 - *AutoDS* just asks a big model two yes/no questions ("is this mathematically intelligent? is it educational?") and
-  keeps the documents it says yes to.
-- *FineWeb-Edu* trains a cheap classifier to imitate a big model's 0–5 "educational value" rating. (Caveat: "educational"
-  is deliberately grade-school-flavored and *down-weights* technical/arXiv content — so it's broader than "reasoning.")
+  keeps the documents it says yes to. Caveats: the 2.4× efficiency headline is one model on one task read off noisy
+  curves with no error bars; on Gemma-2B it inverts; and the scorer is Qwen-72B, so it's a large-model-curates-for-small
+  pipeline, not truly "autonomous."
+- *FineWeb-Edu* trains a cheap classifier to imitate a big model's 0–5 "educational value" rating. Caveats:
+  "educational" is deliberately grade-school-flavored and *down-weights* technical/arXiv content; and the MMLU/ARC
+  gains have a target-eval circularity (school-exam-flavored filter scored on school-exam benchmarks — aggressive
+  filtering *hurts* HellaSwag, so it's domain steering, not a free lunch).
 
-**(6) Completeness — regime-dependent.**
-- For **explicit** reasoning, completeness helps: filling in unstated premises steadily improves formal
-  logical-argument verification (Enthymeme, 0.53→0.73).
+**(6) Completeness — regime-dependent, and the explicit-regime evidence is now weaker.**
+- For **explicit** reasoning, completeness *may* help: filling in unstated premises improves formal logical-argument
+  verification (Enthymeme, 0.53→0.73) — but that headline is entailment-class-only recall with no specificity control,
+  and the gold complete premise barely beats no premise (0.558 vs 0.530), so part of the gain is verifier plumbing,
+  not completeness. Balanced metrics show a modest gain. Treat as suggestive.
 - For **latent** (no-scratchpad) reasoning, the lever is format-match and exposure, not completeness: what installs
   composition is matching the no-scratchpad inference distribution and exposing the composition itself, not how
   completely the text spells the steps out (Exposure). Making the bridge explicit does not, by itself, teach the model
@@ -134,6 +156,18 @@ model. Their line: front-loading reasoning "cannot be fully replicated by later-
   reasoning where a two-model gap does not.
 - **Multi-model rank-match works (PreSelect).** Score by whether per-char loss **rank-orders** across a model ladder in
   the same order as the models' ability — the *sign* over many pairs, not one magnitude gap.
+- **A third multi-model signal exists (Perplexity Correlations, ICLR 2025)** — correlate ~90 public models' per-domain
+  bits-per-byte with their benchmark accuracy, no training needed. It works at *domain* granularity, but its own
+  appendix shows **plain mean loss predicts nearly as well** as the correlation, its top-correlated domains for a
+  reasoning benchmark are optometry-clinic and children's-hospital sites, and the signal **evaporates on pre-filtered
+  pools**. So multi-model perplexity structure is real, but the naive version detects general quality/language, not
+  reasoning.
+- **Warning from RHO-1 (now fully read):** its excess-loss token selection looks like a weak-vs-strong gap that works —
+  but its own self-reference ablation shows **~80% of the headline gain (+16.5pp → +3.3pp) comes from the curated
+  reference-model data**, i.e. it's distilling a curated distribution through a token mask, and the authors never
+  claim it finds *reasoning* tokens ("closely related to mathematics", "aligned with the desired distribution").
+- **A caveat that now applies to ALL the working signals:** each one is validated as finding *generally valuable* text
+  (quality, domain, difficulty-shape) — none has a control that isolates *reasoning* content specifically.
 - The two usable recipes for our reverse-filter: **(A)** self-ablation on our own 1.4B (one model, no tokenizer
   mismatch, has a same-day go/no-go check), **(B)** multi-model rank-match on the Qwen size ladder (0.5B→72B, same
   tokenizer). Exact recipes in the AttentionInfluence and PreSelect entries below.
@@ -142,12 +176,14 @@ model. Their line: front-loading reasoning "cannot be fully replicated by later-
 
 ## What this means for our thread
 
-1. **Reasoning-in-pretraining is worth it** — it persists and compounds through fine-tuning and RL (Front-Loading), and
-   explicit reasoning reliably helps *at answer-time* (chain-of-thought; SOCRATES ~8%→~93%). Whether that benefit can be
-   baked into *training text* is the open question.
+1. **Reasoning-in-pretraining is worth it** — it persists and compounds through fine-tuning and RL (Front-Loading;
+   though "you can't catch up later" is unproven at matched reasoning-token budgets — see its entry), and explicit
+   reasoning reliably helps *at answer-time* (chain-of-thought; SOCRATES ~8%→~93%). Whether that benefit can be baked
+   into *training text* — for reasons beyond distilling the teacher that writes the reasoning — is the open question.
 2. **The design fork is inference format, not completeness-per-se.** For **latent** (no-scratchpad) reasoning, the
    levers are matching the no-scratchpad inference distribution and exposing the composition itself (Exposure). For
-   **externalized** (scratchpad) reasoning, completeness helps (Enthymeme) — and Exposure says nothing against it.
+   **externalized** (scratchpad) reasoning, completeness *may* help — the Enthymeme result points that way but is
+   confounded (positive-class-only metric, gold-premise anomaly) — and Exposure says nothing against it.
    Faithfulness's *necessity* (does the model actually *use* the chain?) is the metric that cuts across both.
 3. **Composition is exposure-bound.** A corpus can contain every fact yet fail to teach the operations over them; data
    coverage must be defined over *operations/paths*, not just facts.
@@ -232,6 +268,14 @@ shortcut is laid down early in pretraining, and continued training doesn't fix i
 authors think fixing this "may require fundamental changes to training and architectures," which is a caution that
 simply feeding better text may not dislodge an entrenched shortcut.
 
+**Adversarial re-read (2026-07-23).** Four scope caveats: the random-ablation control is not matched for activation
+magnitude (heuristic neurons are by construction high-activation, so "causal specificity" isn't fully separated from
+"generally important neurons"); there is no non-arithmetic control task; the 0.96 faithfulness is in-distribution
+(same operand regime, no held-out carry/large-operand test); and the 79% developmental number is survivorship-framed
+(mutual heuristics are *defined* by the final checkpoint, so any early mechanism outside the taxonomy is invisible).
+The authors themselves scope the claim to multi-digit-tokenization models. The Won't story stands; the "never
+replaced by an algorithm" universality is narrower than the headline.
+
 ### 📖 When LLMs Stop Following Steps
 Sailesh Panda … Mayank Singh (both IIT Gandhinagar) · 2026 preprint · **0 citations** (too new) · `2605.00817`
 
@@ -241,18 +285,61 @@ model is never missing any knowledge — the only question is whether it faithfu
 
 **What they did.** They generate arithmetic procedures of varying length (5 steps up to 95 steps), give the model the
 full recipe and two numbers, and check both the final answer and whether the model actually walked through every
-step. 15 models, ~55,000 problems.
+step. 14 models, 55 datasets × 1,000 = ~55,000 problems.
 
-**What they found.** As procedures get longer, accuracy collapses from **63% (5 steps) to 20% (95 steps)** — and the
-reason isn't arithmetic mistakes, it's that the model **stops following the recipe partway through** (it "under-
-executes": completing all steps drops from 71% to 47%, giving up early rises from 24% to 51%). Crucially this
-happens *even though the complete procedure is right there in the prompt*, and it happens to reasoning/RL-tuned
-models too.
+**What they found.** As procedures get longer, accuracy collapses from **61% (5 steps) to 20% (95 steps)** — and a
+large share of failures is that the model **stops following the recipe partway through** (exact-step execution drops
+from ~71% to ~47%; under-execution rises from ~24% to ~51%). This happens *even though the complete procedure is
+right there in the prompt*, and it happens to reasoning/RL-tuned models too.
 
-**Why it matters here.** Two things for us. First, it isolates **Won't/execution** from **Can't/knowledge** — the
-knowledge is literally supplied, and the model still fails. Second, it's a caution for the completeness thesis: even
-a *maximally complete* chain sitting in front of the model doesn't get followed over long horizons. Completeness of
-the text is not the same as the model using it.
+**Adversarial re-read (2026-07-23) — this paper has the same no-scratchpad trap as Exposure, plus a contaminated
+metric.** (1) The prompt *forbids* written reasoning ("You MUST NOT explain your reasoning… MUST NOT output anything
+except the final result") — so thinking models get a de facto scratchpad in their hidden reasoning channel while the
+one non-reasoning model is denied token-space computation entirely and predictably floors; the written-execution
+control is never run. (2) The "under-execution" metric counts *obedient direct answering* as failure (the paper
+itself notes GPT-oss-120B "appears to generate the final output directly"), and in single-op variants batching 95
+identical additions into one multiplication is *correct math*, also scored as under-execution. (3) A big share of
+the decline is per-operation float arithmetic, not lost procedure-state: add/sub stay ~97–99% while mult/div sit at
+~43–53% for the best models, and exact 3-decimal matching accrues rounding drift over 95 chained ops. Two models
+keep exact-step execution high while accuracy still declines — the authors concede "factors beyond premature
+termination also contribute."
+
+**Why it matters here.** The construction still rules out missing *knowledge* (the full recipe is supplied), so
+something execution-shaped fails at long horizons — but the paper can no longer carry the clean "isolates Won't from
+Can't" weight we gave it: the no-scratchpad prompt, the contaminated under-execution metric, and the arithmetic
+confound entangle a Can't-execute (precision/capacity) component. Keep the weaker lesson: a maximally complete
+chain in-context does not guarantee faithful long-horizon execution — and note its eval forbids exactly the
+externalization that would test our thesis fairly.
+
+### 📖 GSM-Symbolic: Understanding the Limitations of Mathematical Reasoning in LLMs *(full read added 2026-07-23)*
+Iman Mirzadeh … Mehrdad Farajtabar (both Apple) · ICLR 2025 · **591 citations** · `2410.05229`
+
+**What it is.** The widely-cited fragility benchmark: take 100 GSM8K questions, turn each into a parameterized
+template (names/numbers become variables with validity constraints), sample 50 instances per template, and measure
+how much performance moves when only the surface changes — plus controlled variants that add/remove clauses
+(M1/P1/P2) and **GSM-NoOp**, which inserts a relevant-*sounding* but logically inert clause.
+
+**What they found.** (~25 models, 2B–27B open + 4 closed.) Number swaps and added clauses hurt: Gemma2-9B goes
+79.1→44.0→41.8 as one then two clauses are added (drops ~35pp, far beyond the ±3–6 std); GSM-NoOp is the killer —
+Phi-3-mini 85.0→18.0 (−67pp), Gemma2-9B −64.7pp, models "blindly subtract" the irrelevant quantity. RL-trained
+reasoners resist much better but not fully: o1-preview −18.6pp on NoOp, essentially flat on clause-scaling. And
+8-shot prompts of the *same question with full correct reasoning* (NoOp-Symb) do **not** fix it.
+
+**Adversarial re-read notes.** The headline NoOp drop is measured against GSM8K-original — which the paper *itself*
+shows is contaminated (original sits >1 std right of the GSM-Symbolic distribution for 21/25 models), so the −67pp
+mixes contamination-loss with the distractor effect; the fair baseline (GSM-Symbolic vs NoOp) still shows the effect
+but smaller. Their own significance test (which they admit is inappropriate for two-dataset comparisons) finds
+GPT-4o and Llama3-8B's name/number fragility *not significant*. Clause-scaling confounds reasoning depth with prompt
+length. And the NoOp failure is equally well explained as a learned Gricean prior ("every stated quantity is
+relevant" — true of all training word problems), i.e. a distributional shortcut, not missing capacity; the paper
+defaults to the strongest "no formal reasoning" interpretation without running any training intervention.
+
+**Why it matters here.** Strong behavioral evidence for H1's premise — the shortcut is real, and RL shrinks but does
+not erase it (o1 still drops on NoOp). For H2 it's a caution in both directions: no training intervention was run
+(so it says nothing about whether augmentation fixes the shortcut), and its one adjacent result — complete worked
+reasoning in-context failing to teach premise-relevance — echoes the Exposure lesson that *presenting* reasoning is
+not the same as *installing* it. The distributional-shortcut reading suggests the fix may be training-distribution
+coverage (include distractor-bearing problems) as much as reasoning completeness.
 
 ---
 
@@ -282,6 +369,14 @@ pieces but frequently fails to connect them, and making it bigger doesn't help.
 there internally*, unused. And because scale doesn't fix the second hop, it hints that the fix has to come from
 *how the model is trained*, not from more parameters — which is at least consistent with a data intervention.
 
+**Adversarial re-read (2026-07-23).** Three probe-validity caveats: the first-hop metric (EntRec) cannot separate
+genuine bridge resolution from shallow n-gram co-occurrence ("Superstition"↔"Stevie Wonder") — the authors list this
+competing pathway themselves; the two hops are measured with *different* metrics and their "both hops" joint rate
+assumes independence of two events derived from the same hidden state (the 25% null is unjustified); and the probes
+are never conditioned on the model actually *answering* the two-hop question correctly — this is a representational
+signature, not behavioral reasoning. The authors hedge appropriately ("lower bound", "one pathway"); treat the
+scaling asymmetry as suggestive, not measured behavior.
+
 ### 📖 Hopping Too Late: The Limitations of LLMs on Multi-Hop Queries
 Eden Biran (Tel Aviv University) … Amir Globerson (Tel Aviv University / Google) · EMNLP 2024 · **97 citations** · `2406.12775`
 
@@ -302,6 +397,14 @@ previously-wrong cases, proving the answer was reachable — the model just ran 
 compose them, but the architecture runs out of layers. Data augmentation wouldn't directly fix this particular
 mechanism — but the authors note that writing the intermediate step out explicitly (chain-of-thought) sidesteps it,
 which is indirect support for externalizing the hidden step.
+
+**Adversarial re-read (2026-07-23).** The 66% is softer than we stated: it's "up to" — the best single model (Pythia
+6.9B); LLaMA models fix 41–58%. "Fixed" means *there exists* at least one (source-layer × target-layer) patch that
+flips the answer — a max over a large intervention grid selected on the outcome, with **no random/placebo back-patch
+baseline**, so an unknown share could be generic perturbation nudging. And back-patching re-runs extra layers on the
+later state, so "knowledge arrived too late" is confounded with "extra effective depth constructs the answer."
+Credit where due: the incorrect-case construction (model provably knows both facts in isolation) genuinely holds
+knowledge constant. The timing-bottleneck story is plausible but under-controlled.
 
 ### 📖 Grokked Transformers are Implicit Reasoners
 Boshi Wang … Huan Sun (both Ohio State University) · NeurIPS 2024 · **90 citations** · `2405.15071`
@@ -324,6 +427,12 @@ hard architectural limit. And frontier models (GPT-4, Gemini) score near random 
 (architecture can't generalize composition out-of-distribution). The uncomfortable note for the augmentation thesis:
 the model can internalize reasoning *with no explicit chains in the data at all* — so explicit chains aren't strictly
 necessary; the lever the paper found is the *ratio* of reasoning-examples to plain-facts in the mix.
+
+**Adversarial re-read (2026-07-23).** The internal result (composition-vs-comparison, same architecture/regime) is
+fair and well-controlled. The famous "GPT-4/Gemini score near random (~28–37%)" comparison is **not** apples-to-apples:
+it pits a model trained from scratch *on this exact knowledge graph* (facts in weights, grokked over hundreds of
+thousands of steps) against frontier models seeing the facts once in-context, zero-shot — a parametric-vs-in-context
+memory mismatch, not a reasoning-skill gap. Don't quote that number as "tiny grokked transformer out-reasons GPT-4."
 
 ### 📖 Do LLMs Perform Latent Multi-Hop Reasoning *Without Exploiting Shortcuts*? (SOCRATES)
 Sohee Yang (UCL / Google DeepMind) … Mor Geva (Google Research / Tel Aviv University) · ACL 2025 Findings · **33 citations** · `2411.16679`
@@ -348,6 +457,14 @@ knowledge but does not silently run the inference — and making the middle step
 supports "explicit reasoning helps," while cautioning that merely having the facts present in text does *not* teach
 silent composition (in their pretraining trace, silent 2-hop reasoning emerged for only ~11% of eligible cases).
 
+**Adversarial re-read (2026-07-23).** The latent-vs-CoT contrast is fair *as an elicitation diagnostic* (no author-side
+training, so no Exposure-style format trap), and conditioning on 1-hop knowledge is a genuinely strong control. Three
+caveats: single-hop and composed queries use *different prompt templates*, so some "latent failures" could be
+query-parsing failures (the missing control: put both facts in-context, still forbid CoT); the country-bridge ~83%
+bin is plausibly the *least* shortcut-controlled (a soft prior over a small country set survives their
+single-prompt-ablation filter), so the honest latent numbers are the year/city bins (~6% and below); and their own
+~5× inflation figure implies residual undetected shortcuts could still inflate the 8%.
+
 ### 📖 Language Models Can Learn Implicit Multi-Hop Reasoning, But Only With Lots of Data
 Yuekun Yao (Saarland University) … Alexander Koller (Saarland University) · EMNLP 2025 · **10 citations** · `2505.17923`
 
@@ -366,6 +483,14 @@ beat dumping it all in uniformly.
 **Why it matters here.** It reframes some "under-reasoning" as a plain **capacity/coverage** problem, not a removable
 shortcut — a caution for us. But the curriculum result is encouraging: *how* you stage reasoning examples matters a
 lot, which is an argument for thoughtful augmentation rather than raw volume.
+
+**Adversarial re-read (2026-07-23).** The headline test set is not guaranteed shortcut-free: the paper's *curriculum*
+section builds rejection-sampled test sets specifically "to avoid shortcut solutions" (no sub-chain overlap with
+training), but that control is **not** described for the main Section-4 evaluation — so a held-out 4-hop query can
+share its first 3 hops with a training query and be solved by one fresh hop. The data-budget curve is therefore
+optimistic (a strictly shortcut-free test would demand at least as much data); the "genuinely learnable" claim leans
+more on their mechanistic layer-wise evidence than the accuracy numbers. Also 4-hop_large got 2× the training steps
+of other cells, and the depth lower-bound is conditional on a query-independent attention pattern (authors flag it).
 
 ---
 
@@ -394,6 +519,70 @@ question-answer / long chain-of-thought fine-tuning-style data mixed into pretra
 rewritten to expose its reasoning** — and their proxy for "quality" is basically how long the reasoning traces are.
 So it strongly supports front-loading reasoning, but doesn't itself test "rewrite normal text to be more complete."
 
+**Adversarial re-read (2026-07-23) — the catch-up claim is not token-matched.** The reasoning-pretrained models got
+~200B reasoning tokens in pretraining (20% of 1T) *plus* 1× SFT; the "catch-up" baseline got reasoning only at SFT
+and merely doubled it (4.8M→9.6M samples — far below 200B; the paper never reports the token counts). A fair test
+would give the baseline a post-training reasoning budget equal to the 200B, or ablate placement at fixed total
+reasoning tokens — neither is run. Their own Table 6 shows naive SFT-doubling with mixed-quality data *harms* math
+(−4.9%), so "doubling didn't help" partly reflects quality-scaling damage. Two more confounds: base-stage models
+trained on QA/CoT format are evaluated few-shot on QA benchmarks (format familiarity, no format-matched control),
+and the 20% reasoning data *substitutes* for general corpus (adding reasoning is entangled with removing web text).
+Also interesting for us: at the pretraining stage, *diversity/scale* beat curated long-CoT quality — the
+quality/depth effect only pays off later ("latent" until SFT unlocks it). Keep the compounding direction; drop the
+"cannot be replicated later" absolutism.
+
+### 📖 Does RL Really Incentivize Reasoning Capacity Beyond the Base Model? (Yue et al.) *(full read added 2026-07-23)*
+Yang Yue (Tsinghua) … Gao Huang (Tsinghua) · 2025 preprint · **924 citations** · `2504.13837`
+
+**What it is.** The anchor of the "RL doesn't add capacity" camp. Sample a base model and its RLVR-trained
+descendant many times per problem (up to n=1024) and compare **pass@k**: does RL ever solve a problem the base
+model *couldn't* solve in any of k tries?
+
+**What they found.** RLVR raises pass@1 (reliability) but pass@k *coverage* shrinks as training progresses
+(train-set pass@1 26.1→42.5 while pass@256 declines); at large k the base matches or beats the RL model (Minerva
+32B: base +~9% at k=128); RL uniquely solves ~0% of problems the base can't; and RL outputs sit in the low-perplexity
+region of the *base's own* distribution — RL re-weights existing paths, it doesn't create new ones. Distillation, by
+contrast, genuinely lifts the whole pass@k curve. Their sampling-efficiency gap stays >40pts across all six RLVR
+algorithms tested.
+
+**Adversarial re-read notes.** Pass@k at huge k structurally favors the higher-entropy model — RL *by design* trades
+coverage for per-sample reliability, so "boundary narrows" is partly a framing choice on an entropy-sensitive metric
+(their own perplexity result supports "re-weighted, not deleted"). The top of the curve is high-variance (n set equal
+to the largest k). The lucky-guess control is a manual CoT audit on only ~25 GSM8K + ~7 AIME problems. On
+deployment-relevant metrics (pass@1, maj@k) RL wins. So: strong evidence RL mostly *sharpens* the base distribution;
+weak license for the stronger "RL destroys capacity" reading.
+
+**Why it matters here.** For H1.3 persistence this is the key indirect argument that capacity is set upstream: if the
+base lacks a reasoning path, ordinary RLVR won't install it — only distillation (new information from a teacher)
+does. That rhymes with "put the reasoning into pretraining," without being a test of it. Bonus detail for our
+can't/won't lens: it cleanly maps RLVR to fixing a *Won't* (path exists, rarely sampled) while doing nothing for a
+*Can't* (path absent).
+
+### 📖 ProRL: Prolonged RL Expands Reasoning Boundaries *(full read added 2026-07-23)*
+Mingjie Liu (NVIDIA) … Yi Dong (NVIDIA) · 2025 preprint · **156 citations** · `2505.24864`
+
+**What it is.** The "RL expands" camp's flagship: >2,000 RL steps (unusually long) on DeepSeek-R1-Distill-Qwen-1.5B
+with a KL penalty, periodic hard resets of the reference policy, and a diverse 136K-example verifiable-reward suite
+(math/code/STEM/logic-puzzles/instruction-following).
+
+**What they found.** Large pass@1 gains (math avg 44.5→60.1; Reasoning Gym 4.2→59.1; GPQA +25.9), approaching a
+distilled 7B. The boundary evidence: tasks where the base has pass@128≈0 and the RL model reaches high pass rates
+(e.g. boxnet 0→7.9 pass@1; family_relationships ~0→near-perfect) — presented as RL creating genuinely new capability
+under matched sampling budget (256 samples each).
+
+**Adversarial re-read notes.** Three untested confounds: eval temperature (0.6) is the RL-optimal setting, not tuned
+per model — Yue et al. show base pass@k is very temperature-sensitive, so "base fails entirely" may be partly a
+decoding artifact; the base is *already distilled from R1* (a ~671B reasoner), so "expansion" is confounded with
+resurfacing distilled-but-suppressed capability (no non-distilled-base control); and no ablation isolates the
+"prolonged" ingredients. Their own "Diminished" category concedes pass@128 *declines* where the base is already
+competent — a partial concession to the Yue critique. Expansion is selective and base-competence-dependent, not a
+uniform property.
+
+**Why it matters here.** Together with Yue, the honest synthesis is: ordinary RLVR sharpens; *prolonged,
+diversity-preserving* RL may expand — but the clean demonstration (non-distilled base, per-model temperature sweep)
+hasn't been run. Either way, both camps agree the base model's distribution is the dominant term, which is the
+thread-relevant point: what pretraining installs is what post-training has to work with.
+
 ### 📖 The Debate on RLVR's Reasoning Boundary: Shrinkage, Expansion, or Both?
 Xinhao Yao (Renmin University of China / Ant Group) … Yong Liu (Renmin University of China) · 2025 preprint · **10 citations** · `2510.04028`
 
@@ -413,6 +602,13 @@ ability is the effective ceiling.
 bounded by what the base model can already do, it's better to get the reasoning into the base. Neutral on our
 specific text-augmentation question.
 
+**Adversarial re-read (2026-07-23).** Weaker than it looks as a reconciliation: eval temperature/top-p is not stated
+(so the -N variants' large-k gains could be a diversity artifact — the missing control is a raised-temperature base);
+the load-bearing Stage-2 result is a 14/30-vs-20/30 gap on AIME's 30 problems (inside noise, no CIs); and in their
+own Table 1 the RL models meet or beat base at the largest k *everywhere* — the "shrinkage" half rests on theory and
+entropy curves, not a demonstrated base>RL crossover. Treat the two-stage story as a hypothesis, not a settled
+referee decision.
+
 ---
 
 ## H2.4 — how to identify reasoning-rich text in a corpus
@@ -430,11 +626,22 @@ Score each doc by the relative loss gap `(L_masked − L_base) / L_base` between
 ranked **within-domain**. Keep top 20%, upsample into the corpus, pretrain a 7B model. (The retrieval-head-detection
 code is public — `nightdessert/Retrieval_Head` — and was verified; the scoring/masking loop has no released code.)
 
-**What they found.** Selected data measurably improves reasoning benchmarks (**HumanEval +3.5, GSM8K +2.7, MMLU-Pro
-+2.7 pts**), and leans more "reasoning" than an educational classifier (GPT-4o rated its picks 0.88 vs 0.52 on math).
-The decisive internal check (Table 6): masking the top-5% retrieval heads **collapses** GSM8K 0.18→0.007 and BBH
-0.32→0.04, while masking *random* heads barely moves them — so the ablation really is hitting reasoning machinery.
-Caveats: within-domain-comparable only; also lifts pure-knowledge benchmarks.
+**What they found.** Upsampling the selected top-20% into the corpus (both runs token-matched at 1T) improves the
+reasoning subset (**HumanEval +3.5, GSM8K +2.7, MMLU-Pro +2.7 pts**) — but the *overall* average gain is **+0.75pp**,
+with commonsense regressions (WinoGrande −2.2, OpenBookQA −1.4, PIQA −1.1); the abstract's "+1.4 to +3.5pp"
+cherry-picks the reasoning subset. The internal check (Table 6): masking the top-5% retrieval heads **collapses**
+GSM8K 0.182→0.007 and BBH 0.317→0.043; masking random heads leaves BBH/MMLU-Pro/AGIEval essentially intact
+(0.301/0.128/0.207) though GSM8K still drops ~30% relative (→0.127). GPT-4o rates its picks more "reasoning" than the
+FineWeb-Edu classifier's **only in math/code domains** (OpenWebMath 0.52→0.88, Python-Edu 0.76→0.87); in
+FineWeb-Edu-Dedup and Cosmopedia the *classifier* scores higher.
+
+**Adversarial re-read (2026-07-23).** Two missing controls matter for us: (1) the intervention is **upsampling**, and
+selected docs are **~2× longer** (OpenWebMath 1023→2256 tokens) — no matched-upsampling baseline (random 20%,
+length-matched, or classifier-top-20% at the same token budget) was ever run, so "+0.75pp because *reasoning*
+content" is not isolated from "upweighting longer/higher-quality docs"; (2) there is **no downstream training
+bake-off** against the FineWeb-Edu classifier — the "better than a classifier" claim rests on data-composition
+analyses only. Also, Table 6 validates the *head selection*, not the *data selection's* reasoning-vs-quality claim,
+and the retrieval-head→reasoning equivalence is inherited from Wu et al., not validated here.
 
 **Why it matters here.** This is recipe **(A)** for our reverse-filter, and the reason it works is the cancellation:
 `L_masked` and `L_base` come from the *same weights*, so everything the model memorized (frequency, n-grams) appears in
@@ -473,6 +680,15 @@ random tokens (a 10× efficiency win), and it beats other selection methods. Cav
 downstream ability (knowledge, code, comprehension), **not reasoning specifically** — the word "reasoning" barely
 appears.
 
+**Adversarial re-read (2026-07-23).** Three caveats on the headline (the ScalingFilter result is untouched — that
+comparison is the paper's cleanest, same pool/setup, only the metric differs): (1) home-field confound — PreSelect's
+fastText is trained *natively* on the eval pool with a target anchored to benchmarks that overlap the eval suite,
+while the DCLM/FineWeb-Edu baselines are imported foreign scorers; (2) the "20% gains in Math and Code" are
+**bits-per-char compression, not accuracy** — the authors state GSM8K/HumanEval accuracy is "negligible" at these
+scales, so the math/code claim is surface-familiarity, not verified reasoning; (3) MMLU is flat at chance (~26) for
+every method at 1B/3B, so real gains concentrate in ARC-E/SciQ/BBH/LAMBADA. The rank-match signal is real; its
+validation is general-ability at small scale.
+
 **Why it matters here.** This is recipe **(B)** for our reverse-filter — and crucially,
 it is **not a two-model magnitude gap.** It scores by whether *many* models' per-char losses **rank-match** the models'
 ability order (the *sign* over C(6,2)=15 pairs), which is a *different and nearly orthogonal signal* from "how much
@@ -499,9 +715,16 @@ the high-scoring documents, and continue-pretrain on them.
 16.1** and **GSM8K 38.8 → 45.4**, at ~2.4× the token efficiency of using the unfiltered math corpus, and it beats
 other selectors. On a small model (Gemma-2B) it only ties the baseline.
 
-**Why it matters here.** A clean example of "identify reasoning-rich text and it helps," and a useful *contrast* for
+**Why it matters here.** An example of "identify reasoning-rich text and it helps," and a useful *contrast* for
 the perplexity-gap question: its signal is a *single strong model's* confidence, **not** perplexity and **not** a
 weak-vs-strong gap — so it shows there's more than one way to find this text.
+
+**Adversarial re-read (2026-07-23).** Weaker than the headline: the 2.4× token-efficiency figure is one model
+(Mistral-7B) on one task (MATH) read off noisy curves with no error bars or seeds; the gaps over Uniform are often
+1–2 points near the MATH floor; DSIR is a strawman baseline (it targets Pile-Wikipedia as the "math" domain and lands
+*below* the no-pretrain base); and no ablation tests what the Qwen-72B judgment actually keys on (reasoning vs
+generic cleanliness). The "autonomous" framing also overstates — the scorer is a 72B model curating for 2B–7B
+trainees, i.e. weak-to-strong curation.
 
 ### 📖 The FineWeb Datasets (incl. FineWeb-Edu)
 Guilherme Penedo … Thomas Wolf (both HuggingFace) · NeurIPS 2024 · **1029 citations** · `2406.17557`
@@ -519,6 +742,13 @@ reproduce those ratings (82% F1), and used it to filter 15 trillion tokens down 
 "educational" is deliberately aimed at grade-school knowledge and *down-weights* technical/arXiv content — so it's
 broader than, and partly orthogonal to, "reasoning-rich." Useful to distinguish "educational" from "reasoning" when
 we design our own signal.
+
+**Adversarial re-read (2026-07-23).** The MMLU/ARC gains carry a target-eval circularity: the filter's supervision
+target (a 70B model's grade-school-to-college "educational value") is drawn from the same distribution as the school-
+exam benchmarks it's scored on — and their own threshold choice concedes aggressive edu-filtering *hurts* HellaSwag.
+It's domain steering that trades commonsense for exam-style knowledge, and no control tests whether a generic
+well-written-text signal would produce the same lift. Calling the gain "reasoning" overstates it (MMLU is largely
+recall).
 
 ---
 
@@ -563,6 +793,19 @@ want *latent* reasoning, the training format must match the no-scratchpad infere
 operations* (not just facts) must be exposed; (2) if we want *externalized* (chain-of-thought) reasoning, this paper
 says nothing against it. Heavy caveats: fully synthetic, two relation types, GPT-2 scale, silent-reasoning-only.
 
+**Adversarial re-read (2026-07-23) — our correction is CONFIRMED, with one nuance.** The reader verified against the
+full text and appendix: there is **no** scratchpad/free-generation experiment anywhere — the paper explicitly rejects
+that paradigm as "externalizing composition at inference time" — so the fair explicit+scratchpad cell of the 2×2 is
+genuinely never run, and the logit-lens shows the explicit model *did* learn to produce the bridge (it strongly emits
+the bridge token) but is never allowed to use it at eval. The nuance to report honestly: the paper's logit-lens
+(Sec C.5) is a *partial defense* of the single-pass framing — the explicit model's bridge probability rises
+monotonically toward the output (a generation trajectory, not an intermediate variable), which is mechanism-level
+evidence that explicit training installs "bridge as thing-to-generate" rather than "bridge as internal variable."
+That's informative about *why* explicit fails the latent test — but it does not substitute for the missing scratchpad
+experiment. Also confirmed: the exposure result is the robust one (implicit formats *also* fail on P_held, so the
+eval-format advantage can't explain P_held's chance-level floor); and conditions are not strictly token-matched
+(augmentation adds tokens on a shared atomic backbone).
+
 ### 📖 Faithfulness as Information Flow: Evaluating and Training Faithful Chain-of-Thought
 Jinghan Jia (Michigan State University / Anthropic Fellows) … Eric Easley (Anthropic) · 2026 preprint · **0 citations** (too new) · `2605.24286`
 
@@ -586,6 +829,15 @@ off the prompt; any leftover direct path is an incompleteness" — that we could
 **necessity caveat that reshapes the thread**: a complete-*looking* chain isn't enough; what matters is whether the
 model *uses* it. That's the pivot from "is it complete?" to "does the encoding make the model actually run it?"
 
+**Adversarial re-read (2026-07-23).** The training comparison itself is clean (identical rollouts/rewards, only the
+gradient differs), but two validity caveats: the external validation legitimizing the gradient metrics rests on just
+**two** off-the-shelf models differing simultaneously in family, size, and RL recipe — weak evidence the metrics
+track "faithfulness" rather than size/family/entropy; and the "raises faithfulness to ~0.9" numbers are
+verbalization/transparency metrics computed among hint-followers only (a conditioned subset), while the shortcut
+*behavior* is unchanged (wrong-hint following persists; hidden-test pass stuck ~0.32). The authors are honest about
+this ("the interventions do not eliminate reward hacking here, but they make it monitorable"). Borrow the
+definitions; don't borrow the metrics as validated instruments.
+
 ### 📖 Making Implicit Premises Explicit in Enthymemes  ← completeness helps *this* regime
 Xuyao Feng … Anthony Hunter (both UCL) · 2026 preprint · **0 citations** (too new) · `2603.06114`
 
@@ -597,24 +849,110 @@ mortal" leaves out "all men are mortal.")
 — then a formal logic checker (converting the sentences to logic and running a SAT solver) verifies whether the
 argument now actually goes through. They vary how many gap-filling steps are added and measure.
 
-**What they found.** More completeness helps, **monotonically**: verification accuracy rises steadily as you add
-steps (one dataset 0.53 → 0.73, another 0.29 → 0.56), and the LLM's generated premises even beat the datasets' own
-original terse premises.
+**What they found.** On the headline metric, more steps help monotonically: entailment accuracy rises 0.53 → 0.73
+(ANLI) and 0.29 → 0.56 (ARCT) as LLM-generated premises go from none to 3-step, and the LLM's premises beat the
+datasets' own terse gold premises.
 
-**Why it matters here.** This is the counterpoint to the Exposure paper: **for explicit, step-by-step logical
-argument, filling in the missing premises clearly helps.** So completeness isn't universally useless — it's
-regime-dependent. The open question for us is which regime our thread targets: silent one-shot reasoning (where
-explicit hurt) or explicit multi-step argument (where it helped).
+**Adversarial re-read (2026-07-23) — the headline is confounded; downgrade to "suggestive."** Three problems the
+first pass missed: (1) Table 4 is computed **only on items labeled entailment** — it's positive-class recall at fixed
+thresholds with **no paired specificity**; adding premise steps mechanically supplies more overlapping AMR atoms for
+the neuro-matching relaxation, which makes the SAT stack say "entails" more often *regardless of premise quality* —
+so the rise could partly be a loosened trigger. (2) The **gold complete human premise barely beats no premise**
+(ANLI 0.558 vs 0.530; ARCT 0.303 vs 0.293) — a correct, complete single premise does NOT help the verifier; only
+verbose multi-step LLM chains do. That points to verifier plumbing (the AMR→logic→SAT stack needs many atoms to
+fire), not completeness, driving part of the gain. (3) The balanced metrics are much more modest: entailment-class
+best-F1 tops out at 0.59–0.67, overall accuracy peaks ~0.65–0.72, and Table 3 cherry-picks a different threshold
+pair per row.
 
-### 📖 (read earlier) Thinking-Augmented Pretraining (TPT) · `2509.20186` · and BoLT · `2503.18866`
-Both **augment text with generated reasoning uniformly** (no selection) and get real gains (TPT ~3× data efficiency;
-BoLT lifts MATH 5.7 → 25.4) — but on already math-heavy corpora, and they never test *completeness* as a variable.
-They establish "adding reasoning to pretraining text works"; they don't answer "how complete must it be."
+**Why it matters here.** Still the right *framing* paper — it operationalizes enthymeme-completion with formal
+verification, exactly our stopping-rule setting. But it can no longer carry "completeness helps explicit reasoning"
+as an established result; what it shows is "verbose LLM-generated premise chains make a particular neuro-symbolic
+verifier fire more often on entailment items." The regime split (latent vs explicit) survives as a hypothesis; the
+explicit-regime evidence is now suggestive, not clean.
 
-### 📖 (read earlier) Quiet-STaR · `2403.09629`
-Teaches a model to generate a little private rationale after each token to predict the next text better; the
-perplexity gain concentrates on the *hard* tokens — the closest thing to a per-token "this needed reasoning" signal,
-but measured *after* inserting the rationale, not used to find reasoning text beforehand.
+### 📖 Thinking Augmented Pre-training (TPT) *(full read added 2026-07-23)*
+Liang Wang (Microsoft Research) … Furu Wei (Microsoft Research) · 2025 preprint · **3 citations** · `2509.20186`
+
+**What it is.** The biggest "augment pretraining text with reasoning" result: append an automatically-generated
+"thinking trajectory" to *every* document and pretrain on the concatenation.
+
+**What they did.** One fixed prompt ("Simulate an expert's in-depth thought process… Use Feynman technique whenever
+possible"), generated by **Qwen3-8B** for the from-scratch runs (DeepSeek-R1-Distill-7B for mid-training), thinking
+capped at 8k tokens (~3× token inflation). From-scratch 8B on 100B tokens of FineWeb-Edu+MegaMath, token- and
+step-matched against a vanilla baseline (which therefore sees ~3× more raw documents). Augmentation is **uniform** —
+no per-document selection, and completeness/depth/length of the thinking is **never varied** (their ablations vary
+generation *strategy*, which "barely moves the metric" — a 1.5B generator even beats the 7B default).
+
+**What they found.** Big: GSM8K 19.2→50.1, MATH 9.1→21.8, 5-task average 26.2→43.9 (vs LLaMA-3.1-8B@15T at 46.8);
+gains persist and amplify through SFT (AIME24 1.0→35.2, MATH-500 33.8→82.4). A genuinely good data-matched control:
+at a fixed 40B budget with ≤10B raw tokens (vanilla 4 epochs vs TPT 1), TPT still roughly doubles the average.
+
+**Adversarial re-read notes.** (1) **Teacher-distillation confound, the big one:** the from-scratch thinking is
+written by Qwen3-8B — a fully-trained, RL-tuned reasoner — so the headline partly *distills Qwen3-8B* rather than
+demonstrating "decomposition improves learnability"; the weak-teacher ablation that would deconfound this is run
+only in mid-training, never from scratch. (2) Every eval is a reasoning/CoT benchmark — no perplexity, HellaSwag, or
+knowledge-recall control — so reasoning-specificity vs CoT-format-match is never isolated. (3) The loss comparison
+is apples-to-oranges (augmented vs raw data distributions).
+
+**Why it matters here.** The strongest existence proof for H2.5 that uniform reasoning-augmentation of pretraining
+text pays off at scale — but for *our* question it's doubly incomplete: the gain can't be separated from distilling
+a strong teacher, and completeness is applied at one fixed setting, never varied. The completeness dose-response
+experiment remains unclaimed territory.
+
+### 📖 Reasoning to Learn from Latent Thoughts (BoLT) *(full read added 2026-07-23)*
+Yangjun Ruan (U. of Toronto) … Tatsunori Hashimoto (Stanford) · 2025 preprint · **40 citations** · `2503.18866`
+
+**What it is.** The other flagship augmentation paper: treat the reasoning that *produced* a document as a latent
+variable, generate it ("latent thoughts"), and train on thought+text; then bootstrap — the model generates its own
+latents in an EM loop.
+
+**What they did.** TinyLlama-1.1B continued-pretrained on FineMath-4+ (math web — corpus pre-selected as
+reasoning-rich; augmentation *within* it is uniform, chunk-by-chunk). Section 5: latents from GPT-4o-mini, 480M
+unique raw tokens, all baselines compute-matched at an 8B-token budget. Section 6 (BoLT proper): the 1.1B model
+generates its own latents, importance-resamples them (targeting the IWAE bound), retrains, iterates — only a 240M
+GPT-4o-mini warmstart.
+
+**What they found.** Headline: MATH 5.74 (Raw-Repeat) → 25.38; GSM8K 5.76→33.59. But the fair, teacher-matched
+comparison is **Latent-Thought 25.38 vs WRAP-CoT 19.36** (both GPT-4o-mini-generated, same budget) — the novel
+latent-thought design contributes **+6.0 MATH**, roughly a third of the headline delta; the rest is shared with a
+generic "have GPT-4o-mini rewrite with reasoning" baseline. It also beats 8B *fresh unique* raw tokens (11.18) — the
+genuinely surprising data-efficiency result, though that win also bundles distillation. The self-bootstrap (no
+strong teacher in the loop) is real but modest: few-shot MATH ~13%→~20% over 3 iterations, plateauing; GSM8K
+*deteriorates* over iterations on the fixed-data setup.
+
+**Adversarial re-read notes.** Report 25.38-vs-19.36 as the method's isolated contribution, not 5.7→25.4. One eval
+prompt set is GPT-4o-mini-synthesized CoT (train/test format-match advantage; a standard prompt set mitigates).
+Missing: a GPT-4o-mini direct-answer skyline (to bound teacher capability) and any completeness/length ablation.
+
+**Why it matters here.** Conceptually the closest paper to our thesis — it names the exact mechanism ("web text is
+the compressed final outcome of a verbose human thought process") and instantiates completeness-restoration. But its
+strong-teacher results are distillation-confounded, its teacher-free loop yields modest plateauing gains, and
+completeness is never varied. Together with TPT: "augmenting works" is established *only* in the
+strong-teacher-distillation regime, on math-heavy corpora, at one completeness setting.
+
+### 📖 Quiet-STaR *(full read added 2026-07-23)*
+Eric Zelikman (Stanford) … Noah D. Goodman (Stanford) · COLM 2024 · **319 citations** · `2403.09629`
+
+**What it is.** Teaches a model (Mistral-7B, light continued pretraining) to generate a short private rationale at
+*every token position* to better predict the following text — REINFORCE-rewarded by whether the thought improves
+prediction of the true next tokens, with a mixing head interpolating with/without-thought logits.
+
+**What they found.** Zero-shot GSM8K 5.9→10.9, CommonsenseQA 36.3→47.2 (no task finetuning), scaling with the
+*training* thought length. The result we cite most: perplexity gains are negligible on average but **concentrate
+disproportionately on hard tokens** (theorem names, next proof step) — most tokens don't need reasoning; a sparse
+tail does.
+
+**Adversarial re-read notes.** Two worries checked out better than feared: the scored numbers are *direct answering*
+(multiple choice scored by answer-token logits — the gains live in the weights, not test-time thinking), and a
+data-matched control exists (same model, same OpenWebMath, no thought tokens — Fig 2), though the headline deltas
+are stated against off-the-shelf Mistral, not clearly against that control. Real limits: single 7B model, GSM8K
+stays near floor (10.9%), and "scales with rationale length" confounds the mechanism with extra training compute.
+
+**Why it matters here.** The hard-token concentration result is the closest thing in the literature to a per-token
+"this token needed reasoning" signal (a *self*-generated with-vs-without-thought gap — one model, so memorization
+largely cancels, same family as self-ablation). And its motivation is pure enthymeme-framing ("the steps not stated
+between the lines of a proof") — but the method fills gaps *latently*, never making the text itself complete, so it
+motivates rather than tests our completeness thesis.
 
 ---
 
@@ -627,8 +965,58 @@ both losses share weights). PreSelect is a *multi-model rank-match* (does per-ch
 ability order?), and it explicitly shows the two-model magnitude gap ("ScalingFilter") barely beats random (+0.4),
 picks short/easy junk, and is uncorrelated (Spearman 0.05) with the rank-match. Our own reverse-filter's "gold"
 criterion *was* a two-model gap (1.4B-high AND 72B-low) and it found knowledge, not reasoning — exactly what
-ScalingFilter predicts. RHO-1 (read earlier) is the token-level reference-vs-training excess-loss idea, and its authors
-are explicit it finds "high-quality" tokens, not specifically "reasoning" tokens.
+ScalingFilter predicts. The full reads below add a sharper caveat: **every working perplexity-family signal is
+validated as finding *generally valuable* text, not reasoning specifically.**
+
+### 📖 Rho-1: Not All Tokens Are What You Need *(full read added 2026-07-23)*
+Zhenghao Lin (Xiamen U. / Microsoft) … Weizhu Chen (Microsoft) · NeurIPS 2024 · **126 citations** · `2404.07965`
+
+**What it is.** Token-level selection by a loss gap: train a reference model on 0.5B *curated* math tokens
+(GPT-synthesized + manually curated), score every corpus token by excess loss (training-model loss − reference loss),
+and backprop only on the top 60–70% of tokens.
+
+**What they found.** Big math gains at face value: GSM8K +23.4pp at 1B / +24.0pp at 7B over all-token continual
+pretraining on the same 15B OpenWebMath corpus; "up to 30%" few-shot gains; 5–10× token-efficiency framing.
+
+**Adversarial re-read notes — the key ablation is the paper's own.** With a **self-referential** reference model
+(trained on OpenWebMath itself, no curated data), the average gain collapses **+16.5pp → +3.3pp** — i.e. ~80% of the
+headline comes from the curated reference *distribution* leaking through the token mask, not from token selection per
+se. This is distillation of a curated dataset through a mask. Also: the authors never claim the signal finds
+*reasoning* tokens — their own words are "closely related to mathematics" and "aligned with the desired distribution";
+the efficiency framing counts only loss-bearing tokens (both conditions forward-pass the full corpus, plus RM
+training/scoring overhead); the GPT-synthesized RM data is math-CoT-styled with no audit of overlap with GSM8K/MATH;
+and after identical SFT the baseline recovers most of the gap (+2.2/+3.4pp on MATH).
+
+**Why it matters here.** For H2.7 this reframes excess-loss selection: the detector detects "looks like my reference
+set." That's a warning *and* an actionable idea — **if the reference model were trained on complete-reasoning text,
+the same gap signal would point at completeness**; nobody has run that variant.
+
+### 📖 Improving Pretraining Data Using Perplexity Correlations *(full read added 2026-07-23)*
+Tristan Thrush (Stanford) … Tatsunori Hashimoto (Stanford) · ICLR 2025 · **54 citations** · `2409.05816`
+
+**What it is.** The third multi-model signal, and the most observational: no training at all. Take ~90 public models
+(33M–9B), compute per-*domain* bits-per-byte on ~10k web domains, and select the domains where loss **correlates**
+with the models' benchmark accuracy (a rank-based single-index estimator robust to model-family heterogeneity), then
+scale to page level with a fastText classifier.
+
+**What they found.** At 160M/3.2B tokens it beats DSIR everywhere and roughly ties DCLM's handcrafted fastText
+(which *wins* once given a manual language filter); preregistered runs show gains growing to 1.4B — but **only on
+raw pools**; on pre-filtered pools the signal evaporates (correlation coefficients become homogeneous). Notably
+honest: they preregistered the follow-up and reported the null.
+
+**Adversarial re-read notes.** Their own Appendix I concedes **plain mean loss predicts model rank nearly as well**
+as the correlation estimator (no individually significant comparison) — the incremental value of *correlation* over
+generic "good models find it easy" is never isolated on the selection side. The top-correlated domains for a
+reasoning benchmark (ARC Easy) are optometry-clinic and children's-hospital websites; for the DCLM aggregate they're
+weather/finance/currency sites — a general-ability/quality/**language** detector, not a reasoning detector. The
+90-model set includes many partially-trained checkpoints from one Pythia run (pseudo-replication), and the estimator
+fails on models trained on atypical data (Phi).
+
+**Why it matters here.** Validates that multi-model perplexity structure carries real selection signal (H2.7
+feasible in principle) — PreSelect's within-family ladder and this cross-model rank-correlation are cousins — while
+warning that (a) it operates at *domain*, not document, granularity; (b) it dies exactly in our regime (DCLM is a
+pre-filtered pool); and (c) the naive version finds quality/language, not reasoning. A reasoning-specific target
+would have to be engineered in (as PreSelect's A.7.2 steerability suggests).
 
 ---
 
@@ -638,20 +1026,29 @@ are explicit it finds "high-quality" tokens, not specifically "reasoning" tokens
    no-scratchpad inference distribution *and* expose the composition/operation, not just facts) or externalized
    chain-of-thought (which Exposure does not test at all)? This determines what "augmenting text with reasoning" even
    means, and it is a question about inference format, not about how completely the text is written.
-2. **Does augmenting pretraining text with reasoning actually help?** Still open — Exposure's explicit-vs-implicit
-   result is a train/test-format confound (not evidence either way), and the papers that *do* augment (TPT/BoLT) don't
-   vary completeness. No clean evidence yet.
+2. **Does augmenting pretraining text with reasoning actually help — and why?** Still open, now with sharper edges
+   (full reads 2026-07-23): Exposure's explicit-vs-implicit result is a train/test-format confound (not evidence
+   either way); TPT and BoLT *do* show big gains, but both are **strong-teacher-distillation-confounded** (TPT's
+   from-scratch thinking is written by Qwen3-8B; BoLT's honest isolated delta is +6 MATH over a teacher-matched
+   WRAP-CoT baseline, and its teacher-free bootstrap is modest and plateaus), both are math-heavy-corpus-only, and
+   **neither varies completeness**. The completeness dose-response experiment (fixed tokens, vary how complete the
+   injected reasoning is) has still never been run by anyone.
 3. **For the data-selection side (reasoning-rich text):** the two candidates that survive the deep-dive are
    self-ablation on our own 1.4B (recipe A) and multi-model rank-match on the Qwen ladder (recipe B); the two-model
    1.4B-vs-72B gap is ruled out (ScalingFilter). Which — if either — actually surfaces *reasoning* (vs general quality)
-   on DCLM is untested.
+   on DCLM is untested — and note no published signal has cleared that bar either (AttentionInfluence's gain is
+   length/upsampling-confounded; PreSelect/PerpCorr validate on general ability; RHO-1's gain is ~80% its curated
+   reference set). A RHO-1-flavored idea worth holding: train a reference model on *complete-reasoning* text and the
+   excess-loss signal points at completeness.
 4. **Does under-reasoning persist through *our* post-training?** Still under-tested for the Won't form specifically;
    Front-Loading is the closest, but it uses fine-tuning-style reasoning data, not rewritten web text.
 
 ---
 
-*Provenance: full-read workflow `wf_e16faf72-dc2` (2026-07-21), 16 agents (opus), one per paper, HTML/PDF full text,
-schema-validated extraction (method / numbers / verbatim quotes / can't-vs-won't / completeness / limitations /
-verdict). Raw journal: `subagents/workflows/wf_e16faf72-dc2/journal.jsonl`; full structured results in the session
-task output. Papers discovered by a zero-seed neutral search (`wf_869397f2-d8b`). The earlier abstract-only map and
-the knowledge-framing doc `docs/PERSISTENCE_AND_USEFUL_REASONING.md` are both superseded by this.*
+*Provenance: adversarial full re-read workflow `wf_13d49562-ffa` (2026-07-23), 24 agents, one per paper, HTML/PDF
+full text, schema-validated extraction (method / numbers / verbatim quotes / can't-vs-won't / completeness /
+limitations / verdict / **mandatory eval-fairness critique**); per-paper records in that session's
+`subagents/workflows/wf_13d49562-ffa/journal.jsonl`. Builds on the first full-read pass `wf_e16faf72-dc2`
+(2026-07-21, 16 papers) and the Tier-3 code deep-dive `wf_1163664e-5a9` (2026-07-23, AttentionInfluence + PreSelect
+repos). Papers discovered by a zero-seed neutral search (`wf_869397f2-d8b`). The earlier abstract-only map and the
+knowledge-framing doc `docs/PERSISTENCE_AND_USEFUL_REASONING.md` are both superseded by this.*

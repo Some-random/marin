@@ -47,6 +47,42 @@ completeness-augmentation of text tractable AND useful for transfer.
 ---
 
 ## 2026-07-23
+- **Adversarial full re-read of ALL 24 papers in `REASONING_CONTENT_LIT.md`** (workflow `wf_13d49562-ffa`, 24 agents,
+  24/24 full-text fetches, ~10.5 min) — every reader now REQUIRED to critique the paper's own eval methodology (the
+  check that caught the Exposure misread), plus first full reads for the 8 papers that only had thin entries (TPT,
+  BoLT, Quiet-STaR, RHO-1, GSM-Symbolic, Yue, ProRL, Perplexity Correlations). Doc updated throughout. Biggest deltas:
+  1. **Enthymeme's 0.53→0.73 is confounded** — entailment-class-only recall (no specificity control; more steps
+     mechanically loosen the SAT trigger) and the GOLD complete premise barely beats none (0.558 vs 0.530), so part of
+     the gain is verifier plumbing. TL;DR claim "completeness helps explicit reasoning" downgraded to *suggestive*.
+  2. **Front-Loading's "can't catch up" is not token-matched** — reasoning-pretrained models saw ~200B reasoning
+     tokens; the catch-up baseline got a doubled SFT set (≪200B, counts never reported), and their own Table 6 shows
+     naive SFT-doubling *harms* math (−4.9%). Compounding direction stands; irreplaceability claim dropped.
+  3. **When-LLMs-Stop has the same no-scratchpad trap as Exposure** (prompt forbids written reasoning; thinking models
+     get a hidden scratchpad, the one non-reasoning model floors), its under-execution metric counts obedient direct
+     answers and correct batching as failures, and mult/div float drift explains much of the decline (add/sub ~98% vs
+     mult/div ~43–53%). Also corrected our numbers: 14 models, 61%→20% (not 15/63%). Its "isolates Won't" role is
+     substantially weakened.
+  4. **TPT + BoLT (the "augmenting works" evidence) are strong-teacher-distillation-confounded** — TPT's from-scratch
+     thinking is written by Qwen3-8B (weak-teacher ablation only run in mid-training); BoLT's honest isolated delta is
+     +6 MATH vs teacher-matched WRAP-CoT (not 5.7→25.4), and its teacher-free bootstrap is modest (~13→20%, plateaus).
+     Neither varies completeness → the completeness dose-response experiment remains unrun by anyone.
+  5. **RHO-1's own self-reference ablation collapses its gain +16.5pp→+3.3pp** — ~80% of the headline is the curated
+     reference distribution leaking through the token mask (distillation through a mask, not token selection). Flip
+     side, an actionable idea: train the reference model on complete-reasoning text → the gap signal points at
+     completeness.
+  6. **AttentionInfluence weakened as data-selection evidence** (intervention is upsampling; selected docs ~2× longer,
+     no matched-upsampling control; overall avg +0.75pp with commonsense regressions; "more reasoning than classifier"
+     only in math/code domains; corrected "random heads barely move" — random masking still drops GSM8K ~30% rel.).
+     Table-6 head-validation and the recipe-A plan stand.
+  7. **Exposure correction CONFIRMED against full text + appendix** (no scratchpad cell anywhere; the paper rejects
+     the paradigm explicitly), with one nuance to keep: its logit-lens is a partial mechanism-level defense (explicit
+     model treats the bridge as a generation target, not an internal variable) — informative but no substitute for
+     the missing experiment.
+  8. New full reads of the RL-persistence trio (Yue / ProRL / Boundary-debate): pass@k-at-huge-k structurally favors
+     the high-entropy base; ProRL evals the base at RL-optimal temperature with an already-distilled base; the
+     Boundary paper's own Table 1 never reproduces the Yue crossover. "Post-training is bounded by the base" is
+     directionally supported but softer than we'd written.
+  Per-paper records: `subagents/workflows/wf_13d49562-ffa/journal.jsonl` (session 8eafed95); doc provenance updated.
 - **Promoted `REASONING_CONTENT_LIT.md` from `docs/` to the completeness thread ROOT** (next to `EXPERIMENT_LOG.md`)
   via `git mv` — per Dongwei it's "one of the most important things for this project," so it's now a top-level thread
   artifact rather than a buried write-up. Updated the log's layout line, the historical path references in the
