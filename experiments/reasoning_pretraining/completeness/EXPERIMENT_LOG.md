@@ -2,7 +2,8 @@
 
 **Thread:** `experiments/reasoning_pretraining/completeness/`
 **Owner:** Dongwei Jiang · **Started:** 2026-07-04
-*Entries are newest-first. Layout: `docs/` (this log + write-ups), `scripts/` (`*.py`), `data/` (jsonl).*
+*Entries are newest-first. Layout: `EXPERIMENT_LOG.md` + `REASONING_CONTENT_LIT.md` (the literature map — top-level
+thread artifacts) at the thread root; `docs/` (other write-ups), `scripts/` (`*.py`), `data/` (jsonl).*
 
 ## Framing (read first)
 
@@ -45,10 +46,28 @@ completeness-augmentation of text tractable AND useful for transfer.
 
 ---
 
+## 2026-07-23
+- **Promoted `REASONING_CONTENT_LIT.md` from `docs/` to the completeness thread ROOT** (next to `EXPERIMENT_LOG.md`)
+  via `git mv` — per Dongwei it's "one of the most important things for this project," so it's now a top-level thread
+  artifact rather than a buried write-up. Updated the log's layout line, the historical path references in the
+  July-14/July-21 entries, and the doc's internal ref to `docs/PERSISTENCE_AND_USEFUL_REASONING.md`.
+
+## 2026-07-22
+- **Enriched `REASONING_CONTENT_LIT.md` with paper metadata** (commit `e7662784f`): filled every author byline —
+  including the 4 previously unsurfaced, verified from paper HTML: Exposure = Karmim (Inria) / Barrière (U. de Chile),
+  Faithfulness = Jia (Michigan State / Anthropic) / Easley (Anthropic), When-LLMs-Stop = Panda / Singh (IIT
+  Gandhinagar), RLVR-boundary = Yao (Renmin / Ant) / Liu (Renmin) — plus **first/last-author institutions** and
+  **Semantic-Scholar citation counts** per paper, and a consolidated metadata table. Flagged the recency caveat:
+  2026 preprints show 0 citations because they're too new, NOT weak — and the *most thread-relevant* results
+  (Exposure, Faithfulness, When-LLMs-Stop, Front-Loading) are exactly those low/zero-cite recent papers.
+- Restructured the July-21 entry's H1 findings to explicitly map the three investigation sub-questions
+  (1)/(2)/(3) → H1.1 shortcuts / H1.2 latent multi-hop / H1.3 persistence.
+- *(Note: this entry backfilled on 2026-07-23 — the July-22 nightly cron did not fire, session idle at 23:48 PDT.)*
+
 ## 2026-07-21
 - **Full-read all 16 in-scope reasoning/pretraining papers** (workflow `wf_e16faf72-dc2`, 1 agent/paper, HTML/PDF
   full text, body numbers + verbatim quotes + author/venue confirmed; 16/16, 0 failures, ~747k tokens). Upgraded
-  every catalog entry in `docs/REASONING_CONTENT_LIT.md` from abstract-only (◎) to full read (📖), then rewrote the
+  every catalog entry in `REASONING_CONTENT_LIT.md` from abstract-only (◎) to full read (📖), then rewrote the
   catalog a second time as plain-English per-paper narratives (what it is / what they did / what they found / why
   it matters) so the doc reads cold. Two commits: `fdbcee655` (full-read numbers) → `be3af2015` (readable rewrite).
 - **The reads SUPPORT H1 but COMPLICATE the core H2 thesis, with one direct counter-result.** Headlines:
@@ -122,7 +141,7 @@ completeness-augmentation of text tractable AND useful for transfer.
   *exposure, not knowledge*). **Refuted (0-3):** "LLMs don't reason at all," "genuine composability only ~7-8%,"
   and "multi-hop failure is a knowledge gap" — the honest picture is genuine-but-partial, shortcut-inflated,
   exposure-bound.
-- **Wrote + committed `docs/REASONING_CONTENT_LIT.md`** (`3280e183a`): corrected hypotheses + all **26 papers by
+- **Wrote + committed `REASONING_CONTENT_LIT.md`** (`3280e183a`, then in `docs/`): corrected hypotheses + all **26 papers by
   angle with per-paper summaries + real titles + verification flags** (✅ verified-claim / ◎ search-summary /
   📖 read), coverage gaps, and a prioritized full-read plan. Labeled a **first-pass map — full reads pending**
   (summaries are search-derived, not yet my end-to-end reads). H2.4 (identify) and H2.7 (perplexity-gap) had no

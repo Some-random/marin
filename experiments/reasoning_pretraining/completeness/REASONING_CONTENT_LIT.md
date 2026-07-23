@@ -598,4 +598,4 @@ tokens.
 schema-validated extraction (method / numbers / verbatim quotes / can't-vs-won't / completeness / limitations /
 verdict). Raw journal: `subagents/workflows/wf_e16faf72-dc2/journal.jsonl`; full structured results in the session
 task output. Papers discovered by a zero-seed neutral search (`wf_869397f2-d8b`). The earlier abstract-only map and
-the knowledge-framing doc `PERSISTENCE_AND_USEFUL_REASONING.md` are both superseded by this.*
+the knowledge-framing doc `docs/PERSISTENCE_AND_USEFUL_REASONING.md` are both superseded by this.*
