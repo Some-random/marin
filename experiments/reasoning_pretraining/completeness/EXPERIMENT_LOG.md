@@ -47,7 +47,21 @@ completeness-augmentation of text tractable AND useful for transfer.
 ---
 
 ## 2026-07-23
-- **Verification-coverage bug found and closed: 9 papers had silently escaped the PDF-verification pass.** Dongwei's
+- **External spot-audit of the 78 single-witness reads (Dongwei's independent agent) — meta-verified: all five of
+  its material/minor findings check out against the papers.** Auditor sampled 10 of the 78 PDF-tier records and
+  measured **3/10 material**. I re-verified each against the PDFs: (1) Implicit-Deductive record's "Appendices O–U
+  absent from the 28-page PDF" is FALSE — the v1 PDF is 36 pages and App U Table A.18 contains the exact
+  non-inferiority test the record calls missing (likely a truncated download during the original read);
+  (2) RHO-LOSS record conflated Table-2 rows — CoLA 75% target = 3 epochs, 80% = 39 epochs (verified visually);
+  (3) Curriculum-RL: main Table 1 prints pass@1 63.9 but its own App Table 6 gives p@1 46.1 / p@2 63.9 — record
+  missed the paper-internal contradiction (verified visually); (4) Compression Table 5: NQ −0.925, TriviaQA −0.951
+  — record assigned −0.951 to both; (5) mid-train OlympiadBench 43.57-vs-43.46 is the paper's own prose/table
+  mismatch, which the record inherited. **All five are record-level only** — grep-confirmed none of the wrong
+  numbers/critiques appears in `REASONING_CONTENT_LIT.md` (the compact entries happened not to cite them) — so the
+  doc stands, but the tier's measured error rate (3/10, wide CI) means the remaining 68 single-witness records
+  likely hide more; some would land in doc-cited numbers. All 5 records annotated with `meta_audit_correction`
+  sections so future synthesis can't inherit the errors. DECISION PENDING (Dongwei): full verification of the
+  remaining 68 (~9M subagent tokens, must be staggered across ≥2 session windows per the fan-out rule). Dongwei's
   read-depth question exposed it: the 64-paper verification workflow assigned work by "read entry at index i" of a
   shared file, and several agents miscounted — 8 papers got verified 2-3×, 9 got skipped (ProRL, RLVR-Boundary,
   When-LLMs-Stop, ScalingFilter, ProcKN, Echo Chamber, Attrib, Inefficient-Reasoning, CompCollapse). Re-verified
