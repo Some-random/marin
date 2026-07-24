@@ -47,6 +47,32 @@ completeness-augmentation of text tractable AND useful for transfer.
 ---
 
 ## 2026-07-23
+- **Full-corpus completion + verification + rewrite: `REASONING_CONTENT_LIT.md` now covers 143 PDF-verified papers**
+  (per Dongwei's directive: read EVERYTHING before concluding; no synthesis off partial batches). Sequence:
+  1. **Remaining 80 must-reads full-read** (`wf_e87a77d2-8da`, hardened protocol: download PDF + Read page-by-page
+     incl. appendices, figures visually inspected, released code checked when load-bearing): 79/80 full text (51
+     repos inspected, 27 no-repo); 1 unobtainable (TechRxiv draft behind bot-wall, abstract-only, flagged).
+  2. **Gap-fill verification of all 64 earlier reads** (`wf_a05ac667-dc2` — the earlier "full reads" were HTML-text
+     reads: 48/64 had admitted appendix gaps, 24/64 caption-only figures, 2/64 code checked). Result: only 2/64
+     records stood unchanged; 41 minor, **21 material corrections** (227 corrections, 356 new findings). Both
+     directions: wrong numbers in our records (one FABRICATED pairing in Beyond-Code; Logic-Corpus math transfer
+     +0.7 not +5.2; BoLT bootstrap ~1.5× overstated; Front-Loading catch-up +7.39 not +4.09; wrong-version reads)
+     AND overclaimed critiques (Yang's "missing controls" exist in App F; GenVsMem's γ_T sweep exists; Enthymeme
+     precision rises with steps; Yue's entropy hedge killed by its own v5 entropy-matched control).
+     Mid-run lesson logged separately: 3 back-to-back fan-outs exhausted the 5h session window (17 agents died,
+     session locked ~2h) → stagger rule added to CLAUDE.local.md/memory.
+  3. **Bucket-level synthesis over the corrected corpus** (`wf_777fa169-9d7`, 7 agents): ~40 provisional claims
+     audited → ~18 survive, ~11 revised, ~6 weakened, 5 killed; 54 doc corrections cataloged; genuine
+     contradictions kept as contradictions.
+  4. **Doc rewritten in full** (`wf_e0c0abd9-e1e` writers + assembly): 2,949 lines, 146 entries (143 distinct
+     papers; 3 cross-referenced dual-bucket anchors), per-bucket synthesis + papers sections, clean standalone
+     voice, all numbers from verified records with Table/Fig sources. Key corrected conclusions now in the doc:
+     emission-channel primacy (SOCRATES §D.3 silent-hint 6.1% vs CoT 92.8; Exposure Tables 9/7/13); augmentation
+     domain-split (math yes w/ MIND's controls; general web favors cleaning — RePro > reasoning-injection, REWIRE
+     rewritten-alone < raw on CORE); completeness = granularity/structure/difficulty, capacity-conditional dose
+     (long-CoT hurts ≤3B); recipe A + two-model gap + single-model ppl all dead as reasoning detectors (recipe B
+     last, downgraded); pretraining sets post-RL floor/slope/ceiling (ρ≈0.99, ≥1% exposure gate). Total corpus
+     effort: ~26M subagent tokens across read/verify/synthesize/write.
 - **Batch-2 adversarial full-read: top-40 discovery-pool papers → `REASONING_CONTENT_LIT.md` now covers 64 papers**
   (workflow `wf_4006ecb6-289`; first launch lost 39/40 agents to a transient API-529 outage, resumed 15 min later
   with the 1 completed read served from cache — resume-from-cache worked as designed). Compact per-paper entries
