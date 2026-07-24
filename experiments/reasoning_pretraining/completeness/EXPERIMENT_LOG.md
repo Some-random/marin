@@ -47,6 +47,21 @@ completeness-augmentation of text tractable AND useful for transfer.
 ---
 
 ## 2026-07-23
+- **Verification-coverage bug found and closed: 9 papers had silently escaped the PDF-verification pass.** Dongwei's
+  read-depth question exposed it: the 64-paper verification workflow assigned work by "read entry at index i" of a
+  shared file, and several agents miscounted — 8 papers got verified 2-3×, 9 got skipped (ProRL, RLVR-Boundary,
+  When-LLMs-Stop, ScalingFilter, ProcKN, Echo Chamber, Attrib, Inefficient-Reasoning, CompCollapse). Re-verified
+  with explicit per-agent assignment (`wf_de1bb509-eaf`, 9/9, no mismatches): 1 record stood, 5 minor, 3 material.
+  The material ones again cut both ways: (a) When-LLMs-Stop was a WRONG-VERSION read — v3 restores **15 models /
+  63%→20%** (the numbers our tracker originally had; the v1-based "14/61%" correction was itself wrong), look-back
+  −23.85pp, and the v3 prompt *requires* a written scratchpad (killing the "no-scratchpad trap" critique);
+  (b) RLVR-Boundary's critique was refuted by its own appendix — eval sampling stated (App C.2), two model
+  families, and the base>RL shrinkage crossover IS demonstrated (Table 3 MATH-500); (c) CompCollapse's main prompt
+  permits a reasoning block, so its residual failures are not a no-CoT artifact. All 9 patched into the doc
+  (agent-applied, grep-verified); remaining rule-violating narration swept. Also wrote
+  `docs/LIT_REVIEW_VERIFICATION_BRIEF.md` — instructions for an independent audit agent (top priority: spot-audit
+  the 78 single-witness PDF-tier reads, whose error rate is unmeasured). Read-depth ledger now: 55 read+verified /
+  78 single-pass full-depth (single-witness) / 9 read+late-verified / 1 abstract-only (TechRxiv, flagged).
 - **Full-corpus completion + verification + rewrite: `REASONING_CONTENT_LIT.md` now covers 143 PDF-verified papers**
   (per Dongwei's directive: read EVERYTHING before concluding; no synthesis off partial batches). Sequence:
   1. **Remaining 80 must-reads full-read** (`wf_e87a77d2-8da`, hardened protocol: download PDF + Read page-by-page
